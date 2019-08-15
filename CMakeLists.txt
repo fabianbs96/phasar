@@ -430,7 +430,15 @@ install(DIRECTORY config/
               GROUP_WRITE GROUP_READ
               WORLD_READ
 )
-
+install(
+    CODE
+    "
+        include(InstallRequiredSystemLibraries)
+        include(BundleUtilities)
+        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/bin/phasar\"  \"\" \"\")
+    "
+    DESTINATION .
+    COMPONENT Runtime)
 # If the Phasar shared object libraries are not installed into a system folder
 # the so libs must be added manually to the linker search path and the linker
 # config must be updated as follows:
@@ -456,8 +464,7 @@ INCLUDE(InstallRequiredSystemLibraries)
 set(CPACK_SET_DESTDIR "on")
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
-#set(CPACK_GENERATOR "DEB")
-set(CPACK_GENERATOR "RPM")
+set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGE_DESCRIPTION "Phasar")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Phasar a LLVM-based static analysis framework")
 set(CPACK_PACKAGE_VENDOR "Phasar Team - Philipp Schubert and others")
