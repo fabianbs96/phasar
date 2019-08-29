@@ -394,6 +394,10 @@ if (PHASAR_BUILD_UNITTESTS)
   add_subdirectory(test)
 endif()
 
+
+
+add_subdirectory(bundle)
+
 # Install Phasar executable and libraries
 install(TARGETS phasar
         RUNTIME DESTINATION bin
@@ -430,15 +434,7 @@ install(DIRECTORY config/
               GROUP_WRITE GROUP_READ
               WORLD_READ
 )
-install(
-    CODE
-    "
-        include(InstallRequiredSystemLibraries)
-        include(BundleUtilities)
-        fixup_bundle(\"\${CMAKE_INSTALL_PREFIX}/bin/phasar\"  \"\" \"\")
-    "
-    DESTINATION .
-    COMPONENT Runtime)
+
 # If the Phasar shared object libraries are not installed into a system folder
 # the so libs must be added manually to the linker search path and the linker
 # config must be updated as follows:
@@ -502,6 +498,7 @@ set(CPACK_COMPONENTS_ALL Libraries ApplicationData)
 INCLUDE(CPack)
 ENDIF(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
 endif()
+
 
 # Setup the doxygen code documentation
 if(PHASAR_BUILD_DOC)
