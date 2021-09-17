@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarPass/Options.h"
 #include "phasar/Utils/LLVMIRToSrc.h"
 #include "phasar/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -46,8 +48,14 @@ protected:
     LLVMTypeHierarchy TH(IRDB);
     LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
 
-    return asSrcCode ? ICFG.exportICFGAsSourceCodeJson()
-                     : ICFG.exportICFGAsJson();
+    std::cerr << "ModuleRef: " << IRDB.getWPAModule() << "\n";
+
+    auto Ret =
+        asSrcCode ? ICFG.exportICFGAsSourceCodeJson() : ICFG.exportICFGAsJson();
+
+    clearModuleSlotTrackerFor(IRDB.getWPAModule());
+
+    return Ret;
   }
 
   nlohmann::json exportCFGFor(const std::string &testFile,
@@ -60,8 +68,14 @@ protected:
     assert(F != nullptr && "Invalid function");
     // ASSERT_NE(nullptr, F);
 
-    return asSrcCode ? CFG.exportCFGAsSourceCodeJson(F)
-                     : CFG.exportCFGAsJson(F);
+    std::cerr << "ModuleRef: " << IRDB.getWPAModule() << "\n";
+
+    auto Ret =
+        asSrcCode ? CFG.exportCFGAsSourceCodeJson(F) : CFG.exportCFGAsJson(F);
+
+    clearModuleSlotTrackerFor(IRDB.getWPAModule());
+
+    return Ret;
   }
 
   MapTy getAllRetSites(const LLVMBasedICFG &ICFG) {
@@ -93,7 +107,8 @@ protected:
           [&](auto &&Elem) {
             return Elem == nlohmann::json{{"from", From}, {"to", To}};
           }))
-          << "No edge from " << From << " to " << To;
+          << "No edge from " << From << " to " << To << " in "
+          << ExportedICFG.dump(4);
     };
 
     auto print = [WithDebugOutput](auto &&...Args) {
@@ -105,12 +120,13 @@ protected:
 
     for (const auto *F : GroundTruth.getAllFunctions()) {
       for (const auto &Inst : llvm::instructions(F)) {
-        auto InstStr = llvmIRToString(&Inst);
+        auto InstStr = llvmIRToStableString(&Inst);
         if (llvm::isa<llvm::CallBase>(&Inst)) {
           for (const auto *Callee : GroundTruth.getCalleesOfCallAt(&Inst)) {
             if (!Callee->isDeclaration()) {
               print("Callee: ", *Callee);
-              expectEdge(InstStr, llvmIRToString(&Callee->front().front()));
+              expectEdge(InstStr,
+                         llvmIRToStableString(&Callee->front().front()));
 
               print("> end");
             }
@@ -120,11 +136,11 @@ protected:
           const auto &RetSites = RetSitesOf[Inst.getFunction()];
 
           for (const auto *Ret : RetSites) {
-            expectEdge(InstStr, llvmIRToString(Ret));
+            expectEdge(InstStr, llvmIRToStableString(Ret));
           }
         } else {
           for (const auto *Succ : GroundTruth.getSuccsOf(&Inst)) {
-            expectEdge(InstStr, llvmIRToString(Succ));
+            expectEdge(InstStr, llvmIRToStableString(Succ));
           }
         }
       }
@@ -170,7 +186,11 @@ protected:
     LLVMTypeHierarchy TH(IRDB);
     LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
 
+    std::cerr << "ModuleRef: " << IRDB.getWPAModule() << "\n";
+
     verifyIRJson(ICFG.exportICFGAsJson(), ICFG, WithDebugOutput);
+
+    clearModuleSlotTrackerFor(IRDB.getWPAModule());
   }
 };
 

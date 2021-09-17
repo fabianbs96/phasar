@@ -52,12 +52,28 @@ bool matchesSignature(const llvm::Function *F, const llvm::FunctionType *FType,
 bool matchesSignature(const llvm::FunctionType *FType1,
                       const llvm::FunctionType *FType2);
 
+/// We need to be able to remove a Module->ModuleSlotTracker mapping, because
+/// inside the same process the LLVM allocator may choose the same address for a
+/// new llvm::Module as for a previously deleted Module.
+/// Looking up the ModuleSlotTracker for the new module (that has the same
+/// address as the old module) will give the ModuleSlotTracker for the old
+/// module that is invalid for the new one. This is common behavior in the
+/// unittests and leads to several <badref> prints.
+void clearModuleSlotTrackerFor(const llvm::Module *M);
+
 llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V);
 
 /**
  * @brief Returns a string representation of a LLVM Value.
  */
 std::string llvmIRToString(const llvm::Value *V);
+
+/**
+ * @brief Similar to llvmIRToString, but removes the metadata from the output as
+ * they are not always stable. Prefer this function over llvmIRToString, if you
+ * are comparing the string representations of LLVM iR instructions.
+ */
+std::string llvmIRToStableString(const llvm::Value *V);
 
 /**
  * @brief Same as @link(llvmIRToString) but tries to shorten the
