@@ -61,6 +61,8 @@ bool matchesSignature(const llvm::FunctionType *FType1,
 /// unittests and leads to several <badref> prints.
 void clearModuleSlotTrackerFor(const llvm::Module *M);
 
+llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V);
+
 /**
  * @brief Returns a string representation of a LLVM Value.
  */
