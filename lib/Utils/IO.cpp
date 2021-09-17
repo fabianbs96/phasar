@@ -14,38 +14,61 @@
  *      Author: philipp
  */
 
+#include <cstdio>
+#include <filesystem>
 #include <fstream>
+#include <ios>
+#include <string>
+#include <system_error>
 
-#include "boost/filesystem.hpp"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/Utils/IO.h"
-using namespace psr;
-using namespace std;
+#include "phasar/Utils/Utilities.h"
 
 namespace psr {
 
-string readFile(const string &Path) {
-  if (boost::filesystem::exists(Path) &&
-      !boost::filesystem::is_directory(Path)) {
-    ifstream Ifs(Path, ios::binary);
-    if (Ifs.is_open()) {
-      Ifs.seekg(0, std::ifstream::end);
-      size_t FileSize = Ifs.tellg();
-      Ifs.seekg(0, std::ifstream::beg);
-      string Content;
-      Content.resize(FileSize);
-      Ifs.read(const_cast<char *>(Content.data()), FileSize);
-      return Content;
-    }
+std::string readTextFile(const std::filesystem::path &Path) {
+  if (!(std::filesystem::exists(Path) &&
+        std::filesystem::is_regular_file(Path))) {
+    throw std::ios_base::failure("File does not exist: " + Path.string());
   }
-  throw ios_base::failure("could not read file: " + Path);
+
+  auto NumBytes = std::filesystem::file_size(Path);
+
+  auto *F = std::fopen(Path.c_str(), "r");
+
+  if (!F) {
+    throw std::ios_base::failure("Could not open file: " + Path.string());
+  }
+
+  auto CloseFile = scope_exit([F]() { std::fclose(F); });
+
+  std::string Contents;
+
+  /// TODO: Get rid of the zero-initialization of the string
+  Contents.resize(NumBytes);
+
+  auto ReadBytes = std::fread(Contents.data(), 1, NumBytes, F);
+
+  if (ReadBytes != NumBytes) {
+    throw std::ios_base::failure("Could not read file: " + Path.string());
+  }
+
+  return Contents;
 }
 
-void writeFile(const string &Path, const string &Content) {
-  ofstream Ofs(Path, ios::binary);
-  if (Ofs.is_open()) {
-    Ofs.write(Content.data(), Content.size());
+void writeTextFile(const std::filesystem::path &Path,
+                   const std::string &Content) {
+  std::error_code EC;
+  llvm::raw_fd_ostream ROS(Path.string(), EC);
+
+  if (EC) {
+    throw std::ios_base::failure("Error creating the file: " + Path.string() +
+                                 "; " + EC.message());
   }
-  throw ios_base::failure("could not write file: " + Path);
+
+  ROS.write(Content.data(), Content.size());
 }
+
 } // namespace psr
