@@ -250,7 +250,10 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint11) {
   doAnalysis({PathToLLFiles + "xtaint11_cpp.ll"}, gt, std::monostate{});
 }
 
-TEST_F(IDETaintAnalysisTest, XTaint12) {
+/// This test requires must-alias information: The sanitizer sanitizes %call1,
+/// but the sink is called on 'load %call2' which are must-aliases.
+/// However, since we only have may-alias information, we cannot kill %call2
+TEST_F(IDETaintAnalysisTest, DISABLED_XTaint12) {
   map<int, set<string>> gt;
 
   // no leaks expected
