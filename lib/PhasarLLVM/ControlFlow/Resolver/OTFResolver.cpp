@@ -44,8 +44,8 @@ using namespace std;
 using namespace psr;
 
 OTFResolver::OTFResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH,
-                         LLVMBasedICFG &ICF, LLVMPointsToInfo &PT)
-    : CHAResolver(IRDB, TH), ICF(ICF), PT(PT) {}
+                         LLVMBasedICFG &ICF, LLVMPointsToInfo &PT, Soundness S)
+    : CHAResolver(IRDB, TH), ICF(ICF), PT(PT), S(S) {}
 
 void OTFResolver::preCall(const llvm::Instruction *Inst) {}
 
@@ -125,7 +125,8 @@ auto OTFResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
       PossibleCallTargets.insert(Target);
     }
   }
-  if (PossibleCallTargets.empty()) {
+
+  if (PossibleCallTargets.empty() && S == Soundness::Soundy) {
     return CHAResolver::resolveVirtualCall(CallSite);
   }
 
