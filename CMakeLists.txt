@@ -44,16 +44,20 @@ list(GET VERSION_NUMBER_FILE 2 VERSION_NUMBER_PHASAR)
 
 include("phasar_macros")
 
+# use system dependencies
+option(PHASAR_USE_SYSTEM_GTEST "Use system installation for gtest" OFF)
+option(PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR "Use system installation for json-schema-validator" OFF)
+option(PHASAR_USE_SYSTEM_JSON "Use system installation for nlohmann_json" OFF)
+option(PHASAR_USE_SYSTEM_WALI "Use system installation for wali" OFF)
+
+# toggle targets
 option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" ON)
-
 option(PHASAR_BUILD_OPENSSL_TS_UNITTESTS "Build OPENSSL typestate tests (require OpenSSL, default is OFF)" OFF)
-
 option(PHASAR_BUILD_IR "Build IR test code (default is ON)" ON)
-
 option(PHASAR_BUILD_DOC "Build documentation" OFF)
 
+# various
 option(PHASAR_DEBUG_LIBDEPS "Debug internal library dependencies (private linkage)" OFF)
-
 option(BUILD_SHARED_LIBS "Build shared libraries (default is ON)" ON)
 
 option(PHASAR_ENABLE_WARNINGS "Enable warnings" ON)
@@ -119,18 +123,37 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 # JSON library
 option(JSON_BuildTests OFF)
-add_subdirectory(external/json EXCLUDE_FROM_ALL)
-include_directories(external/json/single_include/)
+if (PHASAR_USE_SYSTEM_JSON)
+  find_package(nlohmann_json REQUIRED)
+  include_directories(${nlohmann_json_INCLUDE_DIR})
+else()
+  add_subdirectory(external/json EXCLUDE_FROM_ALL)
+  include_directories(external/json/single_include/)
+endif()
+
+# JSON schema validator library
+if (PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR)
+  find_package(nlohmann_json_schema_validator REQUIRED)
+  include_directories(${nlohmann_json_schema_validator_INCLUDE_DIR})
+else()
+  add_subdirectory(external/json-schema-validator EXCLUDE_FROM_ALL)
+  include_directories(external/json-schema-validator/src/)
+endif()
 
 # Googletest
-if (NOT PHASAR_IN_TREE)
-  add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
-  include_directories(external/googletest/googletest/include)
-  include_directories(external/googletest/googlemock/include)
+if (PHASAR_USE_SYSTEM_GTEST)
+  find_package(GTest REQUIRED)
+  include_directories(${GTest_INCLUDE_DIR})
 else()
-  # Set llvm distributed includes for gtest header
-  include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include)
-  include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googlemock/include)
+  if (NOT PHASAR_IN_TREE)
+    add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
+    include_directories(external/googletest/googletest/include)
+    include_directories(external/googletest/googlemock/include)
+  else()
+    # Set llvm distributed includes for gtest header
+    include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include)
+    include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googlemock/include)
+  endif()
 endif()
 
 # SQL
@@ -204,8 +227,14 @@ if (PHASAR_IN_TREE)
 endif()
 
 # WALi-OpenNWA
-add_subdirectory(external/WALi-OpenNWA)
-include_directories(external/WALi-OpenNWA/Source/wali/include)
+if (PHASAR_USE_SYSTEM_WALI)
+  find_package(wali-opennwa REQUIRED)
+  include_directories(${wali-opennwa_INCLUDE_DIR})
+  link_directories(${wali-opennwa_LIB_DIRS})
+else()
+  add_subdirectory(external/WALi-OpenNWA)
+  include_directories(external/WALi-OpenNWA/Source/wali/include)
+endif()
 
 
 # Add the Phasar subdirectories
