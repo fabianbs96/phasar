@@ -182,8 +182,6 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                       UserEntryPoints.end());
   }
 
-  std::set<const llvm::Instruction *> AlreadyProcessedIndirectCalls;
-
   while (true) {
     bool FixpointReached = true;
 
@@ -191,23 +189,17 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       const llvm::Function *F = FunctionWL.back();
       FunctionWL.pop_back();
       processFunction(F, *Res, FixpointReached);
-
-      if (S == Soundness::Unsound) {
-        for (auto [CS, Targets] : IndirectCalls) {
-          if (Targets == 0 && AlreadyProcessedIndirectCalls.find(CS) ==
-                                  AlreadyProcessedIndirectCalls.end()) {
-            // FixpointReached &= !
-            constructDynamicCall(CS, *Res);
-            AlreadyProcessedIndirectCalls.insert(CS);
-          }
-        }
-      }
     }
 
-    if (S != Soundness::Unsound) {
+    if (S == Soundness::Soundy) {
       for (auto [CS, _] : IndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
+    } else {
+      for (auto &CS : UnsoundIndirectCalls) {
+        FixpointReached &= !constructDynamicCall(CS, *Res);
+      }
+      UnsoundIndirectCalls.clear();
     }
 
     if (FixpointReached) {
@@ -306,6 +298,7 @@ void LLVMBasedICFG::processFunction(const llvm::Function *F, Resolver &Resolver,
                         << "Found dynamic call-site: "
                         << "  " << llvmIRToString(CS));
           IndirectCalls[CS] = 0;
+          UnsoundIndirectCalls.push_back(CS);
 
           if (S == Soundness::Soundy) {
             FixpointReached = false;
