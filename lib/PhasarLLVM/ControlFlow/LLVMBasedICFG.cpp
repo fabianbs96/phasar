@@ -182,6 +182,8 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                       UserEntryPoints.end());
   }
 
+  std::set<const llvm::Instruction *> AlreadyProcessedIndirectCalls;
+
   while (true) {
     bool FixpointReached = true;
 
@@ -189,9 +191,20 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       const llvm::Function *F = FunctionWL.back();
       FunctionWL.pop_back();
       processFunction(F, *Res, FixpointReached);
+
+      if (S == Soundness::Unsound) {
+        for (auto [CS, Targets] : IndirectCalls) {
+          if (Targets == 0 && AlreadyProcessedIndirectCalls.find(CS) ==
+                                  AlreadyProcessedIndirectCalls.end()) {
+            // FixpointReached &= !
+            constructDynamicCall(CS, *Res);
+            AlreadyProcessedIndirectCalls.insert(CS);
+          }
+        }
+      }
     }
 
-    if (S == Soundness::Soundy) {
+    if (S != Soundness::Unsound) {
       for (auto [CS, _] : IndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
@@ -202,13 +215,16 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
     }
   }
 
+  int CallsitesToInstrument = 0;
   for (const auto &[IndirectCall, Targets] : IndirectCalls) {
     if (Targets == 0) {
       LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), WARNING)
                     << "No callees found for callsite "
                     << llvmIRToString(IndirectCall));
+      CallsitesToInstrument++;
     }
   }
+  std::cerr << "Callsites to instrument: " << CallsitesToInstrument << '\n';
 
   std::chrono::high_resolution_clock::time_point EndTime =
       std::chrono::high_resolution_clock::now();
@@ -218,6 +234,8 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                                                                      StartTime)
                    .count()
             << '\n';
+  std::cerr << "Callgraph vertices: " << getNumOfVertices()
+            << ", edges: " << getNumOfEdges() << '\n';
 
   REG_COUNTER("CG Vertices", getNumOfVertices(), PAMM_SEVERITY_LEVEL::Full);
   REG_COUNTER("CG Edges", getNumOfEdges(), PAMM_SEVERITY_LEVEL::Full);
