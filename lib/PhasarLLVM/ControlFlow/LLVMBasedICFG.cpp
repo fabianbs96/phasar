@@ -191,7 +191,7 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       processFunction(F, *Res, FixpointReached);
     }
 
-    if (S == Soundness::Soundy) {
+    if (S != Soundness::Unsound) {
       for (auto [CS, _] : IndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
@@ -300,10 +300,11 @@ void LLVMBasedICFG::processFunction(const llvm::Function *F, Resolver &Resolver,
                         << "Found dynamic call-site: "
                         << "  " << llvmIRToString(CS));
           IndirectCalls[CS] = 0;
-          UnsoundIndirectCalls.push_back(CS);
 
-          if (S == Soundness::Soundy) {
+          if (S != Soundness::Unsound) {
             FixpointReached = false;
+          } else {
+            UnsoundIndirectCalls.push_back(CS);
           }
 
           continue;
