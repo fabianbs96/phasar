@@ -83,7 +83,7 @@ AnalysisController::AnalysisController(
     AnalysisControllerEmitterOptions EmitterOptions,
     const std::string &ProjectID, const std::string &OutDirectory)
     : IRDB(IRDB), TH(IRDB), PT(IRDB, !needsToEmitPTA(EmitterOptions), PTATy),
-      ICF(IRDB, CGTy, EntryPoints, &TH, &PT),
+      ICF(IRDB, CGTy, EntryPoints, &TH, &PT, S),
       DataFlowAnalyses(std::move(DataFlowAnalyses)),
       AnalysisConfigs(std::move(AnalysisConfigs)), EntryPoints(EntryPoints),
       Strategy(Strategy), EmitterOptions(EmitterOptions), ProjectID(ProjectID),

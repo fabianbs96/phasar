@@ -86,6 +86,7 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
+  std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.

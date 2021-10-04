@@ -26,6 +26,7 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/CHAResolver.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
+#include "phasar/Utils/Soundness.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -47,10 +48,11 @@ class OTFResolver : public CHAResolver {
 protected:
   LLVMBasedICFG &ICF;
   LLVMPointsToInfo &PT;
+  Soundness S;
 
 public:
   OTFResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH, LLVMBasedICFG &ICF,
-              LLVMPointsToInfo &PT);
+              LLVMPointsToInfo &PT, Soundness S = Soundness::Soundy);
 
   ~OTFResolver() override = default;
 

@@ -131,6 +131,9 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                              LLVMTypeHierarchy *TH, LLVMPointsToInfo *PT,
                              Soundness S, bool IncludeGlobals)
     : IRDB(IRDB), CGType(CGType), S(S), TH(TH), PT(PT) {
+
+  //   std::chrono::high_resolution_clock::time_point StartTime =
+  //       std::chrono::high_resolution_clock::now();
   PAMM_GET_INSTANCE;
   // check for faults in the logic
   if (!TH && (CGType != CallGraphAnalysisType::NORESOLVE)) {
@@ -188,8 +191,15 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       processFunction(F, *Res, FixpointReached);
     }
 
-    for (auto [CS, _] : IndirectCalls) {
-      FixpointReached &= !constructDynamicCall(CS, *Res);
+    if (S != Soundness::Unsound) {
+      for (auto [CS, _] : IndirectCalls) {
+        FixpointReached &= !constructDynamicCall(CS, *Res);
+      }
+    } else {
+      for (auto &CS : UnsoundIndirectCalls) {
+        FixpointReached &= !constructDynamicCall(CS, *Res);
+      }
+      UnsoundIndirectCalls.clear();
     }
 
     if (FixpointReached) {
@@ -197,13 +207,29 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
     }
   }
 
-  for (const auto &[IndirectCall, Targets] : IndirectCalls) {
-    if (Targets == 0) {
-      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), WARNING)
-                    << "No callees found for callsite "
-                    << llvmIRToString(IndirectCall));
-    }
-  }
+  //   int CallsitesToInstrument = 0;
+  //   for (const auto &[IndirectCall, Targets] : IndirectCalls) {
+  //     if (Targets == 0) {
+  //       LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), WARNING)
+  //                     << "No callees found for callsite "
+  //                     << llvmIRToString(IndirectCall));
+  //       CallsitesToInstrument++;
+  //     }
+  //   }
+  //   std::cerr << "Callsites to instrument: " << CallsitesToInstrument <<
+  //   '\n';
+
+  //   std::chrono::high_resolution_clock::time_point EndTime =
+  //       std::chrono::high_resolution_clock::now();
+
+  //   std::cerr << "Callgraph construction took (ms): "
+  //             <<
+  //             std::chrono::duration_cast<std::chrono::milliseconds>(EndTime -
+  //                                                                      StartTime)
+  //                    .count()
+  //             << '\n';
+  //   std::cerr << "Callgraph vertices: " << getNumOfVertices()
+  //             << ", edges: " << getNumOfEdges() << '\n';
 
   REG_COUNTER("CG Vertices", getNumOfVertices(), PAMM_SEVERITY_LEVEL::Full);
   REG_COUNTER("CG Edges", getNumOfEdges(), PAMM_SEVERITY_LEVEL::Full);
@@ -275,7 +301,12 @@ void LLVMBasedICFG::processFunction(const llvm::Function *F, Resolver &Resolver,
                         << "  " << llvmIRToString(CS));
           IndirectCalls[CS] = 0;
 
-          FixpointReached = false;
+          if (S != Soundness::Unsound) {
+            FixpointReached = false;
+          } else {
+            UnsoundIndirectCalls.push_back(CS);
+          }
+
           continue;
         }
       }
