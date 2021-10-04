@@ -53,6 +53,8 @@ LLVMPointsToSet::LLVMPointsToSet(ProjectIRDB &IRDB, bool UseLazyEvaluation,
                                  PointerAnalysisType PATy)
     : PTA(IRDB, UseLazyEvaluation, PATy), Owner(IRDB.getNumGlobals()) {
 
+  //   std::chrono::high_resolution_clock::time_point StartTime =
+  //       std::chrono::high_resolution_clock::now();
   PointsToSets.reserve(IRDB.getNumGlobals());
 
   for (llvm::Module *M : IRDB.getAllModules()) {
@@ -75,7 +77,6 @@ LLVMPointsToSet::LLVMPointsToSet(ProjectIRDB &IRDB, bool UseLazyEvaluation,
       }
     }
   }
-  std::cerr << "LLVMPointsToSet completed\n";
 }
 
 void LLVMPointsToSet::computeValuesPointsToSet(const llvm::Value *V) {
