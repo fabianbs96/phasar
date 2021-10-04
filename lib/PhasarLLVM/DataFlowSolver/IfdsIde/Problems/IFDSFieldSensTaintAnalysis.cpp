@@ -164,7 +164,8 @@ IFDSFieldSensTaintAnalysis::getSummaryFlowFunction(
   /*
    * Exclude blacklisted functions here.
    */
-  bool IsSink = Config.mayLeakValuesAt(CallSite, DestFun);
+  bool IsSink =
+      Config.mayLeakValuesAt(CallSite, CallSite->getNextNode(), DestFun);
 
   if (IsSink) {
     return std::make_shared<IdentityFlowFunction>(CS, Stats, getZeroValue());
