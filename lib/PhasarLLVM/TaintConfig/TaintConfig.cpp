@@ -30,6 +30,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/Casting.h"
 
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
@@ -345,6 +346,11 @@ void TaintConfig::registerSanitizerCallBack(
   SanitizerCallBack = std::move(SanitizerCB);
 }
 
+void TaintConfig::registerSanitizerEdgeCallBack(
+    TaintDescriptionEdgeCallBackTy CB) {
+  SanitizerEdgeCallBack = std::move(CB);
+}
+
 const TaintConfig::TaintDescriptionCallBackTy &
 TaintConfig::getRegisteredSourceCallBack() const {
   return SourceCallBack;
@@ -353,6 +359,16 @@ TaintConfig::getRegisteredSourceCallBack() const {
 const TaintConfig::TaintDescriptionCallBackTy &
 TaintConfig::getRegisteredSinkCallBack() const {
   return SinkCallBack;
+}
+
+const TaintConfig::TaintDescriptionCallBackTy &
+TaintConfig::getRegisteredSanitizerCallBack() const {
+  return SanitizerCallBack;
+}
+
+const TaintConfig::TaintDescriptionEdgeCallBackTy &
+TaintConfig::getRegisteredSanitizerEdgeCallBack() const {
+  return SanitizerEdgeCallBack;
 }
 
 bool TaintConfig::isSource(const llvm::Value *V) const {
@@ -368,7 +384,9 @@ bool TaintConfig::isSanitizer(const llvm::Value *V) const {
 }
 
 void TaintConfig::forAllGeneratedValuesAt(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst,
+    [[maybe_unused]] const llvm::Instruction *Succ,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);
@@ -385,11 +403,15 @@ void TaintConfig::forAllGeneratedValuesAt(
         Handler(Inst->getOperand(Arg.getArgNo()));
       }
     }
-  }
-
-  for (const auto *Op : Inst->operand_values()) {
-    if (SourceValues.count(Op)) {
-      Handler(Op);
+  } else {
+    /// If we have a call to a source function, we would generate via formal
+    /// parameter instead via actual argument.
+    /// If any function is called with a variable that was defined as source, we
+    /// don't want to re-generate the value.
+    for (const auto *Op : Inst->operand_values()) {
+      if (SourceValues.count(Op)) {
+        Handler(Op);
+      }
     }
   }
 
@@ -399,7 +421,9 @@ void TaintConfig::forAllGeneratedValuesAt(
 }
 
 void TaintConfig::forAllLeakCandidatesAt(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst,
+    [[maybe_unused]] const llvm::Instruction *Succ,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);
@@ -425,7 +449,8 @@ void TaintConfig::forAllLeakCandidatesAt(
 }
 
 void TaintConfig::forAllSanitizedValuesAt(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);
@@ -443,21 +468,28 @@ void TaintConfig::forAllSanitizedValuesAt(
       }
     }
   }
+
+  if (SanitizerEdgeCallBack) {
+    for (const auto *CBESani : SanitizerEdgeCallBack(Inst, Succ)) {
+      Handler(CBESani);
+    }
+  }
 }
 
-bool TaintConfig::generatesValuesAt(const llvm::Instruction *Inst,
-                                    const llvm::Function *Callee) const {
+bool TaintConfig::generatesValuesAt(
+    const llvm::Instruction *Inst,
+    [[maybe_unused]] const llvm::Instruction *Succ,
+    const llvm::Function *Callee) const {
   assert(Inst != nullptr);
 
   if (SourceCallBack && !SourceCallBack(Inst).empty()) {
     return true;
   }
 
-  if (Callee && std::any_of(Callee->arg_begin(), Callee->arg_end(),
-                            [this](const auto &Arg) {
-                              return SourceValues.count(&Arg);
-                            })) {
-    return true;
+  if (Callee) {
+    return std::any_of(
+        Callee->arg_begin(), Callee->arg_end(),
+        [this](const auto &Arg) { return SourceValues.count(&Arg); });
   }
 
   return SourceValues.count(Inst) ||
@@ -465,8 +497,10 @@ bool TaintConfig::generatesValuesAt(const llvm::Instruction *Inst,
                      [this](const auto *Op) { return SourceValues.count(Op); });
 }
 
-bool TaintConfig::mayLeakValuesAt(const llvm::Instruction *Inst,
-                                  const llvm::Function *Callee) const {
+bool TaintConfig::mayLeakValuesAt(
+    const llvm::Instruction *Inst,
+    [[maybe_unused]] const llvm::Instruction *Succ,
+    const llvm::Function *Callee) const {
   assert(Inst != nullptr);
 
   if (SinkCallBack && !SinkCallBack(Inst).empty()) {
@@ -479,6 +513,7 @@ bool TaintConfig::mayLeakValuesAt(const llvm::Instruction *Inst,
                                });
 }
 bool TaintConfig::sanitizesValuesAt(const llvm::Instruction *Inst,
+                                    const llvm::Instruction *Succ,
                                     const llvm::Function *Callee) const {
   assert(Inst != nullptr);
 
@@ -486,10 +521,14 @@ bool TaintConfig::sanitizesValuesAt(const llvm::Instruction *Inst,
     return true;
   }
 
-  return Callee && std::any_of(Callee->arg_begin(), Callee->arg_end(),
-                               [this](const auto &Arg) {
-                                 return SanitizerValues.count(&Arg);
-                               });
+  if (Callee && std::any_of(Callee->arg_begin(), Callee->arg_end(),
+                            [this](const auto &Arg) {
+                              return SanitizerValues.count(&Arg);
+                            })) {
+    return true;
+  }
+
+  return SanitizerEdgeCallBack && !SanitizerEdgeCallBack(Inst, Succ).empty();
 }
 
 TaintCategory TaintConfig::getCategory(const llvm::Value *V) const {
@@ -503,6 +542,26 @@ TaintCategory TaintConfig::getCategory(const llvm::Value *V) const {
     return TaintCategory::Sanitizer;
   }
   return TaintCategory::None;
+}
+
+size_t TaintConfig::getNumSourceValues() const { return SourceValues.size(); }
+
+size_t TaintConfig::getNumSinkValues() const { return SinkValues.size(); }
+
+size_t TaintConfig::getNumSanitizerValues() const {
+  return SanitizerValues.size();
+}
+
+bool TaintConfig::hasSourceCallBack() const { return bool(SourceCallBack); }
+
+bool TaintConfig::hasSinkCallBack() const { return bool(SinkCallBack); }
+
+bool TaintConfig::hasSanitizerCallBack() const {
+  return bool(SanitizerCallBack);
+}
+
+bool TaintConfig::hasSanitizerEdgeCallBack() const {
+  return bool(SanitizerEdgeCallBack);
 }
 
 void TaintConfig::addSourceValue(const llvm::Value *V) {

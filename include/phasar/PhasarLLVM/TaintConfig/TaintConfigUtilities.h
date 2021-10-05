@@ -27,21 +27,9 @@ template <typename ContainerTy,
 void collectGeneratedFacts(ContainerTy &Dest, const TaintConfig &Config,
                            const llvm::CallBase *CB,
                            const llvm::Function *Callee) {
-  auto Callback = Config.getRegisteredSourceCallBack();
-  if (Callback) {
-    auto CBFacts = Callback(CB);
-    Dest.insert(CBFacts.begin(), CBFacts.end());
-  }
-
-  if (Config.isSource(CB)) {
-    Dest.insert(CB);
-  }
-
-  for (unsigned i = 0, end = Callee->arg_size(); i < end; ++i) {
-    if (Config.isSource(Callee->getArg(i))) {
-      Dest.insert(CB->getArgOperand(i));
-    }
-  }
+  Config.forAllGeneratedValuesAt(
+      CB, CB->getNextNode(), Callee,
+      [&Dest](const llvm::Value *V) { Dest.insert(V); });
 }
 
 template <typename ContainerTy, typename Pred,
@@ -51,18 +39,12 @@ void collectLeakedFacts(ContainerTy &Dest, const TaintConfig &Config,
                         const llvm::CallBase *CB, const llvm::Function *Callee,
                         Pred &&LeakIf) {
 
-  auto Callback = Config.getRegisteredSinkCallBack();
-  if (Callback) {
-    auto CBLeaks = Callback(CB);
-    std::copy_if(CBLeaks.begin(), CBLeaks.end(),
-                 std::inserter(Dest, Dest.end()), LeakIf);
-  }
-
-  for (unsigned i = 0, end = Callee->arg_size(); i < end; ++i) {
-    if (Config.isSink(Callee->getArg(i)) && LeakIf(CB->getArgOperand(i))) {
-      Dest.insert(CB->getArgOperand(i));
-    }
-  }
+  Config.forAllLeakCandidatesAt(CB, CB->getNextNode(), Callee,
+                                [&Dest, &LeakIf](const llvm::Value *V) {
+                                  if (LeakIf(V)) {
+                                    Dest.insert(V);
+                                  }
+                                });
 }
 
 template <typename ContainerTy>
@@ -79,11 +61,9 @@ template <typename ContainerTy,
 void collectSanitizedFacts(ContainerTy &Dest, const TaintConfig &Config,
                            const llvm::CallBase *CB,
                            const llvm::Function *Callee) {
-  for (unsigned i = 0, end = Callee->arg_size(); i < end; ++i) {
-    if (Config.isSanitizer(Callee->getArg(i))) {
-      Dest.insert(CB->getArgOperand(i));
-    }
-  }
+  Config.forAllSanitizedValuesAt(
+      CB, CB->getNextNode(), Callee,
+      [&Dest](const llvm::Value *V) { Dest.insert(V); });
 }
 } // namespace psr
 

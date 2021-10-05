@@ -35,18 +35,21 @@ protected:
 
   [[nodiscard]] std::pair<SourceConfigTy, SinkConfigTy>
   getConfigurationAt(const llvm::Instruction *Inst,
+                     const llvm::Instruction *Succ,
                      const llvm::Function *Callee = nullptr) const;
 
   [[nodiscard]] SourceConfigTy
   getSourceConfigAt(const llvm::Instruction *Inst,
+                    const llvm::Instruction *Succ,
                     const llvm::Function *Callee = nullptr) const;
 
   [[nodiscard]] SinkConfigTy
-  getSinkConfigAt(const llvm::Instruction *Inst,
+  getSinkConfigAt(const llvm::Instruction *Inst, const llvm::Instruction *Succ,
                   const llvm::Function *Callee = nullptr) const;
 
   [[nodiscard]] SanitizerConfigTy
   getSanitizerConfigAt(const llvm::Instruction *Inst,
+                       const llvm::Instruction *Succ,
                        const llvm::Function *Callee = nullptr) const;
 };
 } // namespace psr::XTaint

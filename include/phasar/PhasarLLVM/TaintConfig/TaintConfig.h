@@ -22,6 +22,7 @@
 #include "llvm/ADT/STLExtras.h" // function_ref
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Value.h"
 
 #include "phasar/DB/ProjectIRDB.h"
@@ -58,6 +59,9 @@ class TaintConfig {
 public:
   using TaintDescriptionCallBackTy =
       std::function<std::set<const llvm::Value *>(const llvm::Instruction *)>;
+  using TaintDescriptionEdgeCallBackTy =
+      std::function<std::set<const llvm::Value *>(const llvm::Instruction *,
+                                                  const llvm::Instruction *)>;
 
   TaintConfig(const psr::ProjectIRDB &Code, const nlohmann::json &Config);
   TaintConfig(const psr::ProjectIRDB &AnnotatedCode);
@@ -68,11 +72,16 @@ public:
   void registerSourceCallBack(TaintDescriptionCallBackTy CB);
   void registerSinkCallBack(TaintDescriptionCallBackTy CB);
   void registerSanitizerCallBack(TaintDescriptionCallBackTy CB);
+  void registerSanitizerEdgeCallBack(TaintDescriptionEdgeCallBackTy CB);
 
   [[nodiscard]] const TaintDescriptionCallBackTy &
   getRegisteredSourceCallBack() const;
   [[nodiscard]] const TaintDescriptionCallBackTy &
   getRegisteredSinkCallBack() const;
+  [[nodiscard]] const TaintDescriptionCallBackTy &
+  getRegisteredSanitizerCallBack() const;
+  [[nodiscard]] const TaintDescriptionEdgeCallBackTy &
+  getRegisteredSanitizerEdgeCallBack() const;
 
   [[nodiscard]] bool isSource(const llvm::Value *V) const;
   [[nodiscard]] bool isSink(const llvm::Value *V) const;
@@ -84,7 +93,8 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllGeneratedValuesAt(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   /// \brief Calls Handler for all operands of Inst that may generate a leak
@@ -93,7 +103,8 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllLeakCandidatesAt(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   /// \brief Calls Handler for all operands of Inst that become sanitized after
@@ -102,17 +113,30 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllSanitizedValuesAt(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   [[nodiscard]] bool generatesValuesAt(const llvm::Instruction *Inst,
+                                       const llvm::Instruction *Succ,
                                        const llvm::Function *Callee) const;
   [[nodiscard]] bool mayLeakValuesAt(const llvm::Instruction *Inst,
+                                     const llvm::Instruction *Succ,
                                      const llvm::Function *Callee) const;
   [[nodiscard]] bool sanitizesValuesAt(const llvm::Instruction *Inst,
+                                       const llvm::Instruction *Succ,
                                        const llvm::Function *Callee) const;
 
   [[nodiscard]] TaintCategory getCategory(const llvm::Value *V) const;
+
+  [[nodiscard]] size_t getNumSourceValues() const;
+  [[nodiscard]] size_t getNumSinkValues() const;
+  [[nodiscard]] size_t getNumSanitizerValues() const;
+
+  [[nodiscard]] bool hasSourceCallBack() const;
+  [[nodiscard]] bool hasSinkCallBack() const;
+  [[nodiscard]] bool hasSanitizerCallBack() const;
+  [[nodiscard]] bool hasSanitizerEdgeCallBack() const;
 
   void addSourceValue(const llvm::Value *V);
   void addSinkValue(const llvm::Value *V);
@@ -130,9 +154,12 @@ private:
   std::unordered_set<const llvm::Value *> SourceValues;
   std::unordered_set<const llvm::Value *> SinkValues;
   std::unordered_set<const llvm::Value *> SanitizerValues;
+
   TaintDescriptionCallBackTy SourceCallBack;
   TaintDescriptionCallBackTy SinkCallBack;
   TaintDescriptionCallBackTy SanitizerCallBack;
+
+  TaintDescriptionEdgeCallBackTy SanitizerEdgeCallBack;
 };
 
 //===----------------------------------------------------------------------===//
