@@ -11,6 +11,7 @@
 #include <type_traits>
 
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
 
@@ -411,6 +412,49 @@ IDEExtendedTaintAnalysis::getCallToRetFlowFunction(
     [[maybe_unused]] std::set<f_t> Callees) {
   LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
                 << "##CallToReturn-FF at: " << psr::llvmIRToString(CallSite));
+
+  const bool HasNonIntrinsicDecl =
+      std::any_of(Callees.begin(), Callees.end(), [](const auto *Callee) {
+        return Callee->isDeclaration() && !Callee->isIntrinsic();
+      });
+
+  if (HasNonIntrinsicDecl) {
+    // For a function that is defined in a different module, we cannot assume
+    // any semantics. So we must overapproximate here by tainting all pointer
+    // parameters as well as the return value, if any tainted value flows into
+    // that function
+
+    return makeLambdaFlow<d_t>([CallSite, this](d_t Source) -> std::set<d_t> {
+      if (isZeroValue(Source)) {
+        return {Source};
+      }
+
+      if (const auto *CS = llvm::dyn_cast<llvm::CallBase>(CallSite)) {
+        if (std::none_of(CS->arg_begin(), CS->arg_end(),
+                         [this, Source](const auto &Arg) {
+                           return equivalent(Source, makeFlowFact(Arg));
+                         })) {
+          return {Source};
+        }
+
+        std::set<d_t> Ret{Source};
+        for (const auto &Arg : CS->arg_operands()) {
+          if (Arg->getType()->isPointerTy()) {
+            Ret.insert(makeFlowFact(Arg));
+          }
+        }
+
+        if (!CallSite->getType()->isVoidTy()) {
+          Ret.insert(makeFlowFact(CallSite));
+        }
+
+        return Ret;
+      }
+
+      return {Source};
+    });
+  }
+
   // The CTR-FF is traditionally an identity function. All CTR-relevant stuff is
   // handled on the edges.
 
@@ -481,24 +525,19 @@ auto IDEExtendedTaintAnalysis::getNormalEdgeFunction(n_t Curr, d_t CurrNode,
     return {nullptr, nullptr};
   }();
 
-  if (PointerOp == nullptr) {
+  if (DisableStrongUpdates) {
     return getEdgeIdentity(Curr);
   }
 
-  assert(ValueOp);
+  /// Kill the PointerOp, if we store into it
+  if (PointerOp && CurrNode->mustAlias(makeFlowFact(PointerOp), *PT)) {
+    return makeEF<GenEdgeFunction>(BBO, Curr);
+  }
 
-  if (!DisableStrongUpdates) {
-
-    /// Kill the PointerOp, if we store into it
-    if (CurrNode->mustAlias(makeFlowFact(PointerOp), *PT)) {
+  auto SaniConfig = getSanitizerConfigAt(Curr, Succ);
+  if (!SaniConfig.empty()) {
+    if (isMustAlias(SaniConfig, CurrNode)) {
       return makeEF<GenEdgeFunction>(BBO, Curr);
-    }
-
-    auto SaniConfig = getSanitizerConfigAt(Curr, Succ);
-    if (!SaniConfig.empty()) {
-      if (isMustAlias(SaniConfig, CurrNode)) {
-        return makeEF<GenEdgeFunction>(BBO, Curr);
-      }
     }
   }
 
