@@ -38,7 +38,13 @@ using LeakMap_t = std::unordered_map<const llvm::Instruction *,
                                      llvm::SmallSet<const llvm::Value *, 1>>;
 
 EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
-getGenEdgeFunction(BasicBlockOrdering &BBO);
+getGenEdgeFunction(BasicBlockOrdering &BBO,
+                   const llvm::Instruction *Sani = nullptr);
+
+EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
+getComposeEdgeFunction(BasicBlockOrdering &BBO,
+                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &F,
+                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &G);
 
 EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
 getEdgeIdentity(const llvm::Instruction *Inst);

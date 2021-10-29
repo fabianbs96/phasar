@@ -53,7 +53,7 @@ GenEdgeFunction::composeWith(EdgeFunctionPtrType SecondFunction) {
   case EdgeDomain::Sanitized:
     return getAllSanitized();
   default:
-    return makeEF<GenEdgeFunction>(BBO, Res.getSanitizer());
+    return getGenEdgeFunction(BBO, Res.getSanitizer());
   }
 }
 
@@ -87,7 +87,7 @@ GenEdgeFunction::joinWith(EdgeFunctionPtrType OtherFunction) {
       case EdgeDomain::Sanitized:
         return getAllSanitized();
       default:
-        return makeEF<GenEdgeFunction>(BBO, JoinSani.getSanitizer());
+        return getGenEdgeFunction(BBO, JoinSani.getSanitizer());
       }
     }
 
@@ -99,7 +99,7 @@ GenEdgeFunction::joinWith(EdgeFunctionPtrType OtherFunction) {
       // sanitizers
 
       if (Res.isNotSanitized()) {
-        return makeEF<GenEdgeFunction>(BBO, nullptr);
+        return getGenEdgeFunction(BBO);
       }
 
       return makeEF<JoinConstEdgeFunction>(BBO, OtherJoin->getFunction(),

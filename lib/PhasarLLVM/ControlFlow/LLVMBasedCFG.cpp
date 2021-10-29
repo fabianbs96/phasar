@@ -26,6 +26,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
 
 #include "nlohmann/json.hpp"
@@ -92,30 +93,42 @@ LLVMBasedCFG::getSuccsOf(const llvm::Instruction *I) const {
   return Successors;
 }
 
-vector<pair<const llvm::Instruction *, const llvm::Instruction *>>
-LLVMBasedCFG::getAllControlFlowEdges(const llvm::Function *Fun) const {
-  vector<pair<const llvm::Instruction *, const llvm::Instruction *>> Edges;
-
-  for (const auto &I : llvm::instructions(Fun)) {
-    if (IgnoreDbgInstructions) {
-      // Check for call to intrinsic debug function
-      if (const auto *DbgCallInst = llvm::dyn_cast<llvm::CallInst>(&I)) {
-        if (DbgCallInst->getCalledFunction() &&
-            DbgCallInst->getCalledFunction()->isIntrinsic() &&
-            (DbgCallInst->getCalledFunction()->getName() ==
-             "llvm.dbg.declare")) {
-          continue;
-        }
-      }
+void LLVMBasedCFG::getSuccsOf(
+    const llvm::Instruction *Inst,
+    llvm::SmallVectorImpl<const llvm::Instruction *> &Successors) const {
+  if (!IgnoreDbgInstructions) {
+    if (Inst->getNextNode()) {
+      Successors.push_back(Inst->getNextNode());
     }
-
-    auto Successors = getSuccsOf(&I);
-    for (const auto *Successor : Successors) {
-      Edges.emplace_back(&I, Successor);
+  } else {
+    if (Inst->getNextNonDebugInstruction(false)) {
+      Successors.push_back(Inst->getNextNonDebugInstruction());
     }
   }
 
-  return Edges;
+  if (Inst->isTerminator()) {
+    Successors.reserve(Inst->getNumSuccessors() + Successors.size());
+    std::transform(llvm::succ_begin(Inst), llvm::succ_end(Inst),
+                   back_inserter(Successors),
+                   [](const llvm::BasicBlock *BB) { return &BB->front(); });
+  }
+}
+
+void LLVMBasedCFG::getAllControlFlowEdges(
+    const llvm::Function *Fun,
+    std::vector<std::pair<const llvm::Instruction *, const llvm::Instruction *>>
+        &Dest) const {
+  llvm::SmallVector<const llvm::Instruction *> Successors;
+  for (const auto &I : llvm::instructions(Fun)) {
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
+      continue;
+    }
+    Successors.clear();
+    getSuccsOf(&I, Successors);
+    for (const auto *Successor : Successors) {
+      Dest.emplace_back(&I, Successor);
+    }
+  }
 }
 
 vector<const llvm::Instruction *>
@@ -346,50 +359,14 @@ LLVMBasedCFG::exportCFGAsJson(const llvm::Function *F) const {
 LLVMBasedCFG::exportCFGAsSourceCodeJson(const llvm::Function *F) const {
   nlohmann::json J;
 
-  for (const auto &BB : *F) {
-    assert(!BB.empty() && "Invalid IR: Empty BasicBlock");
-    auto it = BB.begin();
-    auto end = BB.end();
-    auto From = getFirstNonEmpty(it, end);
-
-    if (it == end) {
+  for (auto [From, To] : getAllControlFlowEdges(F)) {
+    if (llvm::isa<llvm::UnreachableInst>(From)) {
       continue;
     }
-
-    const auto *FromInst = &*it;
-
-    ++it;
-
-    // Edges inside the BasicBlock
-    for (; it != end; ++it) {
-      auto To = getFirstNonEmpty(it, end);
-      if (To.empty()) {
-        break;
-      }
-
-      J.push_back({{"from", From}, {"to", To}});
-
-      FromInst = &*it;
-      From = std::move(To);
-    }
-
-    const auto *Term = BB.getTerminator();
-    assert(Term && "Invalid IR: BasicBlock without terminating instruction!");
-
-    auto numSuccessors = Term->getNumSuccessors();
-
-    if (numSuccessors != 0) {
-      // Branch Edges
-
-      for (const auto *Succ : llvm::successors(&BB)) {
-        assert(Succ && !Succ->empty());
-
-        auto To = getFirstNonEmpty(Succ);
-        if (From != To) {
-          J.push_back({{"from", From}, {"to", std::move(To)}});
-        }
-      }
-    }
+    J.push_back({{"from", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(From),
+                                               llvmIRToStableString(From)}},
+                 {"to", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(To),
+                                             llvmIRToStableString(To)}}});
   }
 
   return J;

@@ -15,7 +15,7 @@
 
 namespace psr::XTaint {
 
-class KillIfSanitizedEdgeFunction : public EdgeFunctionBase {
+class KillIfSanitizedEdgeFunction final : public EdgeFunctionBase {
   const llvm::Instruction *Load;
 
 public:
@@ -23,6 +23,8 @@ public:
                               const llvm::Instruction *Load);
 
   l_t computeTarget(l_t Source) override;
+
+  EdgeFunctionPtrType composeWith(EdgeFunctionPtrType SecondFunction) override;
 
   bool equal_to(EdgeFunctionPtrType OtherFunction) const override;
 

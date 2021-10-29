@@ -49,9 +49,23 @@ public:
   [[nodiscard]] std::vector<const llvm::Instruction *>
   getSuccsOf(const llvm::Instruction *Inst) const override;
 
-  [[nodiscard]] std::vector<
+  void
+  getSuccsOf(const llvm::Instruction *Inst,
+             llvm::SmallVectorImpl<const llvm::Instruction *> &Succs) const;
+
+  [[nodiscard]] inline std::vector<
       std::pair<const llvm::Instruction *, const llvm::Instruction *>>
-  getAllControlFlowEdges(const llvm::Function *Fun) const override;
+  getAllControlFlowEdges(const llvm::Function *Fun) const override {
+    std::vector<std::pair<const llvm::Instruction *, const llvm::Instruction *>>
+        Ret;
+    getAllControlFlowEdges(Fun, Ret);
+    return Ret;
+  }
+
+  void getAllControlFlowEdges(
+      const llvm::Function *Fun,
+      std::vector<std::pair<const llvm::Instruction *,
+                            const llvm::Instruction *>> &Dest) const;
 
   [[nodiscard]] std::vector<const llvm::Instruction *>
   getAllInstructionsOf(const llvm::Function *Fun) const override;

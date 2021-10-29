@@ -13,7 +13,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionBase.h"
 
 namespace psr::XTaint {
-class JoinConstEdgeFunction : public EdgeFunctionBase {
+class JoinConstEdgeFunction final : public EdgeFunctionBase {
   EdgeFunctionPtrType OtherFn;
   const llvm::Instruction *OtherConst;
 

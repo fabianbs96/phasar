@@ -13,7 +13,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionBase.h"
 
 namespace psr::XTaint {
-class TransferEdgeFunction : public EdgeFunctionBase {
+class TransferEdgeFunction final : public EdgeFunctionBase {
   const llvm::Instruction *Load;
   const llvm::Instruction *To;
 

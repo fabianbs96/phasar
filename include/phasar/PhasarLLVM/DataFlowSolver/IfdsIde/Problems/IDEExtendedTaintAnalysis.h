@@ -152,7 +152,7 @@ public:
                            std::set<std::string> EntryPoints, unsigned Bound,
                            bool DisableStrongUpdates);
 
-  ~IDEExtendedTaintAnalysis() override = default;
+  ~IDEExtendedTaintAnalysis() override;
 
   // Flow functions
 

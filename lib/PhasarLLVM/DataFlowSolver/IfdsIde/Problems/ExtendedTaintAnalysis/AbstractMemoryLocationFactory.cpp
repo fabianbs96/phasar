@@ -7,6 +7,7 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
+#include <cstddef>
 #include <exception>
 #include <limits>
 
@@ -44,8 +45,7 @@ auto AbstractMemoryLocationFactoryBase::Allocator::Block::create(
 
   auto *Ret = reinterpret_cast<Block *>(new size_t[1 + NumPointerEntries]);
 
-  new (Ret) Block(Next);
-  return Ret;
+  return new (Ret) Block(Next);
 }
 
 void AbstractMemoryLocationFactoryBase::Allocator::Block::destroy(Block *Blck) {
@@ -112,9 +112,7 @@ AbstractMemoryLocationFactoryBase::Allocator::create(
 
   Pos += NumPointersRequired;
 
-  new (Ret) AbstractMemoryLocationImpl(Baseptr, Offsets, Lifetime);
-
-  return Ret;
+  return new (Ret) AbstractMemoryLocationImpl(Baseptr, Offsets, Lifetime);
 }
 
 AbstractMemoryLocationFactoryBase::AbstractMemoryLocationFactoryBase(

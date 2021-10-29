@@ -16,7 +16,15 @@
 
 namespace psr::XTaint {
 EdgeFunctionBase::EdgeFunctionBase(Kind Kind, BasicBlockOrdering &BBO)
-    : BBO(BBO), kind(Kind) {}
+    : BBO(BBO), kind(Kind) {
+  ++AllocationCount;
+  if (CtorCount++ % 10000 == 0) {
+    std::cerr << "EdgeFunction: #Objects" << AllocationCount
+              << "; #Ctors: " << CtorCount << '\n';
+  }
+}
+
+EdgeFunctionBase::~EdgeFunctionBase() { --AllocationCount; }
 
 EdgeFunctionBase::EdgeFunctionPtrType
 EdgeFunctionBase::composeWith(EdgeFunctionPtrType SecondFunction) {
@@ -36,7 +44,7 @@ EdgeFunctionBase::composeWith(EdgeFunctionPtrType SecondFunction) {
     return SecondFunction;
   }
 
-  return makeEF<ComposeEdgeFunction>(BBO, shared_from_this(), SecondFunction);
+  return getComposeEdgeFunction(BBO, shared_from_this(), SecondFunction);
 }
 EdgeFunctionBase::EdgeFunctionPtrType
 EdgeFunctionBase::joinWith(EdgeFunctionPtrType OtherFunction) {
