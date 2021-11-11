@@ -17,7 +17,7 @@ class Instruction;
 }
 
 namespace psr::XTaint {
-class GenEdgeFunction : public EdgeFunctionBase {
+class GenEdgeFunction final : public EdgeFunctionBase {
   const llvm::Instruction *Sani;
 
 public:

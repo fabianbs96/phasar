@@ -20,7 +20,9 @@ namespace psr::XTaint {
 TransferEdgeFunction::TransferEdgeFunction(BasicBlockOrdering &BBO,
                                            const llvm::Instruction *Load,
                                            const llvm::Instruction *To)
-    : EdgeFunctionBase(Kind::Transfer, BBO), Load(Load), To(To) {}
+    : EdgeFunctionBase(Kind::Transfer, BBO), Load(Load), To(To) {
+  std::cerr << "Transfer[To: " << llvmIRToShortString(To) << "]\n";
+}
 
 auto TransferEdgeFunction::computeTarget(l_t Source) -> l_t {
 

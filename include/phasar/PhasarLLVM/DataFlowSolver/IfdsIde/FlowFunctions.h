@@ -17,7 +17,9 @@
 #ifndef PHASAR_PHASARLLVM_IFDSIDE_FLOWFUNCTIONS_H_
 #define PHASAR_PHASARLLVM_IFDSIDE_FLOWFUNCTIONS_H_
 
+#include <cstddef>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <set>
 #include <type_traits>
@@ -36,6 +38,9 @@ template <typename D, typename Container = std::set<D>> class FlowFunction {
   static_assert(std::is_same<typename Container::value_type, D>::value,
                 "Container values needs to be the same as D");
 
+  static inline size_t AllocationCount = 0;
+  static inline size_t CtorCount = 0;
+
 public:
   using FlowFunctionType = FlowFunction<D, Container>;
   using FlowFunctionPtrType = std::shared_ptr<FlowFunctionType>;
@@ -43,7 +48,14 @@ public:
   using container_type = Container;
   using value_type = typename container_type::value_type;
 
-  virtual ~FlowFunction() = default;
+  FlowFunction() {
+    ++AllocationCount;
+    if (CtorCount++ % 10000 == 0) {
+      std::cerr << "FlowFunction: #Objects" << AllocationCount
+                << "; #Ctors: " << CtorCount << '\n';
+    }
+  }
+  virtual ~FlowFunction() { --AllocationCount; }
 
   //
   // This function is called for each data-flow fact Source that holds before

@@ -15,6 +15,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/EdgeDomain.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/GenEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/Helpers.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionCache.h"
 #include "phasar/PhasarLLVM/Utils/BasicBlockOrdering.h"
 
 namespace psr::XTaint {
@@ -29,16 +30,31 @@ bool isEdgeIdentity(EdgeFunction<EdgeDomain> *EF) {
 }
 
 EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
-getGenEdgeFunction(BasicBlockOrdering &BBO) {
-  static llvm::SmallDenseMap<BasicBlockOrdering *,
-                             EdgeFunction<EdgeDomain>::EdgeFunctionPtrType, 2>
-      Cache;
-
-  auto &Ret = Cache[&BBO];
-  if (!Ret) {
-    Ret = std::make_shared<GenEdgeFunction>(BBO, nullptr);
+getGenEdgeFunction(BasicBlockOrdering &BBO, const llvm::Instruction *Sani) {
+  auto &Ret = EdgeFunctionCache::GenEdgeFunction(BBO, Sani);
+  if (auto RetShared = Ret.lock()) {
+    return RetShared;
   }
-  return Ret;
+
+  auto RetShared = makeEF<GenEdgeFunction>(BBO, Sani);
+  Ret = RetShared;
+
+  return RetShared;
+}
+
+EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
+getComposeEdgeFunction(BasicBlockOrdering &BBO,
+                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &F,
+                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &G) {
+  auto &Ret = EdgeFunctionCache::ComposeEdgeFunction(BBO, &*F, &*G);
+  if (auto RetShared = Ret.lock()) {
+    return RetShared;
+  }
+
+  auto RetShared = makeEF<ComposeEdgeFunction>(BBO, F, G);
+  Ret = RetShared;
+
+  return RetShared;
 }
 
 llvm::hash_code

@@ -32,12 +32,14 @@ protected:
 
 private:
   const Kind kind;
+  static inline size_t AllocationCount = 0;
+  static inline size_t CtorCount = 0;
 
 public:
   using l_t = EdgeDomain;
 
   EdgeFunctionBase(Kind Kind, BasicBlockOrdering &BBO);
-  ~EdgeFunctionBase() override = default;
+  ~EdgeFunctionBase() override;
 
   EdgeFunctionPtrType composeWith(EdgeFunctionPtrType SecondFunction) override;
   EdgeFunctionPtrType joinWith(EdgeFunctionPtrType OtherFunction) override;

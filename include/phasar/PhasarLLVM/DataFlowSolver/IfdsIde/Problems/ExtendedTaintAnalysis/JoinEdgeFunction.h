@@ -17,7 +17,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionBase.h"
 
 namespace psr::XTaint {
-class JoinEdgeFunction : public EdgeFunctionBase {
+class JoinEdgeFunction final : public EdgeFunctionBase {
   struct EFDenseSetInfo {
     static inline EdgeFunctionPtrType getEmptyKey() {
       static EdgeFunctionPtrType EmptyKey(

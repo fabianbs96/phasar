@@ -23,6 +23,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/JoinEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/KillIfSanitizedEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/TransferEdgeFunction.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionCache.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/IDEExtendedTaintAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
@@ -47,6 +48,11 @@ IDEExtendedTaintAnalysis::IDEExtendedTaintAnalysis(
   base_t::ZeroValue = createZeroValue();
 
   FactFactory.setDataLayout(DL);
+}
+
+IDEExtendedTaintAnalysis::~IDEExtendedTaintAnalysis() {
+  // Note: Do not use this in a multithreaded context!
+  XTaint::EdgeFunctionCache::clear();
 }
 
 InitialSeeds<IDEExtendedTaintAnalysis::n_t, IDEExtendedTaintAnalysis::d_t,
@@ -133,7 +139,7 @@ IDEExtendedTaintAnalysis::getStoreFF(const llvm::Value *PointerOp,
   auto Mem = makeFlowFact(PointerOp);
   return makeLambdaFlow<d_t>([this, TV, Mem, PTS{std::move(PTS)}, PointerOp,
                               ValueOp, Store,
-                              PALevel](d_t Source) mutable -> std::set<d_t> {
+                              PALevel](d_t Source) -> std::set<d_t> {
     if (Source->isZero()) {
       std::set<d_t> Ret = {Source};
       generateFromZero(Ret, Store, PointerOp, ValueOp,
@@ -531,13 +537,13 @@ auto IDEExtendedTaintAnalysis::getNormalEdgeFunction(n_t Curr, d_t CurrNode,
 
   /// Kill the PointerOp, if we store into it
   if (PointerOp && CurrNode->mustAlias(makeFlowFact(PointerOp), *PT)) {
-    return makeEF<GenEdgeFunction>(BBO, Curr);
+    return getGenEdgeFunction(BBO, Curr);
   }
 
   auto SaniConfig = getSanitizerConfigAt(Curr, Succ);
   if (!SaniConfig.empty()) {
     if (isMustAlias(SaniConfig, CurrNode)) {
-      return makeEF<GenEdgeFunction>(BBO, Curr);
+      return getGenEdgeFunction(BBO, Curr);
     }
   }
 
@@ -602,7 +608,7 @@ auto IDEExtendedTaintAnalysis::getCallToRetEdgeFunction(
       if (Arg.get()->getType()->isPointerTy() &&
           equivalent(CallNode, makeFlowFact(Arg.get()))) {
         // kill the flow fact unconditionally
-        return makeEF<GenEdgeFunction>(BBO, CallSite);
+        return getGenEdgeFunction(BBO, CallSite);
       }
     }
   }
@@ -652,13 +658,13 @@ auto IDEExtendedTaintAnalysis::getSummaryEdgeFunction(n_t Curr, d_t CurrNode,
   EdgeFunctionPtrType Ret = getEdgeIdentity(Curr);
 
   if (isMustAlias(SaniConfig, CurrNode)) {
-    return makeEF<GenEdgeFunction>(BBO, Curr);
+    return getGenEdgeFunction(BBO, Curr);
   }
 
   // MemIntrinsic covers memset, memcpy and memmove
   if (const auto *MemSet = llvm::dyn_cast<llvm::MemIntrinsic>(Curr);
       MemSet && CurrNode->mustAlias(makeFlowFact(MemSet->getRawDest()), *PT)) {
-    return makeEF<GenEdgeFunction>(BBO, Curr);
+    return getGenEdgeFunction(BBO, Curr);
   }
 
   return Ret;
