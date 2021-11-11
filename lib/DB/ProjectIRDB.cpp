@@ -31,6 +31,7 @@
 #include "phasar/Config/Configuration.h"
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/LLVMZeroValue.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/PhasarLLVM/Passes/GeneralStatisticsAnalysis.h"
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/Utils/EnumFlags.h"
@@ -53,6 +54,7 @@ ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
   PB.registerModuleAnalyses(MAM);
   // add the transformation pass ValueAnnotationPass
   MPM.addPass(ValueAnnotationPass());
+  MPM.addPass(FunctionAnnotationPass());
   // just to be sure that none of the passes messed up the module!
   MPM.addPass(llvm::VerifierPass());
 }
@@ -278,7 +280,13 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
     OS << '\n';
     for (const auto *F : getAllFunctions()) {
       if (!F->isDeclaration() && Module->getFunction(F->getName())) {
-        OS << F->getName().str() << " {\n";
+        OS << F->getName().str();
+        if (F->getSectionPrefix().hasValue()) {
+          OS << " | FunID: " << F->getSectionPrefix().getValue().str()
+             << " {\n";
+        } else {
+          OS << " {\n";
+        }
         for (const auto &BB : *F) {
           // do not print the label of the first BB
           if (BB.getPrevNode()) {
@@ -471,6 +479,19 @@ std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
     }
   }
   return Functions;
+}
+
+const llvm::Function *
+ProjectIRDB::getFunctionWithSectionPrefixOrNull(std::string SectionPrefix) {
+  for (const auto &[File, Module] : Modules) {
+    for (auto &F : *Module) {
+      if (F.getSectionPrefix().hasValue() &&
+          F.getSectionPrefix().getValue().equals(SectionPrefix)) {
+        return &F;
+      }
+    }
+  }
+  return nullptr;
 }
 
 void ProjectIRDB::insertModule(llvm::Module *M) {

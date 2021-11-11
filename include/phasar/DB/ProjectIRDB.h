@@ -122,6 +122,9 @@ public:
   [[nodiscard]] std::set<const llvm::Function *> getAllFunctions() const;
 
   [[nodiscard]] const llvm::Function *
+  getFunctionWithSectionPrefixOrNull(std::string SectionPrefix);
+
+  [[nodiscard]] const llvm::Function *
   getFunctionDefinition(llvm::StringRef FunctionName) const;
   [[nodiscard]] llvm::Function *
   getFunctionDefinition(llvm::StringRef FunctionName);
