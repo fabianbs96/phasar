@@ -465,7 +465,7 @@ bool LLVMBasedICFG::addRuntimeEdges(
           // Updating the points-to information
           psr::Resolver::FunctionSetTy CallTargetSet{RuntimeCallTarget};
           Res->handlePossibleTargets(CallBase, CallTargetSet);
-          // ITST_TODO: Record statistics
+          TotalRuntimeEdgesAdded++;
           ICFGAugumented = true;
 
           Res->postCall(CallSite);
@@ -1353,6 +1353,10 @@ unsigned LLVMBasedICFG::getNumOfVertices() const {
 
 unsigned LLVMBasedICFG::getNumOfEdges() const {
   return boost::num_edges(CallGraph);
+}
+
+unsigned LLVMBasedICFG::getTotalRuntimeEdgesAdded() const {
+  return TotalRuntimeEdgesAdded;
 }
 
 const llvm::Function *

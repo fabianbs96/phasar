@@ -91,6 +91,8 @@ private:
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
+  // Counter to store the number of runtime edges added
+  unsigned int TotalRuntimeEdgesAdded = 0;
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -330,6 +332,8 @@ public:
   [[nodiscard]] unsigned getNumOfVertices() const;
 
   [[nodiscard]] unsigned getNumOfEdges() const;
+
+  [[nodiscard]] unsigned getTotalRuntimeEdgesAdded() const;
 
   std::vector<const llvm::Function *> getDependencyOrderedFunctions();
 

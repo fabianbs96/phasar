@@ -408,6 +408,7 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
   ASSERT_TRUE(ICFG.getNumOfEdges() == TotalEdgesBefore + 1);
   ASSERT_TRUE(ICFG.getCallersOf(Bar).find(IRDB.getInstruction(10)) !=
               ICFG.getCallersOf(Bar).end());
+  ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 1);
 }
 
 TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
@@ -440,6 +441,7 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
   boost::container::flat_set<const llvm::Function *> VertFunsAfter =
       ICFG.getAllVertexFunctions();
   ASSERT_TRUE(VertFunsAfter.find(Bar) == boost::end(VertFunsAfter));
+  ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 0);
 }
 
 int main(int Argc, char **Argv) {
