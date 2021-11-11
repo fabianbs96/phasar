@@ -423,6 +423,59 @@ bool LLVMBasedICFG::constructDynamicCall(const llvm::Instruction *I,
   return NewTargetsFound;
 }
 
+bool LLVMBasedICFG::addRuntimeEdges(
+    std::set<std::pair<int, int>> CallerCalleeMap) {
+  bool ICFGAugumented = false;
+  for (auto &[CallSiteId, FunctionPrefixId] : CallerCalleeMap) {
+    const auto CallSite = IRDB.getInstruction(CallSiteId);
+    assert(CallSite && "addRuntimeEdges: callSite not found in IRDB");
+    if (const auto CallBase = llvm::dyn_cast<llvm::CallBase>(CallSite)) {
+      auto RuntimeCallTarget = IRDB.getFunctionWithSectionPrefixOrNull(
+          std::to_string(FunctionPrefixId));
+      if (RuntimeCallTarget) {
+        vertex_t CallSiteVertexDescriptor;
+        auto FvmItr = FunctionVertexMap.find(CallSite->getFunction());
+        if (FvmItr != FunctionVertexMap.end()) {
+          CallSiteVertexDescriptor = FvmItr->second;
+        } else {
+          LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), ERROR)
+                        << "addRuntimeEdges: Did not find vertex of "
+                           "calling function "
+                        << CallSite->getFunction()->getName().str()
+                        << " at callsite " << llvmIRToString(CallSite));
+          std::terminate();
+        }
+
+        vertex_t RuntimeTargetVertex;
+        auto TargetFvmItr = FunctionVertexMap.find(RuntimeCallTarget);
+        if (TargetFvmItr != FunctionVertexMap.end()) {
+          RuntimeTargetVertex = TargetFvmItr->second;
+        } else {
+          RuntimeTargetVertex =
+              boost::add_vertex(VertexProperties(RuntimeCallTarget), CallGraph);
+          FunctionVertexMap[RuntimeCallTarget] = RuntimeTargetVertex;
+        }
+
+        if (!boost::edge(CallSiteVertexDescriptor, RuntimeTargetVertex,
+                         CallGraph)
+                 .second) {
+          Res->preCall(CallSite);
+          boost::add_edge(CallSiteVertexDescriptor, RuntimeTargetVertex,
+                          EdgeProperties(CallSite), CallGraph);
+          // Updating the points-to information
+          psr::Resolver::FunctionSetTy CallTargetSet{RuntimeCallTarget};
+          Res->handlePossibleTargets(CallBase, CallTargetSet);
+          // ITST_TODO: Record statistics
+          ICFGAugumented = true;
+
+          Res->postCall(CallSite);
+        }
+      }
+    }
+  }
+  return ICFGAugumented;
+}
+
 std::unique_ptr<Resolver> LLVMBasedICFG::makeResolver(ProjectIRDB &IRDB,
                                                       CallGraphAnalysisType CGT,
                                                       LLVMTypeHierarchy &TH,

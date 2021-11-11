@@ -244,6 +244,14 @@ public:
   OutEdgesAndTargets getOutEdgeAndTarget(const llvm::Function *Fun) const;
 
   /**
+   * For the given pair of (instruction id - function id), if there are no edges
+   * in the callgraph, this function adds the edges
+   *
+   * \return boolean flag that tells if the callgraph is modified
+   */
+  bool addRuntimeEdges(std::set<std::pair<int, int>> CallerCalleeMap);
+
+  /**
    * Removes all edges found for the given instruction within the
    * sourceFunction. \return number of edges removed
    */
