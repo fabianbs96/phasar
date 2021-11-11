@@ -102,6 +102,8 @@ globalValuesUsedinFunction(const llvm::Function *F);
  */
 std::string getMetaDataID(const llvm::Value *V);
 
+std::optional<unsigned> getFunctionId(const llvm::Function *F);
+
 /**
  * @brief Does less-than comparison based on the annotated ID.
  *

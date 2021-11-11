@@ -284,9 +284,8 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
     for (const auto *F : getAllFunctions()) {
       if (!F->isDeclaration() && Module->getFunction(F->getName())) {
         OS << F->getName().str();
-        if (F->getSectionPrefix().hasValue()) {
-          OS << " | FunID: " << F->getSectionPrefix().getValue().str()
-             << " {\n";
+        if (auto FId = getFunctionId(F)) {
+          OS << " | FunID: " << *FId << " {\n";
         } else {
           OS << " {\n";
         }
@@ -488,14 +487,8 @@ const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
   /// Maybe cache this mapping later on
   for (const auto &[File, Module] : Modules) {
     for (auto &F : *Module) {
-      auto *MD = F.getMetadata(FunctionAnnotationPass::FunctionMetadataId);
-      if (!MD) {
-        continue;
-      }
-
-      auto *MDInt = llvm::cast<llvm::ValueAsMetadata>(MD->getOperand(0));
-      if (llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue() ==
-          Id) {
+      auto FId = getFunctionId(&F);
+      if (FId && *FId == Id) {
         return &F;
       }
     }
