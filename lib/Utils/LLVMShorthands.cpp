@@ -36,6 +36,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "phasar/Config/Configuration.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -148,7 +149,7 @@ static llvm::SmallDenseMap<const llvm::Module *,
 
 llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V) {
   const auto *M = getModuleFromVal(V);
-  
+
   auto &Ret = ModuleToSlotTracker[M];
   if (!Ret) {
     Ret = std::make_unique<llvm::ModuleSlotTracker>(M);
@@ -248,6 +249,17 @@ std::string getMetaDataID(const llvm::Value *V) {
     return string(FName + "." + ArgNr);
   }
   return "-1";
+}
+
+std::optional<unsigned> getFunctionId(const llvm::Function *F) {
+  auto *MD = F->getMetadata(FunctionAnnotationPass::FunctionMetadataId);
+  if (!MD) {
+    return std::nullopt;
+  }
+
+  auto *MDInt = llvm::cast<llvm::ValueAsMetadata>(MD->getOperand(0));
+  return static_cast<unsigned>(
+      llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue());
 }
 
 llvmValueIDLess::llvmValueIDLess() : sless(stringIDLess()) {}

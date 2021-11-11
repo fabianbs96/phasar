@@ -16,12 +16,15 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Demangle/Demangle.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Utils.h"
@@ -31,6 +34,7 @@
 #include "phasar/Config/Configuration.h"
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/LLVMZeroValue.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/PhasarLLVM/Passes/GeneralStatisticsAnalysis.h"
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/Utils/EnumFlags.h"
@@ -53,6 +57,7 @@ ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
   PB.registerModuleAnalyses(MAM);
   // add the transformation pass ValueAnnotationPass
   MPM.addPass(ValueAnnotationPass());
+  MPM.addPass(FunctionAnnotationPass());
   // just to be sure that none of the passes messed up the module!
   MPM.addPass(llvm::VerifierPass());
 }
@@ -278,7 +283,12 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
     OS << '\n';
     for (const auto *F : getAllFunctions()) {
       if (!F->isDeclaration() && Module->getFunction(F->getName())) {
-        OS << F->getName().str() << " {\n";
+        OS << F->getName().str();
+        if (auto FId = getFunctionId(F)) {
+          OS << " | FunID: " << *FId << " {\n";
+        } else {
+          OS << " {\n";
+        }
         for (const auto &BB : *F) {
           // do not print the label of the first BB
           if (BB.getPrevNode()) {
@@ -471,6 +481,19 @@ std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
     }
   }
   return Functions;
+}
+
+const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
+  /// Maybe cache this mapping later on
+  for (const auto &[File, Module] : Modules) {
+    for (auto &F : *Module) {
+      auto FId = getFunctionId(&F);
+      if (FId && *FId == Id) {
+        return &F;
+      }
+    }
+  }
+  return nullptr;
 }
 
 void ProjectIRDB::insertModule(llvm::Module *M) {

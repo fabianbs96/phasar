@@ -86,11 +86,14 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
+  std::set<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
+  // Counter to store the number of runtime edges added
+  unsigned int TotalRuntimeEdgesAdded = 0;
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -244,6 +247,15 @@ public:
   OutEdgesAndTargets getOutEdgeAndTarget(const llvm::Function *Fun) const;
 
   /**
+   * For the given pair of (callsite id - function id), if there are no edges
+   * in the callgraph, this function adds the edges
+   *
+   * \return boolean flag that tells if the callgraph is modified
+   */
+  bool addRuntimeEdges(
+      const std::set<std::pair<unsigned, unsigned>> &CallerCalleeMap);
+
+  /**
    * Removes all edges found for the given instruction within the
    * sourceFunction. \return number of edges removed
    */
@@ -319,9 +331,13 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
+  [[nodiscard]] const std::set<const llvm::Instruction *> &getUnsoundCallSites();
+
   [[nodiscard]] unsigned getNumOfVertices() const;
 
   [[nodiscard]] unsigned getNumOfEdges() const;
+
+  [[nodiscard]] unsigned getTotalRuntimeEdgesAdded() const;
 
   std::vector<const llvm::Function *> getDependencyOrderedFunctions();
 

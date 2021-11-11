@@ -9,6 +9,8 @@
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
+#include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
@@ -285,8 +287,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_1) {
   ASSERT_TRUE(Main);
   ASSERT_TRUE(BeforeMain);
 
-  boost::container::flat_set<const llvm::Function *> VertFuns =
-      ICFG.getAllVertexFunctions();
+  auto VertFuns = ICFG.getAllVertexFunctions();
 
   ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
@@ -310,8 +311,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_2) {
   ASSERT_TRUE(BeforeMain);
   ASSERT_TRUE(AfterMain);
 
-  boost::container::flat_set<const llvm::Function *> VertFuns =
-      ICFG.getAllVertexFunctions();
+  auto VertFuns = ICFG.getAllVertexFunctions();
 
   ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
@@ -334,8 +334,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_3) {
   ASSERT_TRUE(Ctor);
   ASSERT_TRUE(Dtor);
 
-  boost::container::flat_set<const llvm::Function *> VertFuns =
-      ICFG.getAllVertexFunctions();
+  auto VertFuns = ICFG.getAllVertexFunctions();
 
   ASSERT_TRUE(VertFuns.find(Ctor) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(Dtor) != boost::end(VertFuns));
@@ -363,14 +362,81 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
   ASSERT_TRUE(BeforeMain);
   ASSERT_TRUE(AfterMain);
 
-  boost::container::flat_set<const llvm::Function *> VertFuns =
-      ICFG.getAllVertexFunctions();
+  auto VertFuns = ICFG.getAllVertexFunctions();
 
   ASSERT_TRUE(VertFuns.find(Ctor) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(Dtor) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
   ASSERT_TRUE(VertFuns.find(AfterMain) != boost::end(VertFuns));
+}
+
+TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
+  psr::ValueAnnotationPass::resetValueID();
+  psr::FunctionAnnotationPass::resetFunctionID();
+  ProjectIRDB IRDB(
+      {unittest::PathToLLTestFiles + "call_graphs/runtime_edges_1_cpp.ll"},
+      IRDBOptions::WPA);
+  LLVMTypeHierarchy TH(IRDB);
+  LLVMPointsToSet PT(IRDB);
+  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::NORESOLVE, {"main"}, &TH, &PT,
+                     Soundness::Unsound, true);
+
+  // llvm::errs() << *IRDB.getWPAModule() << '\n';
+
+  const llvm::Function *Main = IRDB.getFunctionDefinition("main");
+  const llvm::Function *Foo = IRDB.getFunctionDefinition("_Z3foov");
+  const llvm::Function *Bar = IRDB.getFunctionDefinition("_Z3barv");
+
+  ASSERT_TRUE(Main);
+  ASSERT_TRUE(Foo);
+
+  auto VertFunsBefore = ICFG.getAllVertexFunctions();
+
+  ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
+  auto TotalEdgesBefore = ICFG.getNumOfEdges();
+
+  std::set<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 1}};
+  auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
+
+  ASSERT_TRUE(ICFGChanged);
+  auto VertFunsAfter = ICFG.getAllVertexFunctions();
+  ASSERT_TRUE(VertFunsAfter.find(Bar) != boost::end(VertFunsAfter));
+  ASSERT_TRUE(ICFG.getNumOfEdges() == TotalEdgesBefore + 1);
+  ASSERT_TRUE(ICFG.getCallersOf(Bar).find(IRDB.getInstruction(10)) !=
+              ICFG.getCallersOf(Bar).end());
+  ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 1);
+}
+
+TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
+  psr::ValueAnnotationPass::resetValueID();
+  psr::FunctionAnnotationPass::resetFunctionID();
+  ProjectIRDB IRDB(
+      {unittest::PathToLLTestFiles + "call_graphs/runtime_edges_1_cpp.ll"},
+      IRDBOptions::WPA);
+  LLVMTypeHierarchy TH(IRDB);
+  LLVMPointsToSet PT(IRDB);
+  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
+                     Soundness::Unsound, true);
+  const llvm::Function *Main = IRDB.getFunctionDefinition("main");
+  const llvm::Function *Foo = IRDB.getFunctionDefinition("_Z3foov");
+  const llvm::Function *Bar = IRDB.getFunctionDefinition("_Z3barv");
+
+  ASSERT_TRUE(Main);
+  ASSERT_TRUE(Foo);
+
+  auto VertFunsBefore = ICFG.getAllVertexFunctions();
+
+  ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
+  auto TotalEdgesBefore = ICFG.getNumOfEdges();
+
+  std::set<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 0}};
+  auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
+
+  ASSERT_FALSE(ICFGChanged);
+  auto VertFunsAfter = ICFG.getAllVertexFunctions();
+  ASSERT_TRUE(VertFunsAfter.find(Bar) == boost::end(VertFunsAfter));
+  ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 0);
 }
 
 int main(int Argc, char **Argv) {

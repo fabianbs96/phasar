@@ -199,6 +199,8 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       for (auto &CS : UnsoundIndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
+      std::copy(UnsoundIndirectCalls.begin(), UnsoundIndirectCalls.end(),
+                std::inserter(UnsoundCallSites, UnsoundCallSites.end()));
       UnsoundIndirectCalls.clear();
     }
 
@@ -421,6 +423,61 @@ bool LLVMBasedICFG::constructDynamicCall(const llvm::Instruction *I,
   }
 
   return NewTargetsFound;
+}
+
+bool LLVMBasedICFG::addRuntimeEdges(
+    const std::set<std::pair<unsigned, unsigned>> &CallerCalleeMap) {
+  bool ICFGAugumented = false;
+  for (const auto &[CallSiteId, FunctionPrefixId] : CallerCalleeMap) {
+    const auto *CallSite = IRDB.getInstruction(CallSiteId);
+    assert(CallSite && "addRuntimeEdges: callSite not found in IRDB");
+    const auto *CallBase = llvm::dyn_cast<llvm::CallBase>(CallSite);
+    if (!CallBase) {
+      continue;
+    }
+    const auto *RuntimeCallTarget = IRDB.getFunctionById(FunctionPrefixId);
+    if (!RuntimeCallTarget) {
+      /// TODO: At least log this incident
+      continue;
+    }
+    vertex_t CallSiteVertexDescriptor;
+    if (auto FvmItr = FunctionVertexMap.find(CallSite->getFunction());
+        FvmItr != FunctionVertexMap.end()) {
+      CallSiteVertexDescriptor = FvmItr->second;
+    } else {
+      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), ERROR)
+                    << "addRuntimeEdges: Did not find vertex of "
+                       "calling function "
+                    << CallSite->getFunction()->getName().str()
+                    << " at callsite " << llvmIRToString(CallSite));
+      continue;
+    }
+
+    vertex_t RuntimeTargetVertex;
+    auto TargetFvmItr = FunctionVertexMap.find(RuntimeCallTarget);
+    if (TargetFvmItr != FunctionVertexMap.end()) {
+      RuntimeTargetVertex = TargetFvmItr->second;
+    } else {
+      RuntimeTargetVertex =
+          boost::add_vertex(VertexProperties(RuntimeCallTarget), CallGraph);
+      FunctionVertexMap[RuntimeCallTarget] = RuntimeTargetVertex;
+    }
+
+    if (!boost::edge(CallSiteVertexDescriptor, RuntimeTargetVertex, CallGraph)
+             .second) {
+      Res->preCall(CallSite);
+      boost::add_edge(CallSiteVertexDescriptor, RuntimeTargetVertex,
+                      EdgeProperties(CallSite), CallGraph);
+      // Updating the points-to information
+      psr::Resolver::FunctionSetTy CallTargetSet{RuntimeCallTarget};
+      Res->handlePossibleTargets(CallBase, CallTargetSet);
+      TotalRuntimeEdgesAdded++;
+      ICFGAugumented = true;
+
+      Res->postCall(CallSite);
+    }
+  }
+  return ICFGAugumented;
 }
 
 std::unique_ptr<Resolver> LLVMBasedICFG::makeResolver(ProjectIRDB &IRDB,
@@ -1294,12 +1351,21 @@ vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
   return Functions;
 }
 
+const std::set<const llvm::Instruction *> &
+LLVMBasedICFG::getUnsoundCallSites() {
+  return UnsoundCallSites;
+}
+
 unsigned LLVMBasedICFG::getNumOfVertices() const {
   return boost::num_vertices(CallGraph);
 }
 
 unsigned LLVMBasedICFG::getNumOfEdges() const {
   return boost::num_edges(CallGraph);
+}
+
+unsigned LLVMBasedICFG::getTotalRuntimeEdgesAdded() const {
+  return TotalRuntimeEdgesAdded;
 }
 
 const llvm::Function *

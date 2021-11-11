@@ -31,6 +31,7 @@ set(NoMem2regSources
 	global_ctor_dtor_2.cpp
 	global_ctor_dtor_3.cpp
 	global_ctor_dtor_4.cpp
+  runtime_edges_1.cpp
 )
 
 foreach(TEST_SRC ${NoMem2regSources})
