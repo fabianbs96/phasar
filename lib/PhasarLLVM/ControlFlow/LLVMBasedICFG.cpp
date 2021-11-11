@@ -441,7 +441,8 @@ bool LLVMBasedICFG::addRuntimeEdges(
       continue;
     }
     vertex_t CallSiteVertexDescriptor;
-    if (auto FvmItr = FunctionVertexMap.find(CallSite->getFunction()); FvmItr != FunctionVertexMap.end()) {
+    if (auto FvmItr = FunctionVertexMap.find(CallSite->getFunction());
+        FvmItr != FunctionVertexMap.end()) {
       CallSiteVertexDescriptor = FvmItr->second;
     } else {
       LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), ERROR)
@@ -449,7 +450,7 @@ bool LLVMBasedICFG::addRuntimeEdges(
                        "calling function "
                     << CallSite->getFunction()->getName().str()
                     << " at callsite " << llvmIRToString(CallSite));
-      std::terminate();
+      continue;
     }
 
     vertex_t RuntimeTargetVertex;
@@ -1350,7 +1351,8 @@ vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
   return Functions;
 }
 
-const std::set<const llvm::Instruction *> &LLVMBasedICFG::getUnsoundCallSites() {
+const std::set<const llvm::Instruction *> &
+LLVMBasedICFG::getUnsoundCallSites() {
   return UnsoundCallSites;
 }
 
