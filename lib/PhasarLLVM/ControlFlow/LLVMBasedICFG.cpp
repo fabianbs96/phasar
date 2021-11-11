@@ -1350,7 +1350,7 @@ vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
   return Functions;
 }
 
-std::set<const llvm::Instruction *> LLVMBasedICFG::getUnsoundCallSites() {
+const std::set<const llvm::Instruction *> &LLVMBasedICFG::getUnsoundCallSites() {
   return UnsoundCallSites;
 }
 
