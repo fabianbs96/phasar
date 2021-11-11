@@ -331,7 +331,7 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
-  [[nodiscard]] std::set<const llvm::Instruction *> getUnsoundCallSites();
+  [[nodiscard]] const std::set<const llvm::Instruction *> &getUnsoundCallSites();
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 
