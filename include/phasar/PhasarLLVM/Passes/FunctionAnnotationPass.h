@@ -1,6 +1,7 @@
 #ifndef PHASAR_PHASARLLVM_PASSES_RUNTIMEINFORMATION_FUNCTIONANNOTATIONPASS_H_
 #define PHASAR_PHASARLLVM_PASSES_RUNTIMEINFORMATION_FUNCTIONANNOTATIONPASS_H_
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/PassManager.h"
 
 namespace llvm {
@@ -28,6 +29,8 @@ private:
   static size_t UniqueFunctionId;
 
 public:
+  static inline constexpr llvm::StringLiteral FunctionMetadataId = "psr.fun.id";
+
   explicit FunctionAnnotationPass();
 
   static llvm::PreservedAnalyses run(llvm::Module &M,

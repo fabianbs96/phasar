@@ -16,12 +16,15 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Demangle/Demangle.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Utils.h"
@@ -481,12 +484,18 @@ std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
   return Functions;
 }
 
-const llvm::Function *
-ProjectIRDB::getFunctionWithSectionPrefixOrNull(std::string SectionPrefix) {
+const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
+  /// Maybe cache this mapping later on
   for (const auto &[File, Module] : Modules) {
     for (auto &F : *Module) {
-      if (F.getSectionPrefix().hasValue() &&
-          F.getSectionPrefix().getValue().equals(SectionPrefix)) {
+      auto *MD = F.getMetadata(FunctionAnnotationPass::FunctionMetadataId);
+      if (!MD) {
+        continue;
+      }
+
+      auto *MDInt = llvm::cast<llvm::ValueAsMetadata>(MD->getOperand(0));
+      if (llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue() ==
+          Id) {
         return &F;
       }
     }
