@@ -441,8 +441,7 @@ bool LLVMBasedICFG::addRuntimeEdges(
       continue;
     }
     vertex_t CallSiteVertexDescriptor;
-    auto FvmItr = FunctionVertexMap.find(CallSite->getFunction());
-    if (FvmItr != FunctionVertexMap.end()) {
+    if (auto FvmItr = FunctionVertexMap.find(CallSite->getFunction()); FvmItr != FunctionVertexMap.end()) {
       CallSiteVertexDescriptor = FvmItr->second;
     } else {
       LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), ERROR)
