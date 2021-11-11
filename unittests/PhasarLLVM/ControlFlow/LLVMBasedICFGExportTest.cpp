@@ -53,6 +53,13 @@ protected:
     auto Ret =
         asSrcCode ? ICFG.exportICFGAsSourceCodeJson() : ICFG.exportICFGAsJson();
 
+    if (asSrcCode) {
+      auto AsString = ICFG.exportICFGAsSourceCodeJsonString();
+      // std::cerr << AsString << "\n";
+      auto AsJson = nlohmann::json::parse(AsString);
+      assert(AsJson == Ret);
+    }
+
     clearModuleSlotTrackerFor(IRDB.getWPAModule());
 
     return Ret;

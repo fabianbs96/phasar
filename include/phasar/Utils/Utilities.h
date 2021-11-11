@@ -13,8 +13,8 @@
 #include <iosfwd>
 #include <set>
 #include <string>
-#include <utility>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "llvm/ADT/Hashing.h"
@@ -208,9 +208,8 @@ auto remove_by_index(Container &Cont, const Indices &Idx) {
 template <typename Fn> class scope_exit {
 public:
   template <typename FFn, typename = decltype(std::declval<FFn>()())>
-  explicit scope_exit(FFn &&F) noexcept(
-      std::is_nothrow_constructible_v<Fn, FFn> ||
-      std::is_nothrow_constructible_v<Fn, FFn &>)
+  scope_exit(FFn &&F) noexcept(std::is_nothrow_constructible_v<Fn, FFn> ||
+                               std::is_nothrow_constructible_v<Fn, FFn &>)
       : F(std::forward<FFn>(F)) {}
 
   ~scope_exit() { F(); }
@@ -231,6 +230,61 @@ template <typename Fn> scope_exit(Fn) -> scope_exit<Fn>;
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 // explicit deduction guide (not needed as of C++20)
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+/// Analoguous to std::quoted, but works for any kind of output streams, not
+/// just std::ostream
+struct quoted final {
+  llvm::StringRef Str;
+  char EscapeChar = '\\';
+  char QuotationMark = '"';
+
+  quoted() = delete;
+  quoted(const quoted &) = delete;
+  quoted(quoted &&) = delete;
+  ~quoted() = default;
+
+  quoted &operator=(const quoted &) = delete;
+  quoted &operator=(quoted &&) = delete;
+
+  explicit inline quoted(llvm::StringRef Str, char EscapeChar = '\\',
+                         char QuotationMark = '"') noexcept
+      : Str(Str), EscapeChar(EscapeChar), QuotationMark(QuotationMark) {}
+};
+
+template <typename OSTy> OSTy &operator<<(OSTy &OS, const quoted &Q) {
+  OS << Q.QuotationMark;
+
+  const auto Str = Q.Str;
+  std::array<char, 3> QuotEsc = {Q.EscapeChar, Q.QuotationMark, '\n'};
+  auto QuotEscStr = llvm::StringRef(QuotEsc.data(), QuotEsc.size());
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto printSlice = [&OS](llvm::StringRef Slice) {
+    if constexpr (is_printable_v<llvm::StringRef, OSTy>) {
+      OS << Slice;
+    } else if constexpr (is_printable_v<std::string_view, OSTy>) {
+      OS << static_cast<std::string_view>(Slice);
+    } else {
+      OS << Slice.str();
+    }
+  };
+
+  size_t Idx = 0;
+  for (size_t QIdx = Str.find_first_of(QuotEscStr);
+       QIdx != llvm::StringRef::npos;
+       QIdx = Str.find_first_of(QuotEscStr, QIdx + 1)) {
+    printSlice(Str.slice(Idx, QIdx));
+    char EscapedChar = Str[QIdx];
+    OS << "\\" << (EscapedChar == '\n' ? 'n' : EscapedChar);
+
+    Idx = QIdx + 1;
+  }
+
+  printSlice(Str.slice(Idx, llvm::StringRef::npos));
+
+  OS << Q.QuotationMark;
+  return OS;
+}
 
 } // namespace psr
 

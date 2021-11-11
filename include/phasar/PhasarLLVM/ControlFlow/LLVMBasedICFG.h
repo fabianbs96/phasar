@@ -36,6 +36,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/ICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
@@ -318,6 +319,13 @@ public:
   /// enriched with source-code information on every edge and ignoring debug
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
+
+  /// Create a JSON export of the whole ICFG similar to
+  /// exportICFGAsSourceCodeJson() but without creating intermediate
+  /// nlohmann::json objects.
+  /// Usually faster than exportICFGAsSourceCodeJson().dump()
+  [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
+  void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 

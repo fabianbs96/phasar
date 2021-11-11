@@ -412,16 +412,16 @@ auto LLVMBasedCFG::getFirstNonEmpty(llvm::BasicBlock::const_iterator &it,
   assert(it != end);
 
   const auto *Inst = &*it;
-  auto ret = getSrcCodeInfoFromIR(Inst);
+  auto Ret = getSrcCodeInfoFromIR(Inst);
 
   // Assume, we aren't skipping relevant calls here
 
-  while ((ret.empty() || it->isDebugOrPseudoInst()) && ++it != end) {
+  while ((Ret.empty() || it->isDebugOrPseudoInst()) && ++it != end) {
     Inst = &*it;
-    ret = getSrcCodeInfoFromIR(Inst);
+    Ret = getSrcCodeInfoFromIR(Inst);
   }
 
-  return {ret, llvmIRToString(Inst)};
+  return {Ret, llvmIRToString(Inst)};
 }
 
 auto LLVMBasedCFG::getFirstNonEmpty(const llvm::BasicBlock *BB)

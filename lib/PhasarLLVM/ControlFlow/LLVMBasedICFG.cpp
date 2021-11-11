@@ -17,11 +17,13 @@
 #include <cassert>
 #include <chrono>
 #include <initializer_list>
+#include <iomanip>
 #include <memory>
 #include <ostream>
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/AbstractCallSite.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -33,6 +35,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "boost/graph/copy.hpp"
 #include "boost/graph/depth_first_search.hpp"
@@ -1320,6 +1323,193 @@ nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
   }
 
   return J;
+}
+
+void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
+  OS << "[";
+  scope_exit CloseBrace = [&OS]() { OS << "]"; };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto isRetVoid = [](const llvm::Instruction *Inst) {
+    const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(Inst);
+    return Ret && !Ret->getReturnValue();
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto getLastNonEmpty =
+      [isRetVoid](const llvm::Instruction *Inst) -> SourceCodeInfoWithIR {
+    if (!isRetVoid(Inst) || !Inst->getPrevNode()) {
+      return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
+    }
+    for (const auto *Prev = Inst->getPrevNode(); Prev;
+         Prev = Prev->getPrevNode()) {
+      auto Src = getSrcCodeInfoFromIR(Prev);
+      if (!Src.empty()) {
+        return {Src, llvmIRToStableString(Prev)};
+      }
+    }
+
+    return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto writeSCI = [](llvm::raw_ostream &OS, const SourceCodeInfoWithIR &SCI) {
+    OS << "{\"sourceCodeLine\":" << psr::quoted(SCI.SourceCodeLine)
+       << ",\"sourceCodeFileName\":" << psr::quoted(SCI.SourceCodeFilename)
+       << ",\"sourceCodeFunctionName\":"
+       << psr::quoted(SCI.SourceCodeFunctionName) << ",\"line\":" << SCI.Line
+       << ",\"column\":" << SCI.Column << ",\"IR\":" << psr::quoted(SCI.IR)
+       << "}";
+  };
+
+  bool IsFirstEdge = true;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createEdge = [&OS, &IsFirstEdge,
+                     writeSCI](const SourceCodeInfoWithIR &From,
+                               const SourceCodeInfoWithIR &To) {
+    if (IsFirstEdge) {
+      IsFirstEdge = false;
+    } else {
+      OS << ",";
+    }
+
+    OS << "{\"from\":";
+    writeSCI(OS, From);
+    OS << ",\"to\":";
+    writeSCI(OS, To);
+    OS << "}";
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createInterEdges = [&](const llvm::Instruction *CS,
+                              const SourceCodeInfoWithIR &From,
+                              std::initializer_list<SourceCodeInfoWithIR> Tos) {
+    for (const auto *Callee : getCalleesOfCallAt(CS)) {
+      if (Callee->isDeclaration()) {
+        continue;
+      }
+
+      // Call Edge
+      auto InterTo = getFirstNonEmpty(&Callee->front());
+      createEdge(From, InterTo);
+
+      // Return Edges
+      for (const auto *ExitInst : getAllExitPoints(Callee)) {
+        for (const auto &To : Tos) {
+          createEdge(getLastNonEmpty(ExitInst), To);
+        }
+      }
+    }
+  };
+
+  for (const auto *F : getAllFunctions()) {
+    for (const auto &BB : *F) {
+      assert(!BB.empty() && "Invalid IR: Empty BasicBlock");
+      auto It = BB.begin();
+      auto End = BB.end();
+      auto From = getFirstNonEmpty(It, End);
+
+      if (It == End) {
+        continue;
+      }
+
+      const auto *FromInst = &*It;
+
+      ++It;
+
+      // Edges inside the BasicBlock
+      for (; It != End; ++It) {
+        auto To = getFirstNonEmpty(It, End);
+        if (To.empty()) {
+          break;
+        }
+
+        if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(FromInst)) {
+          // Call- and Return Edges
+          createInterEdges(FromInst, From, {To});
+        } else if (From != To && !isRetVoid(&*It)) {
+          // Normal Edge
+          createEdge(From, To);
+        }
+
+        FromInst = &*It;
+        From = std::move(To);
+      }
+
+      const auto *Term = BB.getTerminator();
+      assert(Term && "Invalid IR: BasicBlock without terminating instruction!");
+
+      auto NumSuccessors = Term->getNumSuccessors();
+
+      if (NumSuccessors == 0) {
+        // Return edges already handled
+      } else if (const auto *Invoke = llvm::dyn_cast<llvm::InvokeInst>(Term)) {
+        // Invoke Edges (they are not handled by the Call edges, because they
+        // are always terminator instructions)
+
+        // Note: The unwindDest is never reachable from a return instruction.
+        // However, this is how it is modeled in the ICFG at the moment
+        createInterEdges(Term,
+                         SourceCodeInfoWithIR{getSrcCodeInfoFromIR(Term),
+                                              llvmIRToStableString(Term)},
+                         {getFirstNonEmpty(Invoke->getNormalDest()),
+                          getFirstNonEmpty(Invoke->getUnwindDest())});
+        // Call Edges
+      } else {
+        // Branch Edges
+        for (size_t I = 0; I < NumSuccessors; ++I) {
+          auto *Succ = Term->getSuccessor(I);
+          assert(Succ && !Succ->empty());
+
+          auto To = getFirstNonEmpty(Succ);
+          if (From != To) {
+            createEdge(From, To);
+          }
+        }
+      }
+    }
+  }
+}
+
+std::string LLVMBasedICFG::exportICFGAsSourceCodeJsonString() const {
+  /// Use a heuristic to estimate the number of chars required to store the
+  /// json. Note: We probably underestimate the size, but that doesn't matter as
+  /// long as the number of reallocations is still very small, e.g. 1 - 3
+
+  // Max is 80 typically
+  constexpr size_t ExpNumCharsPerSrcCodeLine = 40;
+  // Filenames are typically very long
+  constexpr size_t ExpNumCharsPerFileName = 100;
+  // Just a made-up number
+  constexpr size_t ExpNumCharsPerFunctionName = 20;
+  // We may have hundrets of LOC in a file
+  constexpr size_t ExpNumCharsPerLine = 3;
+  // we typically have up to 80 cols in a line
+  constexpr size_t ExpNumCharsPerCol = 2;
+  // IR instructions tend to be very long
+  constexpr size_t ExpNumCharsPerIRInst = 60;
+  // code, file, func, line, col, ir
+  // Delims{"":"","":"","":"","":,"":,"":""}
+  // Note, sizeof includes the null-terminator; however, we don't need to be
+  // very precise here (and it somehow adds up with the quotes needed in some
+  // places)
+  constexpr size_t ExpNumCharsPerSrcInfo =
+      33 + sizeof("sourceCodeLine") + ExpNumCharsPerSrcCodeLine +
+      sizeof("sourceCodeFileName") + ExpNumCharsPerFileName +
+      sizeof("sourceCodeFunctionName") + ExpNumCharsPerFunctionName +
+      sizeof("line") + ExpNumCharsPerLine + sizeof("column") +
+      ExpNumCharsPerCol + sizeof("IR");
+  // Delims{:,:}, "from", "to", From, To
+  constexpr size_t ExpNumCharsPerEdge = 5 + 6 + 4 + 2 * ExpNumCharsPerSrcInfo;
+
+  std::string Ret;
+  Ret.reserve(IRDB.getNumInstructions() * ExpNumCharsPerEdge);
+  llvm::raw_string_ostream OS(Ret);
+
+  exportICFGAsSourceCodeJson(OS);
+
+  OS.flush();
+  return Ret;
 }
 
 vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
