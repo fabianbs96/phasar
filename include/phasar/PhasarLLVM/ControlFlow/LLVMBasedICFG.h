@@ -86,6 +86,7 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
+  std::set<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
@@ -328,6 +329,8 @@ public:
   /// enriched with source-code information on every edge and ignoring debug
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
+
+  [[nodiscard]] std::set<const llvm::Instruction *> getUnsoundCallSites();
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 

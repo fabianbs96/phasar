@@ -199,6 +199,8 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       for (auto &CS : UnsoundIndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
+      std::copy(UnsoundIndirectCalls.begin(), UnsoundIndirectCalls.end(),
+                std::inserter(UnsoundCallSites, UnsoundCallSites.end()));
       UnsoundIndirectCalls.clear();
     }
 
@@ -1345,6 +1347,10 @@ vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
     }
   }
   return Functions;
+}
+
+std::set<const llvm::Instruction *> LLVMBasedICFG::getUnsoundCallSites() {
+  return UnsoundCallSites;
 }
 
 unsigned LLVMBasedICFG::getNumOfVertices() const {
