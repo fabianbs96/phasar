@@ -243,13 +243,13 @@ std::string getModuleIDFromIR(const llvm::Value *V) {
   return "";
 }
 
-bool SourceCodeInfo::empty() const noexcept { return SourceCodeLine.empty(); }
+bool SourceCodeInfo::empty() const noexcept { return true; }
 
 bool SourceCodeInfo::operator==(const SourceCodeInfo &Other) const noexcept {
   // don't compare the SourceCodeFunctionName. It is directly derivable from
   // line, column and filename
   return Line == Other.Line && Column == Other.Column &&
-         SourceCodeLine == Other.SourceCodeLine &&
+        //  SourceCodeLine == Other.SourceCodeLine &&
          SourceCodeFilename == Other.SourceCodeFilename;
 }
 
@@ -257,7 +257,7 @@ bool SourceCodeInfo::equivalentWith(const SourceCodeInfo &Other) const {
   // Here, we need to compare the SourceCodeFunctionName, because we don't
   // compare the complete SourceCodeFilename
   if (Line != Other.Line || Column != Other.Column ||
-      SourceCodeLine != Other.SourceCodeLine ||
+      // SourceCodeLine != Other.SourceCodeLine ||
       SourceCodeFunctionName != Other.SourceCodeFunctionName) {
     return false;
   }
@@ -274,7 +274,7 @@ bool SourceCodeInfo::equivalentWith(const SourceCodeInfo &Other) const {
 }
 
 void from_json(const nlohmann::json &J, SourceCodeInfo &Info) {
-  J.at("sourceCodeLine").get_to(Info.SourceCodeLine);
+  // J.at("sourceCodeLine").get_to(Info.SourceCodeLine);
   J.at("sourceCodeFileName").get_to(Info.SourceCodeFilename);
   if (auto Fn = J.find("sourceCode"); Fn != J.end()) {
     Fn->get_to(Info.SourceCodeFunctionName);
@@ -284,7 +284,7 @@ void from_json(const nlohmann::json &J, SourceCodeInfo &Info) {
 }
 void to_json(nlohmann::json &J, const SourceCodeInfo &Info) {
   J = nlohmann::json{
-      {"sourceCodeLine", Info.SourceCodeLine},
+      // {"sourceCodeLine", Info.SourceCodeLine},
       {"sourceCodeFileName", Info.SourceCodeFilename},
       {"sourceCodeFunctionName", Info.SourceCodeFunctionName},
       {"line", Info.Line},
@@ -294,7 +294,7 @@ void to_json(nlohmann::json &J, const SourceCodeInfo &Info) {
 
 SourceCodeInfo getSrcCodeInfoFromIR(const llvm::Value *V) {
   return SourceCodeInfo{
-      getSrcCodeFromIR(V),
+      // getSrcCodeFromIR(V),
       getFilePathFromIR(V),
       llvm::demangle(getFunctionNameFromIR(V)),
       getLineFromIR(V),

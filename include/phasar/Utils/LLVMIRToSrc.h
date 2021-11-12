@@ -50,7 +50,7 @@ std::string getSrcCodeFromIR(const llvm::Value *V);
 std::string getModuleIDFromIR(const llvm::Value *V);
 
 struct SourceCodeInfo {
-  std::string SourceCodeLine;
+  // std::string SourceCodeLine;
   std::string SourceCodeFilename;
   std::string SourceCodeFunctionName;
   unsigned Line;
