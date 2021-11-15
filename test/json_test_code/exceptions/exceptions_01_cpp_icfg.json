@@ -229,7 +229,7 @@
             "column": 3,
             "line": 21,
             "sourceCodeFileName": "test/llvm_test_code/exceptions/exceptions_01.cpp",
-            "sourceCodeFunctionName": "main",
+            "sourceCodeFunctionName": "main"
         },
         "to": {
             "IR": "%4 = load i32, i32* %a, align 4, !dbg !74, !psr.id !75 | ID: 39",

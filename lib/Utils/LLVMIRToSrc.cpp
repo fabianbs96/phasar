@@ -243,7 +243,7 @@ std::string getModuleIDFromIR(const llvm::Value *V) {
   return "";
 }
 
-bool SourceCodeInfo::empty() const noexcept { return true; }
+bool SourceCodeInfo::empty() const noexcept { return false; }
 
 bool SourceCodeInfo::operator==(const SourceCodeInfo &Other) const noexcept {
   // don't compare the SourceCodeFunctionName. It is directly derivable from

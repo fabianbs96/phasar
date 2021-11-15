@@ -76,7 +76,7 @@
             "column": 7,
             "line": 4,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
-            "sourceCodeFunctionName": "main",
+            "sourceCodeFunctionName": "main"
         }
     },
     {
