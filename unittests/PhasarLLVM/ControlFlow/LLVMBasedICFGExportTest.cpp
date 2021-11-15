@@ -285,6 +285,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGIRV9) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
   auto results =
       exportICFG("linear_constant/call_01_cpp_dbg.ll", /*asSrcCode*/ true);
+  // std::cerr << results.dump(4) << '\n';
   verifySourceCodeJSON(results,
                        readJson("linear_constant/call_01_cpp_icfg.json"));
 }

@@ -1290,8 +1290,10 @@ nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
   auto createInterEdges = [&](const llvm::Instruction *CS,
                               const SourceCodeInfoWithIR &From,
                               llvm::ArrayRef<SourceCodeInfoWithIR> Tos) {
+    bool HasDecl = false;
     for (const auto *Callee : getCalleesOfCallAt(CS)) {
       if (Callee->isDeclaration()) {
+        HasDecl = true;
         continue;
       }
 
@@ -1305,6 +1307,14 @@ nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
         for (const auto &To : Tos) {
           J.push_back({{"from", getLastNonEmpty(ExitInst)}, {"to", To}});
         }
+      }
+    }
+
+    if (HasDecl) {
+      /// Create a fallback CTR edge, when we cannot find a function body for
+      /// one of the callees
+      for (const auto &To : Tos) {
+        J.push_back({{"from", From}, {"to", To}});
       }
     }
   };
