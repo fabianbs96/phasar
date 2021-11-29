@@ -396,7 +396,7 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
   ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
   auto TotalEdgesBefore = ICFG.getNumOfEdges();
 
-  std::set<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 1}};
+  std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 1}};
   auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
 
   ASSERT_TRUE(ICFGChanged);
@@ -430,7 +430,7 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
   ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
   auto TotalEdgesBefore = ICFG.getNumOfEdges();
 
-  std::set<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 0}};
+  std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 0}};
   auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
 
   ASSERT_FALSE(ICFGChanged);

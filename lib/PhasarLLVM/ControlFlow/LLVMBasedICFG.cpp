@@ -426,7 +426,7 @@ bool LLVMBasedICFG::constructDynamicCall(const llvm::Instruction *I,
 }
 
 bool LLVMBasedICFG::addRuntimeEdges(
-    const std::set<std::pair<unsigned, unsigned>> &CallerCalleeMap) {
+    llvm::ArrayRef<std::pair<unsigned, unsigned>> CallerCalleeMap) {
   bool ICFGAugumented = false;
   for (const auto &[CallSiteId, FunctionPrefixId] : CallerCalleeMap) {
     const auto *CallSite = IRDB.getInstruction(CallSiteId);

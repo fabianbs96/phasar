@@ -253,7 +253,7 @@ public:
    * \return boolean flag that tells if the callgraph is modified
    */
   bool addRuntimeEdges(
-      const std::set<std::pair<unsigned, unsigned>> &CallerCalleeMap);
+      llvm::ArrayRef<std::pair<unsigned, unsigned>> CallerCalleeMap);
 
   /**
    * Removes all edges found for the given instruction within the
@@ -331,7 +331,8 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
-  [[nodiscard]] const std::set<const llvm::Instruction *> &getUnsoundCallSites();
+  [[nodiscard]] const std::set<const llvm::Instruction *> &
+  getUnsoundCallSites();
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 
