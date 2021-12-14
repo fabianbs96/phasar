@@ -30,7 +30,10 @@
 #include "boost/container/flat_set.hpp"
 #include "boost/graph/adjacency_list.hpp"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
@@ -125,7 +128,7 @@ private:
   bidigraph_t CallGraph;
 
   /// Maps functions to the corresponding vertex id.
-  std::unordered_map<const llvm::Function *, vertex_t> FunctionVertexMap;
+  llvm::DenseMap<const llvm::Function *, vertex_t> FunctionVertexMap;
 
   void processFunction(const llvm::Function *F, Resolver &Resolver,
                        bool &FixpointReached);
@@ -197,6 +200,9 @@ public:
 
   [[nodiscard]] std::vector<const llvm::Instruction *>
   getSuccsOf(const llvm::Instruction *Inst) const override;
+  void getSuccsOf(
+      const llvm::Instruction *Inst,
+      llvm::SmallVectorImpl<const llvm::Instruction *> &Successors) const;
 
   [[nodiscard]] const llvm::Function *getFirstGlobalCtorOrNull() const;
 
@@ -270,6 +276,11 @@ public:
   [[nodiscard]] std::set<const llvm::Function *>
   getCalleesOfCallAt(const llvm::Instruction *N) const override;
 
+private:
+  [[nodiscard]] llvm::SmallPtrSet<const llvm::Function *, 8>
+  internalGetCalleesOfCallAt(const llvm::Instruction *N) const;
+
+public:
   void forEachCalleeOfCallAt(
       const llvm::Instruction *I,
       llvm::function_ref<void(const llvm::Function *)> Callback) const;
@@ -326,6 +337,9 @@ public:
   /// Usually faster than exportICFGAsSourceCodeJson().dump()
   [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
   void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
+
+  [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
+  void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 

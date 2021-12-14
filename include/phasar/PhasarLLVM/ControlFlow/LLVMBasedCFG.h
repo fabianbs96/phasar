@@ -24,6 +24,7 @@
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instruction.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/CFG.h"
 #include "phasar/Utils/LLVMIRToSrc.h"
@@ -52,6 +53,10 @@ public:
   [[nodiscard]] std::vector<
       std::pair<const llvm::Instruction *, const llvm::Instruction *>>
   getAllControlFlowEdges(const llvm::Function *Fun) const override;
+  void getAllControlFlowEdges(
+      const llvm::Function *Fun,
+      std::vector<std::pair<const llvm::Instruction *,
+                            const llvm::Instruction *>> &Into) const;
 
   [[nodiscard]] std::vector<const llvm::Instruction *>
   getAllInstructionsOf(const llvm::Function *Fun) const override;

@@ -16,12 +16,17 @@
 
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <initializer_list>
 #include <iomanip>
 #include <memory>
 #include <ostream>
+#include <string>
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/AbstractCallSite.h"
@@ -32,6 +37,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -41,6 +47,7 @@
 #include "boost/graph/depth_first_search.hpp"
 #include "boost/graph/graph_utility.hpp"
 #include "boost/graph/graphviz.hpp"
+#include "boost/range/iterator_range_core.hpp"
 
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
@@ -509,34 +516,50 @@ LLVMBasedICFG::getPredsOf(const llvm::Instruction *Inst) const {
 
 std::vector<const llvm::Instruction *>
 LLVMBasedICFG::getSuccsOf(const llvm::Instruction *Inst) const {
+  llvm::SmallVector<const llvm::Instruction *> Succ;
+  getSuccsOf(Inst, Succ);
 
   vector<const llvm::Instruction *> Successors;
-  // case we wish to consider LLVM's debug instructions
-  if (!IgnoreDbgInstructions) {
-    if (Inst->getNextNode()) {
-      Successors.push_back(Inst->getNextNode());
-    }
-  } else {
-    if (Inst->getNextNonDebugInstruction()) {
-      Successors.push_back(Inst->getNextNonDebugInstruction());
-    }
-  }
-  if (Successors.empty()) {
-    if (const auto *Branch = llvm::dyn_cast<llvm::BranchInst>(Inst);
-        Branch && isStaticVariableLazyInitializationBranch(Branch)) {
-      // Skip the "already initialized" case, such that the analysis is always
-      // aware of the initialized value.
-      Successors.push_back(&Branch->getSuccessor(0)->front());
-
-    } else {
-      Successors.reserve(Inst->getNumSuccessors() + Successors.size());
-      std::transform(llvm::succ_begin(Inst), llvm::succ_end(Inst),
-                     std::back_inserter(Successors),
-                     [](const llvm::BasicBlock *BB) { return &BB->front(); });
-    }
-  }
+  Successors.reserve(Succ.size());
+  Successors.insert(Successors.end(), Succ.begin(), Succ.end());
 
   return Successors;
+}
+
+void LLVMBasedICFG::getSuccsOf(
+    const llvm::Instruction *Inst,
+    llvm::SmallVectorImpl<const llvm::Instruction *> &Successors) const {
+  const auto *Next = IgnoreDbgInstructions
+                         ? Inst->getNextNonDebugInstruction(false)
+                         : Inst->getNextNode();
+  if (Next) {
+    Successors.push_back(Next);
+    return;
+  }
+
+  if (const auto *Branch = llvm::dyn_cast<llvm::BranchInst>(Inst);
+      Branch && isStaticVariableLazyInitializationBranch(Branch)) {
+    // Skip the "already initialized" case, such that the analysis is always
+    // aware of the initialized value.
+    const auto *Succ = &Branch->getSuccessor(0)->front();
+    Successors.push_back(IgnoreDbgInstructions &&
+                                 llvm::isa<llvm::DbgInfoIntrinsic>(Succ)
+                             ? Succ->getNextNonDebugInstruction(false)
+                             : Succ);
+
+  } else {
+    Successors.reserve(Inst->getNumSuccessors() + Successors.size());
+    std::transform(llvm::succ_begin(Inst), llvm::succ_end(Inst),
+                   std::back_inserter(Successors),
+                   [IgnoreDbgInstructions{IgnoreDbgInstructions}](
+                       const llvm::BasicBlock *BB) {
+                     const auto *Ret = &BB->front();
+                     return IgnoreDbgInstructions &&
+                                    llvm::isa<llvm::DbgInfoIntrinsic>(Ret)
+                                ? Ret->getNextNonDebugInstruction(false)
+                                : Ret;
+                   });
+  }
 }
 
 const llvm::Function *LLVMBasedICFG::getFirstGlobalCtorOrNull() const {
@@ -669,10 +692,36 @@ LLVMBasedICFG::getCalleesOfCallAt(const llvm::Instruction *N) const {
   return Callees;
 }
 
+llvm::SmallPtrSet<const llvm::Function *, 8>
+LLVMBasedICFG::internalGetCalleesOfCallAt(const llvm::Instruction *N) const {
+  llvm::SmallPtrSet<const llvm::Function *, 8> Callees;
+  if (!llvm::isa<llvm::CallBase>(N)) {
+    return Callees;
+  }
+
+  auto MapEntry = FunctionVertexMap.find(N->getFunction());
+  if (MapEntry == FunctionVertexMap.end()) {
+    return Callees;
+  }
+
+  for (auto EdgeDesc : boost::make_iterator_range(
+           boost::out_edges(MapEntry->second, CallGraph))) {
+    auto Edge = CallGraph[EdgeDesc];
+    if (N != Edge.CS) {
+      continue;
+    }
+    auto Target = boost::target(EdgeDesc, CallGraph);
+    const auto *F = CallGraph[Target].F;
+    Callees.insert(F);
+  }
+
+  return Callees;
+}
+
 void LLVMBasedICFG::forEachCalleeOfCallAt(
     const llvm::Instruction *I,
     llvm::function_ref<void(const llvm::Function *)> Callback) const {
-  if (!llvm::isa<llvm::CallInst>(I) && !llvm::isa<llvm::InvokeInst>(I)) {
+  if (!llvm::isa<llvm::CallBase>(I)) {
     return;
   }
 
@@ -681,16 +730,15 @@ void LLVMBasedICFG::forEachCalleeOfCallAt(
     return;
   }
 
-  out_edge_iterator EI;
-
-  out_edge_iterator EIEnd;
-  for (boost::tie(EI, EIEnd) = boost::out_edges(MapEntry->second, CallGraph);
-       EI != EIEnd; ++EI) {
-    auto Edge = CallGraph[*EI];
-    if (I == Edge.CS) {
-      auto Target = boost::target(*EI, CallGraph);
-      Callback(CallGraph[Target].F);
+  for (auto EdgeDesc : boost::make_iterator_range(
+           boost::out_edges(MapEntry->second, CallGraph))) {
+    auto Edge = CallGraph[EdgeDesc];
+    if (I != Edge.CS) {
+      continue;
     }
+    auto Target = boost::target(EdgeDesc, CallGraph);
+    const auto *F = CallGraph[Target].F;
+    Callback(F);
   }
 }
 
@@ -1329,6 +1377,48 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
   OS << "[";
   scope_exit CloseBrace = [&OS]() { OS << "]"; };
 
+  struct GetSCIFn {
+    std::vector<SourceCodeInfoWithIR> SCI;
+    llvm::DenseMap<const llvm::Instruction *, size_t> Inst2SCI;
+    [[maybe_unused]] size_t Capacity;
+
+    GetSCIFn(size_t Capacity) {
+      SCI.reserve(Capacity);
+      this->Capacity = SCI.capacity();
+      Inst2SCI.reserve(Capacity);
+    }
+
+    const SourceCodeInfoWithIR &operator()(const llvm::Instruction *Inst) {
+      auto [It, Inserted] = Inst2SCI.try_emplace(Inst, SCI.size());
+
+      if (Inserted) {
+        SCI.push_back({getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)});
+        assert(SCI.capacity() == Capacity &&
+               "We must not resize the vector, as otherwise the references are "
+               "unstable");
+      }
+
+      return SCI[It->second];
+    }
+  }
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  getSCI(IRDB.getNumInstructions());
+
+  // auto getSCI = [SCI{std::deque<SourceCodeInfoWithIR>{}},
+  //                Inst2SCI{llvm::DenseMap<const llvm::Instruction *,
+  //                size_t>{}}](
+  //                   const llvm::Instruction *Inst) mutable
+  //     -> const SourceCodeInfoWithIR & {
+  //   auto [It, Inserted] = Inst2SCI.try_emplace(Inst, SCI.size());
+
+  //   if (Inserted) {
+  //     SCI.push_back({getSrcCodeInfoFromIR(Inst),
+  //     llvmIRToStableString(Inst)});
+  //   }
+
+  //   return SCI[It->second];
+  // };
+
   // NOLINTNEXTLINE(readability-identifier-naming)
   auto isRetVoid = [](const llvm::Instruction *Inst) {
     const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(Inst);
@@ -1337,19 +1427,16 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   auto getLastNonEmpty =
-      [isRetVoid](const llvm::Instruction *Inst) -> SourceCodeInfoWithIR {
+      [isRetVoid,
+       &getSCI](const llvm::Instruction *Inst) -> const SourceCodeInfoWithIR & {
     if (!isRetVoid(Inst) || !Inst->getPrevNode()) {
-      return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
+      return getSCI(Inst);
     }
-    for (const auto *Prev = Inst->getPrevNode(); Prev;
-         Prev = Prev->getPrevNode()) {
-      auto Src = getSrcCodeInfoFromIR(Prev);
-      if (!Src.empty()) {
-        return {Src, llvmIRToStableString(Prev)};
-      }
+    if (const auto *Prev = Inst->getPrevNode()) {
+      return getSCI(Prev);
     }
 
-    return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
+    return getSCI(Inst);
   };
 
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -1381,12 +1468,26 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
   };
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  auto createInterEdges = [&](const llvm::Instruction *CS,
-                              const SourceCodeInfoWithIR &From,
-                              std::initializer_list<SourceCodeInfoWithIR> Tos) {
-    for (const auto *Callee : getCalleesOfCallAt(CS)) {
+  auto getFirstOrEmpty =
+      [IgnoreDbgInstructions{IgnoreDbgInstructions},
+       &getSCI](const llvm::BasicBlock *BB) -> const SourceCodeInfoWithIR & {
+    const auto *Inst = &BB->front();
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(Inst)) {
+      Inst = Inst->getNextNonDebugInstruction(false);
+    }
+
+    return getSCI(Inst);
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createInterEdges = [this, &createEdge,
+                           &getLastNonEmpty](const llvm::Instruction *CS,
+                                             const SourceCodeInfoWithIR &From,
+                                             const SourceCodeInfoWithIR &To) {
+    forEachCalleeOfCallAt(CS, [&createEdge, &getLastNonEmpty, &From,
+                               &To](const llvm::Function *Callee) {
       if (Callee->isDeclaration()) {
-        continue;
+        return;
       }
 
       // Call Edge
@@ -1395,79 +1496,54 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
 
       // Return Edges
       for (const auto *ExitInst : getAllExitPoints(Callee)) {
-        for (const auto &To : Tos) {
-          createEdge(getLastNonEmpty(ExitInst), To);
-        }
+        createEdge(getLastNonEmpty(ExitInst), To);
       }
-    }
+    });
   };
 
-  for (const auto *F : getAllFunctions()) {
-    for (const auto &BB : *F) {
-      assert(!BB.empty() && "Invalid IR: Empty BasicBlock");
-      auto It = BB.begin();
-      auto End = BB.end();
-      auto From = getFirstNonEmpty(It, End);
+  llvm::SmallVector<const llvm::Instruction *, 2> Successors;
 
-      if (It == End) {
+  for (const auto *F : getAllFunctions()) {
+
+    for (const auto &I : llvm::instructions(F)) {
+      if (llvm::isa<llvm::UnreachableInst>(&I)) {
+        continue;
+      }
+      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
         continue;
       }
 
-      const auto *FromInst = &*It;
+      Successors.clear();
+      getSuccsOf(&I, Successors);
+      for (const auto *Successor : Successors) {
+        const auto &FromSCI = getSCI(&I);
+        const auto &ToSCI = getSCI(Successor);
 
-      ++It;
-
-      // Edges inside the BasicBlock
-      for (; It != End; ++It) {
-        auto To = getFirstNonEmpty(It, End);
-        if (To.empty()) {
-          break;
-        }
-
-        if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(FromInst)) {
-          // Call- and Return Edges
-          createInterEdges(FromInst, From, {To});
-        } else if (From != To && !isRetVoid(&*It)) {
-          // Normal Edge
-          createEdge(From, To);
-        }
-
-        FromInst = &*It;
-        From = std::move(To);
-      }
-
-      const auto *Term = BB.getTerminator();
-      assert(Term && "Invalid IR: BasicBlock without terminating instruction!");
-
-      auto NumSuccessors = Term->getNumSuccessors();
-
-      if (NumSuccessors == 0) {
-        // Return edges already handled
-      } else if (const auto *Invoke = llvm::dyn_cast<llvm::InvokeInst>(Term)) {
-        // Invoke Edges (they are not handled by the Call edges, because they
-        // are always terminator instructions)
-
-        // Note: The unwindDest is never reachable from a return instruction.
-        // However, this is how it is modeled in the ICFG at the moment
-        createInterEdges(Term,
-                         SourceCodeInfoWithIR{getSrcCodeInfoFromIR(Term),
-                                              llvmIRToStableString(Term)},
-                         {getFirstNonEmpty(Invoke->getNormalDest()),
-                          getFirstNonEmpty(Invoke->getUnwindDest())});
-        // Call Edges
-      } else {
-        // Branch Edges
-        for (size_t I = 0; I < NumSuccessors; ++I) {
-          auto *Succ = Term->getSuccessor(I);
-          assert(Succ && !Succ->empty());
-
-          auto To = getFirstNonEmpty(Succ);
-          if (From != To) {
-            createEdge(From, To);
-          }
+        if (llvm::isa<llvm::CallBase>(&I)) {
+          createInterEdges(&I, FromSCI, ToSCI);
+        } else {
+          createEdge(FromSCI, ToSCI);
         }
       }
     }
+
+    // for (const auto &Inst : llvm::instructions(F)) {
+    //   Inst2SCI.try_emplace(&Inst, SCI.size());
+    //   SCI.push_back({getSrcCodeInfoFromIR(&Inst),
+    //   llvmIRToStableString(&Inst)});
+    // }
+
+    // getAllControlFlowEdges(F, Edges);
+    // for (auto [From, To] : Edges) {
+    //   const auto &FromSCI = SCI[Inst2SCI[From]];
+    //   const auto &ToSCI = SCI[Inst2SCI[To]];
+
+    //   if (llvm::isa<llvm::CallBase>(From)) {
+    //     createInterEdges(From, FromSCI, ToSCI);
+    //   } else {
+    //     createEdge(FromSCI, ToSCI);
+    //   }
+    // }
   }
 }
 
@@ -1508,6 +1584,124 @@ std::string LLVMBasedICFG::exportICFGAsSourceCodeJsonString() const {
 
   exportICFGAsSourceCodeJson(OS);
 
+  OS.flush();
+  return Ret;
+}
+
+void LLVMBasedICFG::exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const {
+  OS << "digraph ICFG{\n";
+  scope_exit CloseBrace = [&OS]() { OS << "}\n"; };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto writeSCI = [](llvm::raw_ostream &OS, const llvm::Instruction *Inst) {
+    auto SCI = getSrcCodeInfoFromIR(Inst);
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    auto concatStr =
+        [StrBuf{llvm::SmallString<256>{}}](auto &&...Strs) mutable {
+          StrBuf.clear();
+          auto AsStringRef = [](llvm::StringRef S) { return S; };
+          return (AsStringRef(Strs) + ...).toStringRef(StrBuf);
+        };
+
+    auto Str = concatStr("File: ", SCI.SourceCodeFilename,
+                         "\nFunction: ", SCI.SourceCodeFunctionName,
+                         "\nIR: ", llvmIRToStableString(Inst));
+    OS.write_escaped(Str);
+    if (SCI.Line) {
+      Str = concatStr("\nLine: ", std::to_string(SCI.Line),
+                      "\nColumn: ", std::to_string(SCI.Column));
+      OS.write_escaped(Str);
+    }
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createInterEdges = [&OS, this,
+                           IgnoreDbgInstructions{IgnoreDbgInstructions}](
+                              const llvm::Instruction *CS, intptr_t To,
+                              llvm::StringRef Label) {
+    bool HasDecl = false;
+    auto Callees = internalGetCalleesOfCallAt(CS);
+
+    for (const auto *Callee : Callees) {
+      if (Callee->isDeclaration()) {
+        HasDecl = true;
+        continue;
+      }
+
+      // Call Edge
+      const auto *BB = &Callee->front();
+      assert(BB && !BB->empty());
+      const auto *InterTo = &BB->front();
+
+      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(InterTo)) {
+        InterTo = InterTo->getNextNonDebugInstruction(false);
+      }
+      // createEdge(From, InterTo);
+      OS << intptr_t(CS) << "->" << intptr_t(InterTo) << ";\n";
+
+      // Return Edges
+      for (const auto *ExitInst : getAllExitPoints(Callee)) {
+        /// TODO: Be return/resume aware!
+        OS << intptr_t(ExitInst) << "->" << To << Label << ";\n";
+      }
+    }
+
+    if (HasDecl || Callees.empty()) {
+      OS << intptr_t(CS) << "->" << To << Label << ";\n";
+    }
+  };
+
+  llvm::SmallVector<const llvm::Instruction *, 4> Successors;
+
+  for (const auto *F : IRDB.getAllFunctionsVec()) {
+    for (const auto &Inst : llvm::instructions(F)) {
+      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&Inst)) {
+        continue;
+      }
+
+      OS << intptr_t(&Inst) << "[label=\"";
+      writeSCI(OS, &Inst);
+      OS << "\"];\n";
+
+      if (llvm::isa<llvm::UnreachableInst>(Inst)) {
+        continue;
+      }
+
+      Successors.clear();
+      getSuccsOf(&Inst, Successors);
+
+      if (Successors.size() == 2) {
+        if (llvm::isa<llvm::InvokeInst>(Inst)) {
+          createInterEdges(&Inst, intptr_t(Successors[0]),
+                           "[label=\"normal\"]");
+          createInterEdges(&Inst, intptr_t(Successors[1]),
+                           "[label=\"unwind\"]");
+        } else {
+          OS << intptr_t(&Inst) << "->" << intptr_t(Successors[0])
+             << "[label=\"true\"];\n";
+          OS << intptr_t(&Inst) << "->" << intptr_t(Successors[1])
+             << "[label=\"false\"];\n";
+        }
+        continue;
+      }
+
+      for (const auto *Successor : Successors) {
+        if (llvm::isa<llvm::CallBase>(Inst)) {
+          createInterEdges(&Inst, intptr_t(Successor), "");
+        } else {
+          OS << intptr_t(&Inst) << "->" << intptr_t(Successor) << ";\n";
+        }
+      }
+    }
+  }
+}
+
+std::string LLVMBasedICFG::exportICFGAsSourceCodeDotString() const {
+  std::string Ret;
+  /// Just a heuristic reserve number...
+  Ret.reserve(150 * IRDB.getNumInstructions());
+  llvm::raw_string_ostream OS(Ret);
+  exportICFGAsSourceCodeDot(OS);
   OS.flush();
   return Ret;
 }

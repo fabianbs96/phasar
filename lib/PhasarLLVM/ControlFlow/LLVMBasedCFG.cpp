@@ -26,6 +26,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
 
 #include "nlohmann/json.hpp"
@@ -92,29 +93,26 @@ LLVMBasedCFG::getSuccsOf(const llvm::Instruction *I) const {
   return Successors;
 }
 
-vector<pair<const llvm::Instruction *, const llvm::Instruction *>>
-LLVMBasedCFG::getAllControlFlowEdges(const llvm::Function *Fun) const {
-  vector<pair<const llvm::Instruction *, const llvm::Instruction *>> Edges;
-
+void LLVMBasedCFG::getAllControlFlowEdges(
+    const llvm::Function *Fun,
+    std::vector<std::pair<const llvm::Instruction *, const llvm::Instruction *>>
+        &Into) const {
   for (const auto &I : llvm::instructions(Fun)) {
-    if (IgnoreDbgInstructions) {
-      // Check for call to intrinsic debug function
-      if (const auto *DbgCallInst = llvm::dyn_cast<llvm::CallInst>(&I)) {
-        if (DbgCallInst->getCalledFunction() &&
-            DbgCallInst->getCalledFunction()->isIntrinsic() &&
-            (DbgCallInst->getCalledFunction()->getName() ==
-             "llvm.dbg.declare")) {
-          continue;
-        }
-      }
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
+      continue;
     }
 
     auto Successors = getSuccsOf(&I);
     for (const auto *Successor : Successors) {
-      Edges.emplace_back(&I, Successor);
+      Into.emplace_back(&I, Successor);
     }
   }
+}
 
+vector<pair<const llvm::Instruction *, const llvm::Instruction *>>
+LLVMBasedCFG::getAllControlFlowEdges(const llvm::Function *Fun) const {
+  vector<pair<const llvm::Instruction *, const llvm::Instruction *>> Edges;
+  getAllControlFlowEdges(Fun, Edges);
   return Edges;
 }
 

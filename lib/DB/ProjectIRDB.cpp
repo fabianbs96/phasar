@@ -473,6 +473,18 @@ std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
   return Functions;
 }
 
+std::vector<const llvm::Function *> ProjectIRDB::getAllFunctionsVec() const {
+  std::vector<const llvm::Function *> Ret;
+  /// Note: cannot precompute the number of functions, because
+  /// llvm::Module::size() itself is a linear time operation
+  for (const auto &[File, Module] : Modules) {
+    for (auto &F : *Module) {
+      Ret.push_back(&F);
+    }
+  }
+  return Ret;
+}
+
 void ProjectIRDB::insertModule(llvm::Module *M) {
   Contexts.push_back(std::unique_ptr<llvm::LLVMContext>(&M->getContext()));
   Modules.insert(std::make_pair(M->getModuleIdentifier(), M));

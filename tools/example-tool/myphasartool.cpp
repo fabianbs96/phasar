@@ -7,6 +7,7 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 
@@ -22,6 +23,7 @@
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/Utils/Logger.h"
 
+#include "llvm/Support/GraphWriter.h"
 namespace llvm {
 class Value;
 } // namespace llvm
@@ -40,26 +42,45 @@ int main(int Argc, const char **Argv) {
   ProjectIRDB DB({Argv[1]});
   if (const auto *F = DB.getFunctionDefinition("main")) {
     LLVMTypeHierarchy H(DB);
-    // print type hierarchy
-    H.print();
+
     LLVMPointsToSet P(DB);
-    // print points-to information
-    P.print();
     LLVMBasedICFG I(DB, CallGraphAnalysisType::OTF, {"main"}, &H, &P);
-    // print inter-procedural control-flow graph
-    I.print();
-    // IFDS template parametrization test
-    std::cout << "Testing IFDS:\n";
-    IFDSLinearConstantAnalysis L(&DB, &H, &I, &P, {"main"});
-    IFDSSolver S(L);
-    S.solve();
-    S.dumpResults();
-    // IDE template parametrization test
-    std::cout << "Testing IDE:\n";
-    IDELinearConstantAnalysis M(&DB, &H, &I, &P, {"main"});
-    IDESolver T(M);
-    T.solve();
-    T.dumpResults();
+
+    {
+      auto Start = std::chrono::high_resolution_clock::now();
+      auto ICFGStr = I.exportICFGAsSourceCodeJsonString();
+      auto End = std::chrono::high_resolution_clock::now();
+
+      llvm::outs() << "New export: " << (End - Start).count() << '\n';
+      llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
+                   << ICFGStr.capacity() << '\n';
+      // llvm::outs() << ICFGStr << '\n';
+    }
+
+    {
+      auto Start = std::chrono::high_resolution_clock::now();
+      auto ICFGStr = I.exportICFGAsSourceCodeDotString();
+      auto End = std::chrono::high_resolution_clock::now();
+
+      llvm::outs() << "Dot export: " << (End - Start).count() << '\n';
+      llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
+                   << ICFGStr.capacity() << '\n';
+      // llvm::outs() << ICFGStr << '\n';
+    }
+
+    {
+      auto Start = std::chrono::high_resolution_clock::now();
+      auto ICFGJson = I.exportICFGAsSourceCodeJson();
+      auto Mid = std::chrono::high_resolution_clock::now();
+      auto ICFGStr = ICFGJson.dump();
+      auto End = std::chrono::high_resolution_clock::now();
+
+      llvm::outs() << "Old export: " << (End - Start).count() << '\n';
+      llvm::outs() << "> To JSON took: " << (Mid - Start).count() << '\n';
+      llvm::outs() << "> To Str took: " << (End - Mid).count() << '\n';
+      llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
+                   << ICFGStr.capacity() << '\n';
+    }
   } else {
     std::cerr << "error: file does not contain a 'main' function!\n";
   }
