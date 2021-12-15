@@ -1596,27 +1596,22 @@ void LLVMBasedICFG::exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const {
   auto writeSCI = [](llvm::raw_ostream &OS, const llvm::Instruction *Inst) {
     auto SCI = getSrcCodeInfoFromIR(Inst);
     // NOLINTNEXTLINE(readability-identifier-naming)
-    auto concatStr =
-        [StrBuf{llvm::SmallString<256>{}}](auto &&...Strs) mutable {
-          StrBuf.clear();
-          auto AsStringRef = [](llvm::StringRef S) { return S; };
-          return (AsStringRef(Strs) + ...).toStringRef(StrBuf);
-        };
-
-    auto Str = concatStr("File: ", SCI.SourceCodeFilename,
-                         "\nFunction: ", SCI.SourceCodeFunctionName,
-                         "\nIR: ", llvmIRToStableString(Inst));
-    OS.write_escaped(Str);
+    auto writeAll = [](llvm::raw_ostream &OS, auto &&...Strs) {
+      (OS.write_escaped(Strs), ...);
+    };
+    writeAll(OS, "File: ", SCI.SourceCodeFilename,
+             "\nFunction: ", SCI.SourceCodeFunctionName,
+             "\nIR: ", llvmIRToStableString(Inst));
     if (SCI.Line) {
-      Str = concatStr("\nLine: ", std::to_string(SCI.Line),
-                      "\nColumn: ", std::to_string(SCI.Column));
-      OS.write_escaped(Str);
+      writeAll(OS, "\nLine: ", std::to_string(SCI.Line),
+               "\nColumn: ", std::to_string(SCI.Column));
     }
   };
 
+  auto IgnoreDbgInstructions = this->IgnoreDbgInstructions;
+
   // NOLINTNEXTLINE(readability-identifier-naming)
-  auto createInterEdges = [&OS, this,
-                           IgnoreDbgInstructions{IgnoreDbgInstructions}](
+  auto createInterEdges = [&OS, this, IgnoreDbgInstructions](
                               const llvm::Instruction *CS, intptr_t To,
                               llvm::StringRef Label) {
     bool HasDecl = false;
