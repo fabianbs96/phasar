@@ -157,7 +157,7 @@ else()
 endif()
 
 # SQL
-find_path(SQLITE3_INCLUDE_DIR NAMES sqlite3.h)
+find_path(SQLITE3_INCLUDE_DIR NAMES sqlite3.h REQUIRED)
 find_library(SQLITE3_LIBRARY NAMES sqlite3)
 include_directories(${SQLITE3_INCLUDE_DIR})
 
