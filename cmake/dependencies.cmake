@@ -1,15 +1,18 @@
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-  message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
-                "${CMAKE_BINARY_DIR}/conan.cmake"
-                EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
-                TLS_VERIFY ON)
+option(CONAN_BUILD_IN "" ON)
+if (CONAN_BUILD_IN)
+  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+    message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
+                  "${CMAKE_BINARY_DIR}/conan.cmake"
+                  EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
+                  TLS_VERIFY ON)
+  endif()
+  include(${CMAKE_BINARY_DIR}/conan.cmake)
+  conan_cmake_run(
+      BASIC_SETUP
+      CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt" 
+      BUILD missing)
 endif()
-include(${CMAKE_BINARY_DIR}/conan.cmake)
-conan_cmake_run(
-    BASIC_SETUP
-    CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt" 
-    BUILD missing)
 
 set(CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR};${CMAKE_MODULE_PATH}"  )
 
@@ -42,7 +45,7 @@ include_directories(${SQLite3_INCLUDE_DIRS})
 # Curl
 find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
-link_libraries(curl)
+# link_libraries(curl)
 
 # LLVM
 find_package(llvm-core 12 REQUIRED)

@@ -139,8 +139,3 @@ unittests/Utils/PAMMTest
 
 # conan
 *.log
-conanfile.py
-conandata.yml
-patches
-test_package
-utils/conan
