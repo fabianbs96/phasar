@@ -8,6 +8,8 @@ json-schema-validator/2.1.0
 libcurl/7.80.0
 
 [generators]
-cmake
+cmake_find_package
+cmake_paths
 
 [options]
+llvm-core:shared=False

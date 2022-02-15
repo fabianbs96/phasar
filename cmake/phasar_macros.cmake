@@ -27,12 +27,14 @@ function(add_phasar_unittest test_name)
     # ${PHASAR_PLUGINS_LIB}
     phasar_pointer
     phasar_typehierarchy
-    ${SQLite3_LIBRARY_LIST}
+    ${SQLite3_LIBRARIES}
     ${Boost_LIBRARIES}
     ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
     
-    gtest
+    # if you want to use default main method, use gtestd_main
+    gtestd
+    gmockd
   )
 
   add_test(NAME "${test}"

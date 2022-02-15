@@ -31,7 +31,7 @@ target_link_libraries(phasar-clang
   # ${PHASAR_PLUGINS_LIB}
   phasar_pointer
   phasar_typehierarchy
-  ${SQLite3_LIBRARY_LIST}
+  ${SQLite3_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CMAKE_DL_LIBS}
   ${CMAKE_THREAD_LIBS_INIT}

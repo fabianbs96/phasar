@@ -1,5 +1,5 @@
 file(GLOB_RECURSE PLUGINS_SRC *.h *.cpp)
-file(GLOB_RECURSE PLUGINS_SO *.cxx)
+#file(GLOB_RECURSE PLUGINS_SO *.cxx)
 
 set(PHASAR_LINK_LIBS
   phasar_ifdside

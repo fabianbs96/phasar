@@ -1,10 +1,5 @@
 cmake_minimum_required (VERSION 3.0)
 
-# Check if we build within the llvm source tree
-if (DEFINED LLVM_MAIN_SRC_DIR)
-  set(PHASAR_IN_TREE 1)
-endif()
-
 if (NOT PHASAR_IN_TREE)
   project (phasar)
   set(CMAKE_PROJECT_NAME "phasar")
@@ -29,36 +24,24 @@ endif()
 # Enable testing
 enable_testing()
 
-# TODO: allow Phasar to be build as a llvm drop-in as well
-# if (NOT DEFINED LLVM_MAIN_SRC_DIR)
-#  message(FATAL_ERROR "Phasar is not a llvm drop-in, abort!")
-# endif()
-
 set(PHASAR_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PHASAR_SRC_DIR}/cmake")
 
 file(STRINGS ${PHASAR_SRC_DIR}/include/phasar/Config/Version.h VERSION_NUMBER_FILE)
 string(REPLACE " " ";" VERSION_NUMBER_FILE ${VERSION_NUMBER_FILE})
 list(GET VERSION_NUMBER_FILE 2 VERSION_NUMBER_PHASAR)
 
 
-include("phasar_macros")
-
-# use system dependencies
-option(PHASAR_USE_SYSTEM_GTEST "Use system installation for gtest" ON)
-option(PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR "Use system installation for json-schema-validator" ON)
-option(PHASAR_USE_SYSTEM_JSON "Use system installation for nlohmann_json" ON)
-option(PHASAR_USE_SYSTEM_WALI "Use system installation for wali" ON)
+include(cmake/phasar_macros.cmake)
 
 # toggle targets
-option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" ON)
+option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" OFF)
 option(PHASAR_BUILD_OPENSSL_TS_UNITTESTS "Build OPENSSL typestate tests (require OpenSSL, default is OFF)" OFF)
-option(PHASAR_BUILD_IR "Build IR test code (default is ON)" ON)
+option(PHASAR_BUILD_IR "Build IR test code (default is ON)" OFF)
 option(PHASAR_BUILD_DOC "Build documentation" OFF)
 
 # various
 option(PHASAR_DEBUG_LIBDEPS "Debug internal library dependencies (private linkage)" OFF)
-option(BUILD_SHARED_LIBS "Build shared libraries (default is ON)" ON)
+option(BUILD_SHARED_LIBS "Build shared libraries (default is ON)" OFF)
 
 option(PHASAR_ENABLE_WARNINGS "Enable warnings" ON)
 if (PHASAR_ENABLE_WARNINGS)
@@ -113,173 +96,15 @@ else()
 endif()
 
 ### Adding external libraries
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-  message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
-                "${CMAKE_BINARY_DIR}/conan.cmake"
-                EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
-                TLS_VERIFY ON)
-endif()
-include(${CMAKE_BINARY_DIR}/conan.cmake)
-conan_cmake_run(
-    BASIC_SETUP
-    CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt" 
-    BUILD missing)
-
-# Threads
-find_package(Threads REQUIRED)
-
-# Boost
-find_package(Boost 1.72.0 COMPONENTS filesystem graph system program_options log ${BOOST_THREAD} REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
-
-# JSON library
-option(JSON_BuildTests OFF)
-if (PHASAR_USE_SYSTEM_JSON)
-  find_package(nlohmann_json REQUIRED)
-  include_directories(${nlohmann_json_INCLUDE_DIR})
-else()
-  add_subdirectory(external/json EXCLUDE_FROM_ALL)
-  include_directories(external/json/single_include/)
-endif()
-
-# JSON schema validator library
-if (PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR)
-  find_package(nlohmann_json_schema_validator REQUIRED)
-  include_directories(${nlohmann_json_schema_validator_INCLUDE_DIR})
-else()
-  add_subdirectory(external/json-schema-validator EXCLUDE_FROM_ALL)
-  include_directories(external/json-schema-validator/src/)
-endif()
-
-# Googletest
-if (PHASAR_USE_SYSTEM_GTEST)
-  find_package(GTest REQUIRED)
-  include_directories(${GTest_INCLUDE_DIR})
-else()
-  if (NOT PHASAR_IN_TREE)
-    add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
-    include_directories(external/googletest/googletest/include)
-    include_directories(external/googletest/googlemock/include)
-  else()
-    # Set llvm distributed includes for gtest header
-    include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include)
-    include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googlemock/include)
-  endif()
-endif()
-
-# SQL
-find_package(SQLite3 REQUIRED)
-include_directories(${SQLite3_INCLUDE_DIRS})
-
-# Curl
-#find_package(CURL REQUIRED)
-message(FATAL_ERROR "> ${CMAKE_MODULE_PATH} - ${SQLite3_LIBRARY_LIST} - ${CURL_LIBRARY_LIST}") #include_directories(")
-link_directories(/home/ubuntu/.conan/data/libcurl/7.80.0/_/_/package/a052e60213cb40639ddf7e2e29af8801a50fbe93/lib) 
-link_libraries(curl)
-
-# LLVM
-find_package(llvm-core 12 REQUIRED)
-include_directories(${llvm-core_INCLUDE_DIRS})
-link_directories(${llvm-core_LIBRARY_DIRS})
-
-if (NOT PHASAR_IN_TREE)
-  find_library(LLVM_LIBRARY NAMES LLVM PATHS ${LLVM_LIBRARY_DIRS} NO_DEFAULT_PATH)
-  if(NOT ${LLVM_LIBRARY} STREQUAL "LLVM_LIBRARY-NOTFOUND")
-    message(STATUS "Found consolidated shared LLVM lib " ${LLVM_LIBRARY} " that will be linked against.")
-    set(USE_LLVM_FAT_LIB on)
-  endif()
-endif()
-
-# Clang
-# The clang-cpp shared library is now the preferred way to link dynamically against libclang if we build out of tree.
-if(NOT PHASAR_IN_TREE)
-  #find_library(CLANG_LIBRARY NAMES clang-cpp REQUIRED HINTS ${LLVM_LIBRARY_DIRS})
-  #if(${CLANG_LIBRARY} STREQUAL "CLANG_LIBRARY-NOTFOUND")
-    set(NEED_LIBCLANG_COMPONENT_LIBS on)
-  #endif()
-endif()
-# As fallback, look for the small clang libraries
-if(PHASAR_IN_TREE OR NEED_LIBCLANG_COMPONENT_LIBS)
-  set(CLANG_LIBRARY
-    clangTooling
-    clangFrontendTool
-    clangFrontend
-    clangDriver
-    clangSerialization
-    clangCodeGen
-    clangParse
-    clangSema
-    clangStaticAnalyzerFrontend
-    clangStaticAnalyzerCheckers
-    clangStaticAnalyzerCore
-    clangAnalysis
-    clangARCMigrate
-    clangRewrite
-    clangRewriteFrontend
-    clangEdit
-    clangAST
-    clangASTMatchers
-    clangLex
-    clangBasic
-    LLVMFrontendOpenMP)
-endif()
-if (NOT PHASAR_IN_TREE)
-  # Only search for clang if we build out of tree
-  link_directories(${CLANG_LIB_PATH})
-endif()
-
-if (PHASAR_IN_TREE)
-  # Phasar needs clang headers, specificaly some that are generated by clangs table-gen
-  include_directories(
-    ${CLANG_INCLUDE_DIR}
-    ${PHASAR_SRC_DIR}/../clang/include
-    ${PROJECT_BINARY_DIR}/tools/clang/include
-  )
-endif()
-
-# WALi-OpenNWA
-if (PHASAR_USE_SYSTEM_WALI)
-  find_package(wali-opennwa REQUIRED)
-  include_directories(${wali-opennwa_INCLUDE_DIR})
-  link_directories(${wali-opennwa_LIB_DIRS})
-else()
-  add_subdirectory(external/WALi-OpenNWA)
-  include_directories(external/WALi-OpenNWA/Source/wali/include)
-endif()
-
+include(cmake/dependencies.cmake)
 
 # Add the Phasar subdirectories
 add_subdirectory(include)
 add_subdirectory(lib)
 
-set(LLVM_LINK_COMPONENTS
-  coverage
-  coroutines
-  demangle
-  libdriver
-  lto
-  support
-  analysis
-  bitwriter
-  core
-  ipo
-  irreader
-  instcombine
-  instrumentation
-  linker
-  objcarcopts
-  scalaropts
-  transformutils
-  codegen
-  vectorize
-)
-
-
 # phasar-based binaries
-add_subdirectory(tools)
-
-set(PHASAR_PLUGINS_LIB phasar_plugins)
+# XXX conan doesn't support clang currently
+#add_subdirectory(tools)
 
 # Add Phasar unittests and build all IR test code
 if (PHASAR_BUILD_UNITTESTS)
