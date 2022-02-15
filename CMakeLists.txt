@@ -45,10 +45,10 @@ list(GET VERSION_NUMBER_FILE 2 VERSION_NUMBER_PHASAR)
 include("phasar_macros")
 
 # use system dependencies
-option(PHASAR_USE_SYSTEM_GTEST "Use system installation for gtest" OFF)
-option(PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR "Use system installation for json-schema-validator" OFF)
-option(PHASAR_USE_SYSTEM_JSON "Use system installation for nlohmann_json" OFF)
-option(PHASAR_USE_SYSTEM_WALI "Use system installation for wali" OFF)
+option(PHASAR_USE_SYSTEM_GTEST "Use system installation for gtest" ON)
+option(PHASAR_USE_SYSTEM_JSON_SCHEMA_VALIDATOR "Use system installation for json-schema-validator" ON)
+option(PHASAR_USE_SYSTEM_JSON "Use system installation for nlohmann_json" ON)
+option(PHASAR_USE_SYSTEM_WALI "Use system installation for wali" ON)
 
 # toggle targets
 option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" ON)
@@ -113,12 +113,24 @@ else()
 endif()
 
 ### Adding external libraries
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+  message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+  file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/v0.16.1/conan.cmake"
+                "${CMAKE_BINARY_DIR}/conan.cmake"
+                EXPECTED_HASH SHA256=396e16d0f5eabdc6a14afddbcfff62a54a7ee75c6da23f32f7a31bc85db23484
+                TLS_VERIFY ON)
+endif()
+include(${CMAKE_BINARY_DIR}/conan.cmake)
+conan_cmake_run(
+    BASIC_SETUP
+    CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt" 
+    BUILD missing)
+
 # Threads
-find_package(Threads)
+find_package(Threads REQUIRED)
 
 # Boost
-find_package(Boost 1.65.1 COMPONENTS filesystem graph system program_options log ${BOOST_THREAD} REQUIRED)
-#find_package(Boost 1.72.0 COMPONENTS filesystem graph system program_options log ${BOOST_THREAD} REQUIRED)
+find_package(Boost 1.72.0 COMPONENTS filesystem graph system program_options log ${BOOST_THREAD} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # JSON library
@@ -157,19 +169,19 @@ else()
 endif()
 
 # SQL
-find_path(SQLITE3_INCLUDE_DIR NAMES sqlite3.h REQUIRED)
-find_library(SQLITE3_LIBRARY NAMES sqlite3)
-include_directories(${SQLITE3_INCLUDE_DIR})
+find_package(SQLite3 REQUIRED)
+include_directories(${SQLite3_INCLUDE_DIRS})
+
+# Curl
+#find_package(CURL REQUIRED)
+message(FATAL_ERROR "> ${CMAKE_MODULE_PATH} - ${SQLite3_LIBRARY_LIST} - ${CURL_LIBRARY_LIST}") #include_directories(")
+link_directories(/home/ubuntu/.conan/data/libcurl/7.80.0/_/_/package/a052e60213cb40639ddf7e2e29af8801a50fbe93/lib) 
+link_libraries(curl)
 
 # LLVM
-if (NOT PHASAR_IN_TREE)
-  # Only search for LLVM if we build out of tree
-  find_package(LLVM 12 REQUIRED CONFIG)
-  include_directories(${LLVM_INCLUDE_DIRS})
-  link_directories(${LLVM_LIB_PATH} ${LLVM_LIBRARY_DIRS})
-endif()
-
-add_definitions(${LLVM_DEFINITIONS})
+find_package(llvm-core 12 REQUIRED)
+include_directories(${llvm-core_INCLUDE_DIRS})
+link_directories(${llvm-core_LIBRARY_DIRS})
 
 if (NOT PHASAR_IN_TREE)
   find_library(LLVM_LIBRARY NAMES LLVM PATHS ${LLVM_LIBRARY_DIRS} NO_DEFAULT_PATH)
@@ -182,10 +194,10 @@ endif()
 # Clang
 # The clang-cpp shared library is now the preferred way to link dynamically against libclang if we build out of tree.
 if(NOT PHASAR_IN_TREE)
-  find_library(CLANG_LIBRARY NAMES clang-cpp REQUIRED HINTS ${LLVM_LIBRARY_DIRS})
-  if(${CLANG_LIBRARY} STREQUAL "CLANG_LIBRARY-NOTFOUND")
+  #find_library(CLANG_LIBRARY NAMES clang-cpp REQUIRED HINTS ${LLVM_LIBRARY_DIRS})
+  #if(${CLANG_LIBRARY} STREQUAL "CLANG_LIBRARY-NOTFOUND")
     set(NEED_LIBCLANG_COMPONENT_LIBS on)
-  endif()
+  #endif()
 endif()
 # As fallback, look for the small clang libraries
 if(PHASAR_IN_TREE OR NEED_LIBCLANG_COMPONENT_LIBS)
@@ -263,9 +275,6 @@ set(LLVM_LINK_COMPONENTS
   vectorize
 )
 
-llvm_map_components_to_libnames(llvm_libs
-  ${LLVM_LINK_COMPONENTS}
-)
 
 # phasar-based binaries
 add_subdirectory(tools)

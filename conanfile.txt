@@ -1,0 +1,13 @@
+[requires]
+llvm-core/12.0.0@intellisectest+intellisectest-application/stable
+nlohmann_json/3.9.1
+boost/1.76.0@intellisectest+intellisectest-application/stable
+gtest/1.10.0@intellisectest+intellisectest-application/stable
+sqlite3/3.36.0
+json-schema-validator/2.1.0
+libcurl/7.80.0
+
+[generators]
+cmake
+
+[options]

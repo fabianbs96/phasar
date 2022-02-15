@@ -10,11 +10,8 @@ else()
 endif()
 
 find_package(Boost COMPONENTS log filesystem program_options graph ${BOOST_THREAD} REQUIRED)
-if(USE_LLVM_FAT_LIB)
-  llvm_config(phasar-clang USE_SHARED ${LLVM_LINK_COMPONENTS})
-else()
-  llvm_config(phasar-clang ${LLVM_LINK_COMPONENTS})
-endif()
+list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
+target_link_libraries(phasar-clang PUBLIC ${LLVM_LINK_COMPONENTS})
 target_link_libraries(phasar-clang
   LINK_PUBLIC
   phasar_config
@@ -34,7 +31,7 @@ target_link_libraries(phasar-clang
   # ${PHASAR_PLUGINS_LIB}
   phasar_pointer
   phasar_typehierarchy
-  ${SQLITE3_LIBRARY}
+  ${SQLite3_LIBRARY_LIST}
   ${Boost_LIBRARIES}
   ${CMAKE_DL_LIBS}
   ${CMAKE_THREAD_LIBS_INIT}
