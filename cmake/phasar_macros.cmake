@@ -35,6 +35,7 @@ function(add_phasar_unittest test_name)
     # if you want to use default main method, use gtestd_main
     gtestd
     gmockd
+    ${CONAN_LIBS}
   )
 
   add_test(NAME "${test}"

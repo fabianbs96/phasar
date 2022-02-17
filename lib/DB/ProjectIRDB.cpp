@@ -150,7 +150,15 @@ void ProjectIRDB::linkForWPA() {
   // all modules.
   if (Modules.size() > 1) {
     llvm::Module *MainMod = getModuleDefiningFunction("main");
-    assert(MainMod && "could not find main function");
+    // assert(MainMod && "could not find main function");
+    if (!MainMod) {
+      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), INFO)
+                    << "Main funciton not found and hence making an arbitrary "
+                       "[first on in the Modules map] "
+                       "module as the main module");
+      MainMod = Modules.begin()->second.get();
+    }
+
     for (auto &[File, Module] : Modules) {
       // we do not want to link a module with itself!
       if (MainMod != Module.get()) {
