@@ -52,24 +52,26 @@ find_package(llvm-core 12 REQUIRED)
 include_directories(${llvm-core_INCLUDE_DIRS})
 link_directories(${llvm-core_LIBRARY_DIRS})
 
-# set(LLVM_LINK_COMPONENTS
-#   coverage
-#   coroutines
-#   demangle
-#   libdriver
-#   lto
-#   support
-#   analysis
-#   bitwriter
-#   core
-#   ipo
-#   irreader
-#   instcombine
-#   instrumentation
-#   linker
-#   objcarcopts
-#   scalaropts
-#   transformutils
-#   codegen
-#   vectorize
-# )
+# XXX not sure where this is actually used
+set(LLVM_LINK_COMPONENTS
+  Coverage
+  Coroutines
+  Demangle
+  LibDriver
+  LTO
+  Support
+  Analysis
+  BitWriter
+  BinaryFormat
+  Core
+  ipo
+  IRReader
+  InstCombine
+  Instrumentation
+  Linker
+  ObjCARCOpts
+  ScalarOpts
+  TransformUtils
+  CodeGen
+  Vectorize
+)

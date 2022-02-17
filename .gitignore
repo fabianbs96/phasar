@@ -122,7 +122,7 @@ standard_header_paths.conf
 CMakeFiles
 CMakeCache.txt
 !cmake/*.cmake
-cmake-build-debug/*
+*build-*/*
 *.pc
 Makefile
 !test/*/Makefile

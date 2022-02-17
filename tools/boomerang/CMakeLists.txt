@@ -21,7 +21,7 @@ target_link_libraries(boomerang
   phasar_wpds
   phasar_syncpds
   ${PHASAR_PLUGINS_LIB}
-  wali
+  #wali
   phasar_passes
   phasar_pointer
   phasar_typehierarchy
