@@ -34,9 +34,9 @@ list(GET VERSION_NUMBER_FILE 2 VERSION_NUMBER_PHASAR)
 include(cmake/phasar_macros.cmake)
 
 # toggle targets
-option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" OFF)
+option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" ON)
 option(PHASAR_BUILD_OPENSSL_TS_UNITTESTS "Build OPENSSL typestate tests (require OpenSSL, default is OFF)" OFF)
-option(PHASAR_BUILD_IR "Build IR test code (default is ON)" OFF)
+option(PHASAR_BUILD_IR "Build IR test code (default is ON)" ON)
 option(PHASAR_BUILD_DOC "Build documentation" OFF)
 
 # various
@@ -104,7 +104,7 @@ add_subdirectory(lib)
 
 # phasar-based binaries
 # XXX conan doesn't support clang currently
-#add_subdirectory(tools)
+add_subdirectory(tools)
 
 # Add Phasar unittests and build all IR test code
 if (PHASAR_BUILD_UNITTESTS)
