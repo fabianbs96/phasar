@@ -49,22 +49,32 @@ using namespace std;
 
 namespace psr {
 
-ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
+llvm::PassManager<llvm::Module> ProjectIRDB::createDefaultPassManager() {
+  llvm::PassManager<llvm::Module> PassManager;
+  PassManager.addPass(ValueAnnotationPass());
+  PassManager.addPass(FunctionAnnotationPass());
+  return PassManager;
+}
+
+ProjectIRDB::ProjectIRDB(IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> ModulePasses)
+    : Options(Options) {
   // register the GeneralStaticsPass analysis pass to the ModuleAnalysisManager
   // such that we can query its results later on
-  GeneralStatisticsAnalysis GSP;
-  MAM.registerPass([&]() { return std::move(GSP); });
+  MAM.registerPass([&]() { return GeneralStatisticsAnalysis(); });
   PB.registerModuleAnalyses(MAM);
+
   // add the transformation pass ValueAnnotationPass
-  MPM.addPass(ValueAnnotationPass());
-  MPM.addPass(FunctionAnnotationPass());
+  MPM.addPass(std::move(ModulePasses));
+
   // just to be sure that none of the passes messed up the module!
   MPM.addPass(llvm::VerifierPass());
 }
 
 ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
-                         IRDBOptions Options)
-    : ProjectIRDB(Options | IRDBOptions::OWNS) {
+                         IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(Options | IRDBOptions::OWNS, std::move(Passes)) {
   for (const auto &File : IRFiles) {
     // if we have a file that is already compiled to llvm ir
 
@@ -99,8 +109,9 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
 }
 
 ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
-                         IRDBOptions Options)
-    : ProjectIRDB(Options) {
+                         IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(Options, std::move(Passes)) {
   for (auto *M : Modules) {
     insertModule(M);
   }
@@ -108,6 +119,11 @@ ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
     linkForWPA();
   }
 }
+
+ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(IRFiles, (IRDBOptions::WPA | IRDBOptions::OWNS),
+                  std::move(Passes)) {}
 
 ProjectIRDB::~ProjectIRDB() {
   // release resources if IRDB does not own
