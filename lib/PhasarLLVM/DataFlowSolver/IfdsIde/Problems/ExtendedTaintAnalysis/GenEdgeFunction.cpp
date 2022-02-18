@@ -21,7 +21,7 @@ namespace psr::XTaint {
 
 GenEdgeFunction::GenEdgeFunction(BasicBlockOrdering &BBO,
                                  const llvm::Instruction *Sani)
-    : EdgeFunctionBase(Kind::Gen, BBO), Sani(Sani) {}
+    : EdgeFunctionBase(EFKind::Gen, BBO), Sani(Sani) {}
 
 GenEdgeFunction::l_t
 GenEdgeFunction::computeTarget([[maybe_unused]] l_t Source) {
@@ -53,7 +53,7 @@ GenEdgeFunction::composeWith(EdgeFunctionPtrType SecondFunction) {
   case EdgeDomain::Sanitized:
     return getAllSanitized();
   default:
-    return getGenEdgeFunction(BBO, Res.getSanitizer());
+    return makeEF<GenEdgeFunction>(BBO, Res.getSanitizer());
   }
 }
 
@@ -87,7 +87,7 @@ GenEdgeFunction::joinWith(EdgeFunctionPtrType OtherFunction) {
       case EdgeDomain::Sanitized:
         return getAllSanitized();
       default:
-        return getGenEdgeFunction(BBO, JoinSani.getSanitizer());
+        return makeEF<GenEdgeFunction>(BBO, JoinSani.getSanitizer());
       }
     }
 
@@ -99,7 +99,7 @@ GenEdgeFunction::joinWith(EdgeFunctionPtrType OtherFunction) {
       // sanitizers
 
       if (Res.isNotSanitized()) {
-        return getGenEdgeFunction(BBO);
+        return makeEF<GenEdgeFunction>(BBO, nullptr);
       }
 
       return makeEF<JoinConstEdgeFunction>(BBO, OtherJoin->getFunction(),

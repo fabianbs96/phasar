@@ -100,7 +100,7 @@ bool IFDSTaintAnalysis::isSinkCall(const llvm::CallBase *CB,
                      });
 }
 
-bool IFDSTaintAnalysis::isSanitizerCall(const llvm::CallBase *CB,
+bool IFDSTaintAnalysis::isSanitizerCall(const llvm::CallBase * /*CB*/,
                                         const llvm::Function *Callee) const {
   return std::any_of(
       Callee->arg_begin(), Callee->arg_end(),
@@ -180,13 +180,13 @@ IFDSTaintAnalysis::getCallFlowFunction(IFDSTaintAnalysis::n_t CallSite,
 
 IFDSTaintAnalysis::FlowFunctionPtrType IFDSTaintAnalysis::getRetFlowFunction(
     IFDSTaintAnalysis::n_t CallSite, IFDSTaintAnalysis::f_t CalleeFun,
-    IFDSTaintAnalysis::n_t ExitSite,
+    IFDSTaintAnalysis::n_t ExitStmt,
     [[maybe_unused]] IFDSTaintAnalysis::n_t RetSite) {
   // We must check if the return value and formal parameter are tainted, if so
   // we must taint all user's of the function call. We are only interested in
   // formal parameters of pointer/reference type.
   return make_shared<MapFactsToCaller<>>(
-      llvm::cast<llvm::CallBase>(CallSite), CalleeFun, ExitSite, true,
+      llvm::cast<llvm::CallBase>(CallSite), CalleeFun, ExitStmt, true,
       [](IFDSTaintAnalysis::d_t Formal) {
         return Formal->getType()->isPointerTy();
       });
@@ -247,7 +247,7 @@ IFDSTaintAnalysis::getCallToRetFlowFunction(
   if (Kill.empty()) {
     return makeLambdaFlow<d_t>([Gen{std::move(Gen)}, Leak{std::move(Leak)},
                                 this, CallSite](d_t Source) -> std::set<d_t> {
-      if (LLVMZeroValue::getInstance()->isLLVMZeroValue(Source)) {
+      if (LLVMZeroValue::isLLVMZeroValue(Source)) {
         return Gen;
       }
 
@@ -261,7 +261,7 @@ IFDSTaintAnalysis::getCallToRetFlowFunction(
   return makeLambdaFlow<d_t>([Gen{std::move(Gen)}, Leak{std::move(Leak)},
                               Kill{std::move(Kill)}, this,
                               CallSite](d_t Source) -> std::set<d_t> {
-    if (LLVMZeroValue::getInstance()->isLLVMZeroValue(Source)) {
+    if (LLVMZeroValue::isLLVMZeroValue(Source)) {
       return Gen;
     }
 
@@ -319,7 +319,7 @@ IFDSTaintAnalysis::d_t IFDSTaintAnalysis::createZeroValue() const {
 }
 
 bool IFDSTaintAnalysis::isZeroValue(IFDSTaintAnalysis::d_t FlowFact) const {
-  return LLVMZeroValue::getInstance()->isLLVMZeroValue(FlowFact);
+  return LLVMZeroValue::isLLVMZeroValue(FlowFact);
 }
 
 void IFDSTaintAnalysis::printNode(ostream &Os,
@@ -338,7 +338,7 @@ void IFDSTaintAnalysis::printFunction(ostream &Os,
 }
 
 void IFDSTaintAnalysis::emitTextReport(
-    const SolverResults<n_t, d_t, BinaryDomain> &SR, std::ostream &OS) {
+    const SolverResults<n_t, d_t, BinaryDomain> & /*SR*/, std::ostream &OS) {
   OS << "\n----- Found the following leaks -----\n";
   if (Leaks.empty()) {
     OS << "No leaks found!\n";

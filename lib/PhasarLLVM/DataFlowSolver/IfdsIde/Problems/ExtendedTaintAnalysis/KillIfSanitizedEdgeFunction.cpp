@@ -15,12 +15,11 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/JoinEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/KillIfSanitizedEdgeFunction.h"
 #include "phasar/PhasarLLVM/Utils/BasicBlockOrdering.h"
-#include "phasar/Utils/LLVMShorthands.h"
 
 namespace psr::XTaint {
 KillIfSanitizedEdgeFunction::KillIfSanitizedEdgeFunction(
     BasicBlockOrdering &BBO, const llvm::Instruction *Load)
-    : EdgeFunctionBase(Kind::KillIfSani, BBO), Load(Load) {}
+    : EdgeFunctionBase(EFKind::KillIfSani, BBO), Load(Load) {}
 
 KillIfSanitizedEdgeFunction::l_t
 KillIfSanitizedEdgeFunction::computeTarget(l_t Source) {
@@ -38,14 +37,6 @@ KillIfSanitizedEdgeFunction::computeTarget(l_t Source) {
   }
 
   return Source;
-}
-
-KillIfSanitizedEdgeFunction::EdgeFunctionPtrType
-KillIfSanitizedEdgeFunction::composeWith(EdgeFunctionPtrType SecondFunction) {
-  if (this == &*SecondFunction || equal_to(SecondFunction)) {
-    return shared_from_this();
-  }
-  return EdgeFunctionBase::composeWith(std::move(SecondFunction));
 }
 
 bool KillIfSanitizedEdgeFunction::equal_to(

@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_CONTROLLER_ANALYSIS_CONTROLLER_H_
-#define PHASAR_CONTROLLER_ANALYSIS_CONTROLLER_H_
+#ifndef PHASAR_CONTROLLER_ANALYSISCONTROLLER_H
+#define PHASAR_CONTROLLER_ANALYSISCONTROLLER_H
 
 #include <iostream>
 #include <set>
@@ -20,6 +20,7 @@
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/AnalysisStrategy/Strategies.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
@@ -62,7 +63,9 @@ private:
   std::string ProjectID;
   std::string OutDirectory;
   boost::filesystem::path ResultDirectory;
-  [[maybe_unused]] Soundness S;
+  IFDSIDESolverConfig SolverConfig;
+  [[maybe_unused]] Soundness SoundnessLevel;
+  [[maybe_unused]] bool AutoGlobalSupport;
 
   ///
   /// \brief The maximum length of the CallStrings used in the InterMonoSolver
@@ -117,17 +120,20 @@ public:
                      std::vector<DataFlowAnalysisKind> DataFlowAnalyses,
                      std::vector<std::string> AnalysisConfigs,
                      PointerAnalysisType PTATy, CallGraphAnalysisType CGTy,
-                     Soundness S, const std::set<std::string> &EntryPoints,
+                     Soundness SoundnessLevel, bool AutoGlobalSupport,
+                     const std::set<std::string> &EntryPoints,
                      AnalysisStrategy Strategy,
                      AnalysisControllerEmitterOptions EmitterOptions,
+                     IFDSIDESolverConfig SolverConfig,
                      const std::string &ProjectID = "default-phasar-project",
                      const std::string &OutDirectory = "");
 
   ~AnalysisController() = default;
 
   AnalysisController(const AnalysisController &) = delete;
-
   AnalysisController(AnalysisController &&) = delete;
+  AnalysisController &operator=(const AnalysisController &) = delete;
+  AnalysisController &operator=(const AnalysisController &&) = delete;
 
   void executeAs(AnalysisStrategy Strategy);
 };

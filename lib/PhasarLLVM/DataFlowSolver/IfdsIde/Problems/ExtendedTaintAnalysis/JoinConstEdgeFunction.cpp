@@ -20,11 +20,9 @@ namespace psr::XTaint {
 JoinConstEdgeFunction::JoinConstEdgeFunction(
     BasicBlockOrdering &BBO, EdgeFunctionPtrType OtherFn,
     const llvm::Instruction *OtherConst)
-    : EdgeFunctionBase(Kind::JoinConst, BBO), OtherFn(std::move(OtherFn)),
+    : EdgeFunctionBase(EFKind::JoinConst, BBO), OtherFn(std::move(OtherFn)),
       OtherConst(OtherConst) {
   assert(OtherConst);
-  std::cerr << "JOINC[" << this << "| " << &*this->OtherFn << " with const "
-            << llvmIRToShortString(this->OtherConst) << " ]";
 }
 
 JoinConstEdgeFunction::l_t JoinConstEdgeFunction::computeTarget(l_t Source) {
@@ -50,7 +48,7 @@ JoinConstEdgeFunction::joinWith(EdgeFunctionPtrType OtherFunction) {
     // we never return Top, Bottom or Sanitized from a join with two sanitizers
 
     if (Res.isNotSanitized()) {
-      return getGenEdgeFunction(BBO);
+      return makeEF<GenEdgeFunction>(BBO, nullptr);
     }
 
     return makeEF<JoinConstEdgeFunction>(BBO, OtherFn, Res.getSanitizer());

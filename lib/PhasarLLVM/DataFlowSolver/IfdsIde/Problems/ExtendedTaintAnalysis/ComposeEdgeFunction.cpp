@@ -18,8 +18,7 @@ namespace psr::XTaint {
 ComposeEdgeFunction::ComposeEdgeFunction(BasicBlockOrdering &BBO,
                                          EdgeFunctionPtrType F,
                                          EdgeFunctionPtrType G)
-    : EdgeFunctionBase(Kind::Compose, BBO), F(std::move(F)), G(std::move(G)) {
-  std::cerr << "Compose " << this->F.get() << " with " << this->G.get() << "\n";
+    : EdgeFunctionBase(EFKind::Compose, BBO), F(std::move(F)), G(std::move(G)) {
 }
 
 auto ComposeEdgeFunction::computeTarget(l_t Source) -> l_t {

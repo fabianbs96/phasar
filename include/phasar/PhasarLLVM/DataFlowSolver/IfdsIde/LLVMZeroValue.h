@@ -14,8 +14,8 @@
  *      Author: philipp
  */
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_LLVMZEROVALUE_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_LLVMZEROVALUE_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_LLVMZEROVALUE_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_LLVMZEROVALUE_H
 
 #include <memory>
 
@@ -33,9 +33,9 @@ class Value;
 namespace psr {
 
 // do not touch, its only purpose is to make ZeroValue working
-static const std::unique_ptr<llvm::LLVMContext>
+inline const std::unique_ptr<llvm::LLVMContext>
     LLVMZeroValueCTX(new llvm::LLVMContext);
-static const std::unique_ptr<llvm::Module>
+inline const std::unique_ptr<llvm::Module>
     LLVMZeroValueMod(new llvm::Module("zero_module", *LLVMZeroValueCTX));
 
 /**
@@ -55,7 +55,8 @@ private:
             LLVMZeroValueInternalName) {
     setAlignment(llvm::MaybeAlign(4));
   }
-  static constexpr char LLVMZeroValueInternalName[] = "zero_value";
+  ~LLVMZeroValue() = default;
+  static constexpr auto LLVMZeroValueInternalName = "zero_value";
 
 public:
   LLVMZeroValue(const LLVMZeroValue &Z) = delete;
@@ -63,21 +64,18 @@ public:
   LLVMZeroValue(LLVMZeroValue &&Z) = delete;
   LLVMZeroValue &operator=(LLVMZeroValue &&Z) = delete;
 
-  llvm::StringRef getName() const { return LLVMZeroValueInternalName; }
+  [[nodiscard]] llvm::StringRef getName() const {
+    return LLVMZeroValueInternalName;
+  }
 
-  bool isLLVMZeroValue(const llvm::Value *V) {
-    if (V && V->hasName()) {
-      // checks if V's name start with "zero_value"
-      return V->getName().find(LLVMZeroValueInternalName) !=
-             llvm::StringRef::npos;
-    }
-    return false;
+  static bool isLLVMZeroValue(const llvm::Value *V) {
+    return V == getInstance();
   }
 
   // Do not specify a destructor (at all)!
-  static LLVMZeroValue *getInstance() {
-    static LLVMZeroValue *zv = new LLVMZeroValue;
-    return zv;
+  static const LLVMZeroValue *getInstance() {
+    static const auto *ZV = new LLVMZeroValue;
+    return ZV;
   }
 };
 } // namespace psr
