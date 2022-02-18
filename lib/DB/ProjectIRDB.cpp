@@ -108,6 +108,10 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
   preprocessAllModules();
 }
 
+ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(IRFiles, DefaultIRDBOptionsIRFiles, std::move(Passes)) {}
+
 ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
                          IRDBOptions Options,
                          llvm::PassManager<llvm::Module> Passes)
@@ -119,11 +123,6 @@ ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
     linkForWPA();
   }
 }
-
-ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
-                         llvm::PassManager<llvm::Module> Passes)
-    : ProjectIRDB(IRFiles, (IRDBOptions::WPA | IRDBOptions::OWNS),
-                  std::move(Passes)) {}
 
 ProjectIRDB::~ProjectIRDB() {
   // release resources if IRDB does not own

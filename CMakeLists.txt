@@ -96,6 +96,7 @@ else()
 endif()
 
 ### Adding external libraries
+include(cmake/limit-ninja-jobs.cmake)
 include(cmake/dependencies.cmake)
 
 # Add the Phasar subdirectories

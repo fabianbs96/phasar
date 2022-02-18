@@ -78,6 +78,9 @@ private:
 
 public:
   static llvm::PassManager<llvm::Module> createDefaultPassManager();
+  static constexpr IRDBOptions DefaultIRDBOptionsIRFiles =
+      IRDBOptions::WPA | IRDBOptions::OWNS;
+  static constexpr IRDBOptions DefaultIRDBOptionsModules = IRDBOptions::WPA;
 
   /// Constructs an empty ProjectIRDB
   ProjectIRDB(IRDBOptions Options, llvm::PassManager<llvm::Module> Passes =
@@ -85,17 +88,16 @@ public:
   /// Constructs a ProjectIRDB from a bunch of LLVM IR files
   ProjectIRDB(
       const std::vector<std::string> &IRFiles,
-      IRDBOptions Options = (IRDBOptions::WPA | IRDBOptions::OWNS),
+      IRDBOptions Options = DefaultIRDBOptionsIRFiles,
       llvm::PassManager<llvm::Module> Passes = createDefaultPassManager());
+
+  ProjectIRDB(const std::vector<std::string> &IRFiles,
+              llvm::PassManager<llvm::Module> Passes);
+
   /// Constructs a ProjecIRDB from a bunch of LLVM Modules
   ProjectIRDB(
       const std::vector<llvm::Module *> &Modules,
-      IRDBOptions Options = IRDBOptions::WPA,
-      llvm::PassManager<llvm::Module> Passes = createDefaultPassManager());
-
-  // Constructs a ProjectIRDB with default options
-  ProjectIRDB(
-      const std::vector<std::string> &IRFiles,
+      IRDBOptions Options = DefaultIRDBOptionsModules,
       llvm::PassManager<llvm::Module> Passes = createDefaultPassManager());
 
   ProjectIRDB(ProjectIRDB &&) = default;
