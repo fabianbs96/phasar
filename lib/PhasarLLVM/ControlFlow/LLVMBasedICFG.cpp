@@ -1254,10 +1254,6 @@ nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
       [&](const llvm::Instruction *CS, const SourceCodeInfoWithIR &From,
           std::initializer_list<SourceCodeInfoWithIR> Tos) {
         for (const auto *Callee : getCalleesOfCallAt(CS)) {
-          if (Callee->isDeclaration()) {
-            continue;
-          }
-
           // Call Edge
           auto InterTo = getFirstNonEmpty(&Callee->front());
           J.push_back({{"from", From}, {"to", std::move(InterTo)}});
@@ -1282,7 +1278,9 @@ nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
         continue;
       }
 
-      if (!llvm::isa<llvm::CallBase>(From)) {
+      const auto *CB = llvm::dyn_cast<llvm::CallBase>(From);
+      if (!CB || (CB->getCalledFunction() &&
+                  CB->getCalledFunction()->isDeclaration())) {
         J.push_back({{"from", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(From),
                                                    llvmIRToStableString(From)}},
                      {"to", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(To),

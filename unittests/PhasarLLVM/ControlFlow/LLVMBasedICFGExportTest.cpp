@@ -289,7 +289,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
 
-TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
+TEST_F(LLVMBasedICFGExportTest, DISABLED_ExportICFGSource03) {
   auto Results =
       exportICFG("exceptions/exceptions_01_cpp_dbg.ll", /*asSrcCode*/ true);
   // std::cerr << Results.dump(4) << std::endl;
