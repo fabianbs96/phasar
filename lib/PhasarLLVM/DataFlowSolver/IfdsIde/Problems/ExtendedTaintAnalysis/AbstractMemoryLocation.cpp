@@ -10,6 +10,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/raw_os_ostream.h"
+#include <cstddef>
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
 #include "phasar/PhasarLLVM/Utils/BasicBlockOrdering.h"
@@ -19,42 +20,37 @@
 
 namespace psr::detail {
 
-AbstractMemoryLoactionStorage::AbstractMemoryLoactionStorage(
-    const llvm::Value *Baseptr, uint32_t Lifetime,
-    const llvm::ArrayRef<ptrdiff_t> &Offsets) noexcept
-    : Baseptr(Baseptr), Lifetime(Lifetime),
-      NumOffsets(uint32_t(Offsets.size())) {
-  assert(Baseptr && "The baseptr must not be null!");
-  memcpy(this->Offsets, Offsets.begin(), Offsets.size() * sizeof(ptrdiff_t));
-}
-
-AbstractMemoryLoactionStorage::AbstractMemoryLoactionStorage(
-    const llvm::Value *Baseptr, uint32_t Lifetime) noexcept
-    : Baseptr(Baseptr), Lifetime(Lifetime), NumOffsets(0) {
+AbstractMemoryLocationStorage::AbstractMemoryLocationStorage(
+    const llvm::Value *Baseptr, uint32_t Lifetime, uint32_t NumOffsets) noexcept
+    : Baseptr(Baseptr), Lifetime(Lifetime), NumOffsets(NumOffsets) {
   assert(Baseptr && "The baseptr must not be null!");
 }
 
 AbstractMemoryLocationImpl::AbstractMemoryLocationImpl()
-    : AbstractMemoryLoactionStorage(LLVMZeroValue::getInstance(), 0) {}
+    : AbstractMemoryLocationStorage(LLVMZeroValue::getInstance(), 0) {}
 
 AbstractMemoryLocationImpl::AbstractMemoryLocationImpl(
     const llvm::Value *Baseptr, unsigned Lifetime) noexcept
-    : AbstractMemoryLoactionStorage(Baseptr, Lifetime) {}
+    : AbstractMemoryLocationStorage(Baseptr, Lifetime) {}
 AbstractMemoryLocationImpl::AbstractMemoryLocationImpl(
     const llvm::Value *Baseptr, llvm::SmallVectorImpl<ptrdiff_t> &&Offsets,
     unsigned Lifetime) noexcept
-    : AbstractMemoryLoactionStorage(Baseptr, Lifetime, Offsets) {}
+    : AbstractMemoryLocationImpl(Baseptr, llvm::makeArrayRef(Offsets),
+                                 Lifetime) {}
 AbstractMemoryLocationImpl::AbstractMemoryLocationImpl(
     const llvm::Value *Baseptr, llvm::ArrayRef<ptrdiff_t> Offsets,
     unsigned Lifetime) noexcept
-    : AbstractMemoryLoactionStorage(Baseptr, Lifetime, Offsets) {}
+    : AbstractMemoryLocationStorage(Baseptr, Lifetime, Offsets.size()) {
+  memcpy(this->getTrailingObjects<ptrdiff_t>(), Offsets.data(),
+         Offsets.size() * sizeof(ptrdiff_t));
+}
 
 bool AbstractMemoryLocationImpl::isZero() const {
   return LLVMZeroValue::getInstance()->isLLVMZeroValue(Baseptr);
 }
 
 llvm::ArrayRef<ptrdiff_t> AbstractMemoryLocationImpl::offsets() const {
-  return llvm::makeArrayRef(Offsets, NumOffsets);
+  return llvm::makeArrayRef(this->getTrailingObjects<ptrdiff_t>(), NumOffsets);
 }
 
 auto AbstractMemoryLocationImpl::computeOffset(
@@ -75,9 +71,9 @@ auto AbstractMemoryLocationImpl::computeOffset(
 [[nodiscard]] auto AbstractMemoryLocationImpl::operator-(
     const AbstractMemoryLocationImpl &TV) const -> llvm::ArrayRef<ptrdiff_t> {
   if (NumOffsets > TV.offsets().size()) {
-    return offsets().slice(std::max(size_t(1), TV.offsets().size()) - 1);
+    return offsets().drop_front(std::max(size_t(1), TV.offsets().size()) - 1);
   }
-  return TV.offsets().slice(std::max(1U, NumOffsets) - 1);
+  return TV.offsets().drop_front(std::max(1U, NumOffsets) - 1);
 }
 
 bool AbstractMemoryLocationImpl::equivalentOffsets(
@@ -116,6 +112,7 @@ bool AbstractMemoryLocationImpl::mustAlias(
                 << llvmIRToShortString(TV.base()) << ") = " << std::boolalpha
                 << (PT.alias(base(), TV.base()) == AliasResult::MustAlias));
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   auto getFunctionOrNull = [](const llvm::Value *V) -> const llvm::Function * {
     if (const auto *Inst = llvm::dyn_cast<llvm::Instruction>(V)) {
       return Inst->getFunction();
@@ -188,14 +185,14 @@ AbstractMemoryLocation::AbstractMemoryLocation(
   assert(Impl);
 }
 
-std::ostream &operator<<(std::ostream &OS, const AbstractMemoryLocation &TV) {
+std::ostream &operator<<(std::ostream &OS, AbstractMemoryLocation TV) {
   llvm::raw_os_ostream ROS(OS);
   ROS << TV;
   return OS;
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              const AbstractMemoryLocation &TV) {
+                              AbstractMemoryLocation TV) {
   // -> Think about better representation
   OS << "(";
   if (LLVMZeroValue::getInstance()->isLLVMZeroValue(TV->base())) {
@@ -215,12 +212,9 @@ std::string DToString(const AbstractMemoryLocation &AML) {
   return OS.str();
 }
 
-} // namespace psr
-
-namespace llvm {
-llvm::hash_code hash_value(const psr::AbstractMemoryLocation &Val) {
+llvm::hash_code hash_value(psr::AbstractMemoryLocation Val) {
   return hash_combine(
       Val->base(), Val->lifetime() == 0,
-      hash_combine_range(Val->offsets().begin(), Val->offsets().end()));
+      llvm::hash_combine_range(Val->offsets().begin(), Val->offsets().end()));
 }
-} // namespace llvm
+} // namespace psr

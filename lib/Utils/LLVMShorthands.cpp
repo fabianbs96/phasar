@@ -36,6 +36,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "phasar/Config/Configuration.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -142,26 +143,16 @@ bool matchesSignature(const llvm::FunctionType *FType1,
   return false;
 }
 
-static llvm::SmallDenseMap<const llvm::Module *,
-                           std::unique_ptr<llvm::ModuleSlotTracker>, 2>
-    ModuleToSlotTracker;
-
 llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V) {
   const auto *M = getModuleFromVal(V);
-  
-  auto &Ret = ModuleToSlotTracker[M];
-  if (!Ret) {
-    Ret = std::make_unique<llvm::ModuleSlotTracker>(M);
-  }
-
-  return *Ret;
-}
-
-void clearModuleSlotTrackerFor(const llvm::Module *M) {
-  ModuleToSlotTracker.erase(M);
+  return ModulesToSlotTracker::getSlotTrackerForModule(M);
 }
 
 std::string llvmIRToString(const llvm::Value *V) {
+  if (!V) {
+    return "<null>";
+  }
+
   std::string IRBuffer;
   llvm::raw_string_ostream RSO(IRBuffer);
   V->print(RSO, getModuleSlotTrackerFor(V));
@@ -172,6 +163,9 @@ std::string llvmIRToString(const llvm::Value *V) {
 }
 
 std::string llvmIRToStableString(const llvm::Value *V) {
+  if (!V) {
+    return "<null>";
+  }
   std::string IRBuffer;
   llvm::raw_string_ostream RSO(IRBuffer);
   V->print(RSO, getModuleSlotTrackerFor(V));
@@ -196,6 +190,9 @@ std::string llvmIRToStableString(const llvm::Value *V) {
 }
 
 std::string llvmIRToShortString(const llvm::Value *V) {
+  if (!V) {
+    return "<null>";
+  }
   std::string IRBuffer;
   llvm::raw_string_ostream RSO(IRBuffer);
   if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V);
@@ -250,13 +247,22 @@ std::string getMetaDataID(const llvm::Value *V) {
   return "-1";
 }
 
-llvmValueIDLess::llvmValueIDLess() : sless(stringIDLess()) {}
+std::optional<unsigned> getFunctionId(const llvm::Function *F) {
+  auto *MD = F->getMetadata(FunctionAnnotationPass::FunctionMetadataId);
+  if (!MD) {
+    return std::nullopt;
+  }
 
-bool llvmValueIDLess::operator()(const llvm::Value *Lhs,
+  auto *MDInt = llvm::cast<llvm::ValueAsMetadata>(MD->getOperand(0));
+  return static_cast<unsigned>(
+      llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue());
+}
+
+bool LLVMValueIDLess::operator()(const llvm::Value *Lhs,
                                  const llvm::Value *Rhs) const {
   std::string LhsId = getMetaDataID(Lhs);
   std::string RhsId = getMetaDataID(Rhs);
-  return sless(LhsId, RhsId);
+  return Sless(LhsId, RhsId);
 }
 
 int getFunctionArgumentNr(const llvm::Argument *Arg) {
@@ -455,20 +461,34 @@ llvm::StringRef getVarAnnotationIntrinsicName(const llvm::CallInst *CallInst) {
   const int KPointerGlobalStringIdx = 1;
   auto *CE = llvm::cast<llvm::ConstantExpr>(
       CallInst->getOperand(KPointerGlobalStringIdx));
-  assert(CE != nullptr);
-  assert(CE->getOpcode() == llvm::Instruction::GetElementPtr);
-  assert(llvm::dyn_cast<llvm::GlobalVariable>(CE->getOperand(0)) != nullptr);
 
-  auto *AnnoteStr = llvm::dyn_cast<llvm::GlobalVariable>(CE->getOperand(0));
-  assert(llvm::dyn_cast<llvm::ConstantDataSequential>(
-      AnnoteStr->getInitializer()));
+  assert(CE->getOpcode() == llvm::Instruction::GetElementPtr);
+
+  auto *AnnoteStr = llvm::cast<llvm::GlobalVariable>(CE->getOperand(0));
 
   auto *Data =
-      llvm::dyn_cast<llvm::ConstantDataSequential>(AnnoteStr->getInitializer());
+      llvm::cast<llvm::ConstantDataSequential>(AnnoteStr->getInitializer());
 
   // getAsCString to get rid of the null-terminator
   assert(Data->isCString());
   return Data->getAsCString();
+}
+
+llvm::ModuleSlotTracker &
+ModulesToSlotTracker::getSlotTrackerForModule(const llvm::Module *M) {
+  auto &Ret = MToST[M];
+  if (M == nullptr && Ret == nullptr) {
+    Ret = std::make_unique<llvm::ModuleSlotTracker>(M);
+  }
+  assert(Ret != nullptr && "no ModuleSlotTracker instance for module cached");
+  return *Ret;
+}
+
+void ModulesToSlotTracker::updateMSTForModule(const llvm::Module *M) {
+  MToST[M] = std::make_unique<llvm::ModuleSlotTracker>(M);
+}
+void ModulesToSlotTracker::deleteMSTForModule(const llvm::Module *M) {
+  MToST.erase(M);
 }
 
 } // namespace psr

@@ -90,11 +90,14 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
+  std::set<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
+  // Counter to store the number of runtime edges added
+  unsigned int TotalRuntimeEdgesAdded = 0;
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -135,10 +138,8 @@ private:
 
   bool constructDynamicCall(const llvm::Instruction *I, Resolver &Resolver);
 
-  std::unique_ptr<Resolver> makeResolver(ProjectIRDB &IRDB,
-                                         CallGraphAnalysisType CGT,
-                                         LLVMTypeHierarchy &TH,
-                                         LLVMPointsToInfo &PT);
+  std::unique_ptr<Resolver>
+  makeResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH, LLVMPointsToInfo &PT);
 
   template <typename MapTy>
   static void insertGlobalCtorsDtorsImpl(MapTy &Into, const llvm::Module *M,
@@ -187,22 +188,13 @@ public:
   LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                 const std::set<std::string> &EntryPoints = {},
                 LLVMTypeHierarchy *TH = nullptr, LLVMPointsToInfo *PT = nullptr,
-                Soundness S = Soundness::Soundy, bool IncludeGlobals = false);
+                Soundness S = Soundness::Soundy, bool IncludeGlobals = true);
 
-  LLVMBasedICFG(const LLVMBasedICFG &);
+  LLVMBasedICFG(const LLVMBasedICFG &ICF);
+
+  LLVMBasedICFG &operator=(const LLVMBasedICFG &) = delete;
 
   ~LLVMBasedICFG() override;
-
-  // Re-override getSuccsOf and getPredsOf from LLVMBasedCFG to incorporate
-  // information about global ctors and globale dtors
-  [[nodiscard]] std::vector<const llvm::Instruction *>
-  getPredsOf(const llvm::Instruction *Inst) const override;
-
-  [[nodiscard]] std::vector<const llvm::Instruction *>
-  getSuccsOf(const llvm::Instruction *Inst) const override;
-  void getSuccsOf(
-      const llvm::Instruction *Inst,
-      llvm::SmallVectorImpl<const llvm::Instruction *> &Successors) const;
 
   [[nodiscard]] const llvm::Function *getFirstGlobalCtorOrNull() const;
 
@@ -249,6 +241,15 @@ public:
    * \return the edges and the target function for each edge.
    */
   OutEdgesAndTargets getOutEdgeAndTarget(const llvm::Function *Fun) const;
+
+  /**
+   * For the given pair of (callsite id - function id), if there are no edges
+   * in the callgraph, this function adds the edges
+   *
+   * \return boolean flag that tells if the callgraph is modified
+   */
+  bool addRuntimeEdges(
+      llvm::ArrayRef<std::pair<unsigned, unsigned>> CallerCalleeMap);
 
   /**
    * Removes all edges found for the given instruction within the
@@ -311,7 +312,7 @@ public:
   void print(std::ostream &OS = std::cout) const override;
 
   void printAsDot(std::ostream &OS = std::cout,
-                  bool printEdgeLabels = true) const;
+                  bool PrintEdgeLabels = true) const;
 
   void printInternalPTGAsDot(std::ostream &OS = std::cout) const;
 
@@ -341,35 +342,40 @@ public:
   [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
   void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;
 
+  [[nodiscard]] const std::set<const llvm::Instruction *> &
+  getUnsoundCallSites();
+
   [[nodiscard]] unsigned getNumOfVertices() const;
 
   [[nodiscard]] unsigned getNumOfEdges() const;
+
+  [[nodiscard]] unsigned getTotalRuntimeEdgesAdded() const;
 
   std::vector<const llvm::Function *> getDependencyOrderedFunctions();
 
   [[nodiscard]] const llvm::Function *
   getRegisteredDtorsCallerOrNull(const llvm::Module *Mod);
 
-  template <typename Fn> void forEachGlobalCtor(Fn &&fn) const {
+  template <typename Fn> void forEachGlobalCtor(Fn &&F) const {
     for (auto [Prio, Fun] : GlobalCtors) {
-      fn(static_cast<const llvm::Function *>(Fun));
+      std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
-  template <typename Fn> void forEachGlobalDtor(Fn &&fn) const {
+  template <typename Fn> void forEachGlobalDtor(Fn &&F) const {
     for (auto [Prio, Fun] : GlobalDtors) {
-      fn(static_cast<const llvm::Function *>(Fun));
+      std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
 protected:
-  void collectGlobalCtors() override;
+  void collectGlobalCtors() final;
 
-  void collectGlobalDtors() override;
+  void collectGlobalDtors() final;
 
-  void collectGlobalInitializers() override;
+  void collectGlobalInitializers() final;
 
-  void collectRegisteredDtors() override;
+  void collectRegisteredDtors() final;
 };
 
 } // namespace psr

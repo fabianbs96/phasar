@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_TAINT_CONFIG_TAINT_CONFIG_H
-#define PHASAR_PHASARLLVM_TAINT_CONFIG_TAINT_CONFIG_H
+#ifndef PHASAR_PHASARLLVM_TAINTCONFIG_TAINTCONFIG_H
+#define PHASAR_PHASARLLVM_TAINTCONFIG_TAINTCONFIG_H
 
 #include <filesystem>
 #include <functional>
@@ -107,8 +107,8 @@ public:
       const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
-  /// \brief Calls Handler for all operands of Inst that become sanitized after
-  /// the instruction is completed.
+  /// \brief Calls Handler for all operands of Inst that become sanitized
+  /// after the instruction is completed.
   ///
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.

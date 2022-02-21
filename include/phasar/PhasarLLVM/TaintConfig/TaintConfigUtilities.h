@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_TAINT_CONFIG_TAINT_CONFIG_UTILITIES_H
-#define PHASAR_PHASARLLVM_TAINT_CONFIG_TAINT_CONFIG_UTILITIES_H
+#ifndef PHASAR_PHASARLLVM_TAINTCONFIG_TAINTCONFIGUTILITIES_H
+#define PHASAR_PHASARLLVM_TAINTCONFIG_TAINTCONFIGUTILITIES_H
 
 #include <algorithm>
 #include <iterator>
@@ -27,9 +27,21 @@ template <typename ContainerTy,
 void collectGeneratedFacts(ContainerTy &Dest, const TaintConfig &Config,
                            const llvm::CallBase *CB,
                            const llvm::Function *Callee) {
-  Config.forAllGeneratedValuesAt(
-      CB, CB->getNextNode(), Callee,
-      [&Dest](const llvm::Value *V) { Dest.insert(V); });
+  auto Callback = Config.getRegisteredSourceCallBack();
+  if (Callback) {
+    auto CBFacts = Callback(CB);
+    Dest.insert(CBFacts.begin(), CBFacts.end());
+  }
+
+  if (Config.isSource(CB)) {
+    Dest.insert(CB);
+  }
+
+  for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
+    if (Config.isSource(Callee->getArg(I))) {
+      Dest.insert(CB->getArgOperand(I));
+    }
+  }
 }
 
 template <typename ContainerTy, typename Pred,
@@ -39,12 +51,18 @@ void collectLeakedFacts(ContainerTy &Dest, const TaintConfig &Config,
                         const llvm::CallBase *CB, const llvm::Function *Callee,
                         Pred &&LeakIf) {
 
-  Config.forAllLeakCandidatesAt(CB, CB->getNextNode(), Callee,
-                                [&Dest, &LeakIf](const llvm::Value *V) {
-                                  if (LeakIf(V)) {
-                                    Dest.insert(V);
-                                  }
-                                });
+  auto Callback = Config.getRegisteredSinkCallBack();
+  if (Callback) {
+    auto CBLeaks = Callback(CB);
+    std::copy_if(CBLeaks.begin(), CBLeaks.end(),
+                 std::inserter(Dest, Dest.end()), LeakIf);
+  }
+
+  for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
+    if (Config.isSink(Callee->getArg(I)) && LeakIf(CB->getArgOperand(I))) {
+      Dest.insert(CB->getArgOperand(I));
+    }
+  }
 }
 
 template <typename ContainerTy>
@@ -52,7 +70,7 @@ inline void collectLeakedFacts(ContainerTy &Dest, const TaintConfig &Config,
                                const llvm::CallBase *CB,
                                const llvm::Function *Callee) {
   collectLeakedFacts(Dest, Config, CB, Callee,
-                     [](const llvm::Value *V) { return true; });
+                     [](const llvm::Value * /*V*/) { return true; });
 }
 
 template <typename ContainerTy,
