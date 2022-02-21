@@ -86,6 +86,7 @@ class PhasarConan(ConanFile):
     def build(self):
         #disabled because every patch is already applied in our branch
         # self._patch_sources()
+        tools.replace_in_file(self._source_subfolder + "/CMakeLists.txt", "add_subdirectory(tools)", "#add_subdirectory(tools)")
         cmake = CMake(self)
         
         if self.options["boost"].shared:
