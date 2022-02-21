@@ -35,6 +35,7 @@ target_link_libraries(phasar_controller
   LINK_PUBLIC
   
   ${Boost_LIBRARIES}
+  ${PHASAR_STD_FILESYSTEM}
 )
 
 set_target_properties(phasar_controller

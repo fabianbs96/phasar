@@ -88,11 +88,11 @@ public:
 
   [[nodiscard]] bool
   isFallThroughSuccessor(const llvm::Instruction *Inst,
-                         const llvm::Instruction *succ) const override;
+                         const llvm::Instruction *Succ) const override;
 
   [[nodiscard]] bool
   isBranchTarget(const llvm::Instruction *Inst,
-                 const llvm::Instruction *succ) const override;
+                 const llvm::Instruction *Succ) const override;
 
   [[nodiscard]] bool
   isHeapAllocatingFunction(const llvm::Function *Fun) const override;
@@ -131,13 +131,15 @@ protected:
     std::string IR;
   };
 
-  friend void from_json(const nlohmann::json &J, SourceCodeInfoWithIR &Info);
-  friend void to_json(nlohmann::json &J, const SourceCodeInfoWithIR &Info);
+  friend void from_json(const nlohmann::json &J, // NOLINT
+                        SourceCodeInfoWithIR &Info);
+  friend void to_json(nlohmann::json &J, // NOLINT
+                      const SourceCodeInfoWithIR &Info);
 
   /// Used by export(I)CFGAsJson
   static SourceCodeInfoWithIR
-  getFirstNonEmpty(llvm::BasicBlock::const_iterator &it,
-                   llvm::BasicBlock::const_iterator end);
+  getFirstNonEmpty(llvm::BasicBlock::const_iterator &It,
+                   llvm::BasicBlock::const_iterator End);
   static SourceCodeInfoWithIR getFirstNonEmpty(const llvm::BasicBlock *BB);
 };
 

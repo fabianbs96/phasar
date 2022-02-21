@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_LLVMFLOWFUNCTIONS_H
-#define PHASAR_PHASARLLVM_IFDSIDE_LLVMFLOWFUNCTIONS_H
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_LLVMFLOWFUNCTIONS_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_LLVMFLOWFUNCTIONS_H
 
 #include <functional>
 #include <memory>
@@ -39,17 +39,18 @@ namespace psr {
 /// \brief Automatically kills temporary loads that are no longer in use.
 class AutoKillTMPs : public FlowFunction<const llvm::Value *> {
 protected:
-  FlowFunctionPtrType delegate;
-  const llvm::Instruction *inst;
+  FlowFunctionPtrType Delegate;
+  const llvm::Instruction *Inst;
 
 public:
   AutoKillTMPs(FlowFunctionPtrType FF, const llvm::Instruction *In)
-      : delegate(std::move(FF)), inst(In) {}
-  virtual ~AutoKillTMPs() = default;
+      : Delegate(std::move(FF)), Inst(In) {}
+
+  ~AutoKillTMPs() override = default;
 
   container_type computeTargets(const llvm::Value *Source) override {
-    container_type Result = delegate->computeTargets(Source);
-    for (const llvm::Use &U : inst->operands()) {
+    container_type Result = Delegate->computeTargets(Source);
+    for (const llvm::Use &U : Inst->operands()) {
       if (llvm::isa<llvm::LoadInst>(U)) {
         Result.erase(U);
       }
@@ -100,7 +101,7 @@ public:
               })
       : CallSite(CallSite), PropagateGlobals(PropagateGlobals),
         Predicate(std::move(Predicate)){};
-  virtual ~MapFactsAlongsideCallSite() = default;
+  ~MapFactsAlongsideCallSite() override = default;
 
   container_type computeTargets(const llvm::Value *Source) override {
     // Pass ZeroValue as is
@@ -180,12 +181,14 @@ public:
       }
       return {};
     }
+    container_type Res;
     // Pass global variables as is, if desired
+    // Globals could also be actual arguments, then the formal argument needs to
+    // be generated below.
     // Need llvm::Constant here to cover also ConstantExpr and ConstantAggregate
     if (PropagateGlobals && llvm::isa<llvm::Constant>(Source)) {
-      return {Source};
+      Res.insert(Source);
     }
-    container_type Res;
     // Handle back propagation of return value in backwards analysis.
     // We add it to the result here. Later, normal flow in callee can identify
     // it
@@ -259,6 +262,7 @@ private:
   const llvm::Function *CalleeFun;
   const llvm::ReturnInst *ExitInst;
   bool PropagateGlobals;
+  const bool PropagateZeroToCaller;
   std::vector<const llvm::Value *> Actuals;
   std::vector<const llvm::Value *> Formals;
   std::function<bool(const llvm::Value *)> ParamPredicate;
@@ -271,10 +275,12 @@ public:
       std::function<bool(const llvm::Value *)> ParamPredicate =
           [](const llvm::Value *) { return true; },
       std::function<bool(const llvm::Function *)> ReturnPredicate =
-          [](const llvm::Function *) { return true; })
+          [](const llvm::Function *) { return true; },
+      bool PropagateZeroToCaller = true)
       : CallSite(CallSite), CalleeFun(CalleeFun),
         ExitInst(llvm::dyn_cast<llvm::ReturnInst>(ExitInst)),
         PropagateGlobals(PropagateGlobals),
+        PropagateZeroToCaller(PropagateZeroToCaller),
         ParamPredicate(std::move(ParamPredicate)),
         ReturnPredicate(std::move(ReturnPredicate)) {
     assert(ExitInst && "Should not be null");
@@ -294,12 +300,16 @@ public:
   container_type computeTargets(const llvm::Value *Source) override {
     assert(!CalleeFun->isDeclaration() &&
            "Cannot perform mapping to caller for function declaration");
-    // Pass ZeroValue as is
+    // Pass ZeroValue as is, if desired
     if (LLVMZeroValue::getInstance()->isLLVMZeroValue(Source)) {
-      return {Source};
+      if (PropagateZeroToCaller) {
+        return {Source};
+      }
+      return {};
     }
     // Pass global variables as is, if desired
-    if (PropagateGlobals && llvm::isa<llvm::GlobalVariable>(Source)) {
+    // Need llvm::Constant here to cover also ConstantExpr and ConstantAggregate
+    if (PropagateGlobals && llvm::isa<llvm::Constant>(Source)) {
       return {Source};
     }
     // Do the parameter mapping
@@ -340,7 +350,8 @@ public:
       }
     }
     // Collect return value facts
-    if (Source == ExitInst->getReturnValue() && ReturnPredicate(CalleeFun)) {
+    if (ExitInst != nullptr && Source == ExitInst->getReturnValue() &&
+        ReturnPredicate(CalleeFun)) {
       Res.insert(CallSite);
     }
     return Res;
@@ -358,11 +369,11 @@ public:
   PropagateLoad(const llvm::LoadInst *L) : Load(L) {}
   virtual ~PropagateLoad() = default;
 
-  std::set<D> computeTargets(D source) override {
-    if (source == Load->getPointerOperand()) {
-      return {source, Load};
+  std::set<D> computeTargets(D Source) override {
+    if (Source == Load->getPointerOperand()) {
+      return {Source, Load};
     }
-    return {source};
+    return {Source};
   }
 };
 
@@ -374,11 +385,11 @@ public:
   PropagateStore(const llvm::StoreInst *S) : Store(S) {}
   virtual ~PropagateStore() = default;
 
-  std::set<D> computeTargets(D source) override {
-    if (Store->getValueOperand() == source) {
-      return {source, Store->getPointerOperand()};
+  std::set<D> computeTargets(D Source) override {
+    if (Store->getValueOperand() == Source) {
+      return {Source, Store->getPointerOperand()};
     }
-    return {source};
+    return {Source};
   }
 };
 
@@ -392,20 +403,21 @@ protected:
 
 public:
   StrongUpdateStore(const llvm::StoreInst *S, std::function<bool(D)> P)
-      : Store(S), Predicate(P) {}
-  virtual ~StrongUpdateStore() = default;
+      : Store(S), Predicate(std::move(P)) {}
 
-  std::set<D> computeTargets(D source) override {
-    if (source == Store->getPointerOperand()) {
+  ~StrongUpdateStore() override = default;
+
+  std::set<D> computeTargets(D Source) override {
+    if (Source == Store->getPointerOperand()) {
       return {};
-    } else if (Predicate(source)) {
-      return {source, Store->getPointerOperand()};
-    } else {
-      return {source};
     }
+    if (Predicate(Source)) {
+      return {Source, Store->getPointerOperand()};
+    }
+    return {Source};
   }
 };
 
 } // namespace psr
 
-#endif // PHASAR_PHASARLLVM_IFDSIDE_LLVMFLOWFUNCTIONS_H
+#endif

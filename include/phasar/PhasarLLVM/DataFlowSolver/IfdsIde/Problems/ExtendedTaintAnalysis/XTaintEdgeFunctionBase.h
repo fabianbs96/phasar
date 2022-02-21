@@ -7,8 +7,8 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_XTAINTEDGEFUNCTIONBASE_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_XTAINTEDGEFUNCTIONBASE_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_XTAINTEDGEFUNCTIONBASE_H_
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_XTAINTEDGEFUNCTIONBASE_H_
 
 #include <memory>
 
@@ -25,29 +25,27 @@ namespace psr::XTaint {
 class EdgeFunctionBase : public EdgeFunction<EdgeDomain>,
                          public std::enable_shared_from_this<EdgeFunctionBase> {
 public:
-  enum class Kind { Gen, Join, JoinConst, Compose, KillIfSani, Transfer };
+  enum class EFKind { Gen, Join, JoinConst, Compose, KillIfSani, Transfer };
 
 protected:
   BasicBlockOrdering &BBO;
 
 private:
-  const Kind kind;
-  static inline size_t AllocationCount = 0;
-  static inline size_t CtorCount = 0;
+  const EFKind Kind;
 
 public:
   using l_t = EdgeDomain;
 
-  EdgeFunctionBase(Kind Kind, BasicBlockOrdering &BBO);
-  ~EdgeFunctionBase() override;
+  EdgeFunctionBase(EFKind Kind, BasicBlockOrdering &BBO);
+  ~EdgeFunctionBase() override = default;
 
   EdgeFunctionPtrType composeWith(EdgeFunctionPtrType SecondFunction) override;
   EdgeFunctionPtrType joinWith(EdgeFunctionPtrType OtherFunction) override;
 
   /// The actualy kind of this edge function. Can be used in a type-switch.
-  [[nodiscard]] inline Kind getKind() const { return kind; }
+  [[nodiscard]] inline EFKind getKind() const { return Kind; }
 
   virtual llvm::hash_code getHashCode() const = 0;
 };
 } // namespace psr::XTaint
-#endif // PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_XTAINTEDGEFUNCTIONBASE_H_
+#endif

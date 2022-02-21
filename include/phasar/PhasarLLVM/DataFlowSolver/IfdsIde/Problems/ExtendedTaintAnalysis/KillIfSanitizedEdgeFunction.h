@@ -7,15 +7,15 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_KILLIFSANITIZEDEDGEFUNCTION_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_KILLIFSANITIZEDEDGEFUNCTION_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_KILLIFSANITIZEDEDGEFUNCTION_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_KILLIFSANITIZEDEDGEFUNCTION_H
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/Helpers.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionBase.h"
 
 namespace psr::XTaint {
 
-class KillIfSanitizedEdgeFunction final : public EdgeFunctionBase {
+class KillIfSanitizedEdgeFunction : public EdgeFunctionBase {
   const llvm::Instruction *Load;
 
 public:
@@ -23,8 +23,6 @@ public:
                               const llvm::Instruction *Load);
 
   l_t computeTarget(l_t Source) override;
-
-  EdgeFunctionPtrType composeWith(EdgeFunctionPtrType SecondFunction) override;
 
   bool equal_to(EdgeFunctionPtrType OtherFunction) const override;
 
@@ -35,7 +33,7 @@ public:
   llvm::hash_code getHashCode() const override;
 
   inline static bool classof(const EdgeFunctionBase *EF) {
-    return EF->getKind() == Kind::KillIfSani;
+    return EF->getKind() == EFKind::KillIfSani;
   }
 };
 
@@ -47,4 +45,4 @@ makeKillIfSanitizedEdgeFunction(BasicBlockOrdering &BBO,
 
 } // namespace psr::XTaint
 
-#endif // PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_KILLIFSANITIZEDEDGEFUNCTION_H_
+#endif

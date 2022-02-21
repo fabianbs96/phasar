@@ -22,6 +22,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/ModuleSlotTracker.h"
 #include "llvm/IR/Value.h"
 
 #include "phasar/Utils/Utilities.h"
@@ -51,15 +52,6 @@ bool matchesSignature(const llvm::Function *F, const llvm::FunctionType *FType,
 // TODO add description
 bool matchesSignature(const llvm::FunctionType *FType1,
                       const llvm::FunctionType *FType2);
-
-/// We need to be able to remove a Module->ModuleSlotTracker mapping, because
-/// inside the same process the LLVM allocator may choose the same address for a
-/// new llvm::Module as for a previously deleted Module.
-/// Looking up the ModuleSlotTracker for the new module (that has the same
-/// address as the old module) will give the ModuleSlotTracker for the old
-/// module that is invalid for the new one. This is common behavior in the
-/// unittests and leads to several <badref> prints.
-void clearModuleSlotTrackerFor(const llvm::Module *M);
 
 llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V);
 
@@ -110,10 +102,10 @@ std::optional<unsigned> getFunctionId(const llvm::Function *F);
  * This is useful, since Instructions/Globals and Arguments have different
  * underlying types for their ID's, size_t and string respectively.
  */
-struct llvmValueIDLess {
-  stringIDLess sless;
-  llvmValueIDLess();
-  bool operator()(const llvm::Value *lhs, const llvm::Value *rhs) const;
+struct LLVMValueIDLess {
+  StringIDLess Sless;
+  inline LLVMValueIDLess() noexcept : Sless(StringIDLess()) {}
+  bool operator()(const llvm::Value *Lhs, const llvm::Value *Rhs) const;
 };
 
 /**
@@ -132,7 +124,7 @@ int getFunctionArgumentNr(const llvm::Argument *Arg);
  * @return LLVM Argument or nullptr, if argNo invalid.
  */
 const llvm::Argument *getNthFunctionArgument(const llvm::Function *F,
-                                             unsigned argNo);
+                                             unsigned ArgNo);
 
 /**
  * The Instruction count starts with one (not zero, as in Function arguments).
@@ -158,7 +150,7 @@ const llvm::Instruction *getLastInstructionOf(const llvm::Function *F);
  * @return LLVM Instruction or nullptr, if termInstNo invalid.
  */
 const llvm::Instruction *getNthTermInstruction(const llvm::Function *F,
-                                               unsigned termInstNo);
+                                               unsigned TermInstNo);
 /**
  * The Store Instruction count starts with one (not zero, as in Function
  * arguments).
@@ -170,7 +162,7 @@ const llvm::Instruction *getNthTermInstruction(const llvm::Function *F,
  * @return LLVM Store Instruction or nullptr, if stoNo invalid.
  */
 const llvm::StoreInst *getNthStoreInstruction(const llvm::Function *F,
-                                              unsigned stoNo);
+                                              unsigned StoNo);
 
 std::vector<const llvm::Instruction *>
 getAllExitPoints(const llvm::Function *F);
@@ -199,7 +191,7 @@ std::string getModuleNameFromVal(const llvm::Value *V);
  * hash computation.
  * @return Hash value.
  */
-std::size_t computeModuleHash(llvm::Module *M, bool considerIdentifier);
+std::size_t computeModuleHash(llvm::Module *M, bool ConsiderIdentifier);
 
 /**
  * @brief Computes a hash value for a given LLVM Module.
@@ -236,6 +228,24 @@ bool isVarAnnotationIntrinsic(const llvm::Function *F);
  *
  */
 llvm::StringRef getVarAnnotationIntrinsicName(const llvm::CallInst *CallInst);
+
+class ModulesToSlotTracker {
+  friend class ProjectIRDB;
+  friend class LLVMBasedICFG;
+  friend class LLVMZeroValue;
+
+private:
+  static inline llvm::SmallDenseMap<const llvm::Module *,
+                                    std::unique_ptr<llvm::ModuleSlotTracker>, 2>
+      MToST; // NOLINT
+
+  static void updateMSTForModule(const llvm::Module *Module);
+  static void deleteMSTForModule(const llvm::Module *Module);
+
+public:
+  static llvm::ModuleSlotTracker &
+  getSlotTrackerForModule(const llvm::Module *Module);
+};
 } // namespace psr
 
 #endif

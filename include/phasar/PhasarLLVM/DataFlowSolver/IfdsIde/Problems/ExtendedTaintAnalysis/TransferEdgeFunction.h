@@ -7,13 +7,13 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_TRANSFEREDGEFUNCTION_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_TRANSFEREDGEFUNCTION_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_TRANSFEREDGEFUNCTION_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_TRANSFEREDGEFUNCTION_H
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/ExtendedTaintAnalysis/XTaintEdgeFunctionBase.h"
 
 namespace psr::XTaint {
-class TransferEdgeFunction final : public EdgeFunctionBase {
+class TransferEdgeFunction : public EdgeFunctionBase {
   const llvm::Instruction *Load;
   const llvm::Instruction *To;
 
@@ -31,4 +31,4 @@ public:
 };
 } // namespace psr::XTaint
 
-#endif // PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_TRANSFEREDGEFUNCTION_H_
+#endif

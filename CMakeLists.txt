@@ -10,14 +10,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(GNUInstallDirs)
+
 set_property(GLOBAL PROPERTY TARGET_MESSAGES OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build mode ('Debug' or 'Release', default is 'Debug')" FORCE)
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build mode ('DebugSan' or 'Debug' or 'Release', default is 'Debug')" FORCE)
 endif ()
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+if(CMAKE_BUILD_TYPE STREQUAL "DebugSan")
+  message(STATUS "Selected Debug Build with sanitizers")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -MP -fvisibility-inlines-hidden -fstack-protector-strong -ffunction-sections -fdata-sections -pipe -g -fno-omit-frame-pointer -fsanitize=address,undefined")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  message(STATUS "Selected Debug Build")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -MP -fvisibility-inlines-hidden -fstack-protector-strong -ffunction-sections -fdata-sections -pipe -g")
 else()
+  message(STATUS "Selected Release Build")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -MP -fvisibility-inlines-hidden -fstack-protector-strong -ffunction-sections -fdata-sections -pipe -march=native")
 endif()
 
@@ -37,6 +45,9 @@ include(cmake/phasar_macros.cmake)
 option(PHASAR_BUILD_UNITTESTS "Build all tests (default is ON)" ON)
 option(PHASAR_BUILD_OPENSSL_TS_UNITTESTS "Build OPENSSL typestate tests (require OpenSSL, default is OFF)" OFF)
 option(PHASAR_BUILD_IR "Build IR test code (default is ON)" ON)
+
+option(PHASAR_ENABLE_CLANG_TIDY_DURING_BUILD "Run clang-tidy during build (default is OFF)" OFF)
+
 option(PHASAR_BUILD_DOC "Build documentation" OFF)
 
 # various
@@ -81,12 +92,13 @@ endif()
 configure_file(config.h.in config.h @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-
 include_directories(
   ${PHASAR_SRC_DIR}/include
 )
 
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(PHASAR_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR}/phasar)
+
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${PHASAR_INSTALL_LIBDIR})
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 if (LLVM_ENABLE_LIBCXX)
@@ -99,7 +111,7 @@ endif()
 include(cmake/limit-ninja-jobs.cmake)
 include(cmake/dependencies.cmake)
 
-# Add the Phasar subdirectories
+# Add PhASAR's subdirectories
 add_subdirectory(include)
 add_subdirectory(lib)
 

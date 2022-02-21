@@ -7,49 +7,67 @@
  *     Fabian Schiebel, Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H_
-#define PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H_
+#ifndef PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H
+#define PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H
 
-#include "llvm/ADT/DenseMap.h"
-#include <memory>
-#include <vector>
+#include <memory_resource>
+
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/ErrorHandling.h"
+
+#include "phasar/PhasarLLVM/Pointer/DynamicPointsToSetPtr.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
+#include "phasar/Utils/StableVector.h"
+
+namespace llvm {
+class Value;
+} // namespace llvm
 
 namespace psr {
 template <typename PointsToSetTy> class PointsToSetOwner {
 public:
-  explicit PointsToSetOwner() = default;
-  explicit PointsToSetOwner(size_t InitialCapacity) {
-    Owner.reserve(InitialCapacity);
-    OwnedPTS.reserve(InitialCapacity);
-  }
+  PointsToSetOwner(std::pmr::polymorphic_allocator<PointsToSetTy> Alloc =
+                       std::pmr::get_default_resource()) noexcept
+      : Alloc(Alloc), AllPTS(Alloc.resource()) {}
+  PointsToSetOwner(PointsToSetOwner &&) noexcept = default;
 
-  PointsToSetTy *acquire() {
-    Owner.push_back(std::make_unique<PointsToSetTy>());
-    OwnedPTS[Owner.back().get()] = Owner.size() - 1;
-    return Owner.back().get();
-  }
-  void release(PointsToSetTy *PTS) {
-    if (Owner.empty()) {
-      return;
+  PointsToSetOwner(const PointsToSetOwner &) = delete;
+  PointsToSetOwner &operator=(const PointsToSetOwner &) = delete;
+  PointsToSetOwner &operator=(PointsToSetOwner &&) = delete;
+
+  ~PointsToSetOwner() {
+    for (auto PTS : OwnedPTS) {
+      std::destroy_at(PTS);
+      Alloc.deallocate(PTS, 1);
     }
-
-    assert(Owner.size() == OwnedPTS.size());
-
-    if (auto It = OwnedPTS.find(PTS); It != OwnedPTS.end()) {
-      auto Idx = It->second;
-
-      OwnedPTS[Owner.back().get()] = Idx;
-      OwnedPTS.erase(PTS);
-
-      std::swap(Owner[Idx], Owner.back());
-      Owner.pop_back();
-    }
+    OwnedPTS.clear();
   }
+
+  DynamicPointsToSetPtr<PointsToSetTy> acquire() {
+    auto Ptr = new (Alloc.allocate(1)) PointsToSetTy();
+    OwnedPTS.insert(Ptr);
+    return &AllPTS.emplace_back(Ptr);
+  }
+  void release(PointsToSetTy *PTS) noexcept {
+    if (LLVM_UNLIKELY(!OwnedPTS.erase(PTS))) {
+      llvm::report_fatal_error(
+          "ERROR: release PointsToSet that was either already "
+          "freed, or never allocated with this PointsToSetOwner!");
+    }
+    std::destroy_at(PTS);
+    Alloc.deallocate(PTS, 1);
+    /// NOTE: Do not delete from AllPTS!
+  }
+
+  void reserve(size_t Capacity) { OwnedPTS.reserve(Capacity); }
 
 private:
-  std::vector<std::unique_ptr<PointsToSetTy>> Owner;
-  llvm::DenseMap<PointsToSetTy *, size_t> OwnedPTS;
+  std::pmr::polymorphic_allocator<PointsToSetTy> Alloc;
+  llvm::DenseSet<PointsToSetTy *> OwnedPTS;
+  StableVector<PointsToSetTy *> AllPTS;
 };
+
+extern template class PointsToSetOwner<LLVMPointsToInfo::PointsToSetTy>;
 } // namespace psr
 
-#endif // PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H_
+#endif // PHASAR_PHASARLLVM_POINTER_POINTSTOSETOWNER_H

@@ -7,8 +7,8 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_HELPERS_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_HELPERS_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_HELPERS_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_HELPERS_H
 
 #include <functional>
 #include <map>
@@ -38,13 +38,7 @@ using LeakMap_t = std::unordered_map<const llvm::Instruction *,
                                      llvm::SmallSet<const llvm::Value *, 1>>;
 
 EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
-getGenEdgeFunction(BasicBlockOrdering &BBO,
-                   const llvm::Instruction *Sani = nullptr);
-
-EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
-getComposeEdgeFunction(BasicBlockOrdering &BBO,
-                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &F,
-                       const EdgeFunction<EdgeDomain>::EdgeFunctionPtrType &G);
+getGenEdgeFunction(BasicBlockOrdering &BBO);
 
 EdgeFunction<EdgeDomain>::EdgeFunctionPtrType
 getEdgeIdentity(const llvm::Instruction *Inst);
@@ -60,14 +54,14 @@ EdgeFunction<EdgeDomain>::EdgeFunctionPtrType getAllSanitized();
 /// Have an own function for creating a flow/edge-function instance to allow
 /// fast migration to memory-management schemes other than std::shared_ptr
 template <typename FlowFunctionTy, typename... Args>
-inline std::shared_ptr<FlowFunctionTy> makeFF(Args &&...args) {
-  return std::make_shared<FlowFunctionTy>(std::forward<Args>(args)...);
+inline std::shared_ptr<FlowFunctionTy> makeFF(Args &&...Arguments) {
+  return std::make_shared<FlowFunctionTy>(std::forward<Args>(Arguments)...);
 }
 template <typename EdgeFunctionTy, typename... Args>
-inline std::shared_ptr<EdgeFunctionTy> makeEF(Args &&...args) {
-  return std::make_shared<EdgeFunctionTy>(std::forward<Args>(args)...);
+inline std::shared_ptr<EdgeFunctionTy> makeEF(Args &&...Arguments) {
+  return std::make_shared<EdgeFunctionTy>(std::forward<Args>(Arguments)...);
 }
 
 } // namespace psr::XTaint
 
-#endif // PHASAR_PHASARLLVM_IFDSIDE_PROBLEMS_EXTENDEDTAINTANALYSIS_HELPERS_H_
+#endif

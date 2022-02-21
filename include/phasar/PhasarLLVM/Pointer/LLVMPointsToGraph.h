@@ -61,11 +61,11 @@ public:
      */
     const llvm::Value *V = nullptr;
     VertexProperties() = default;
-    VertexProperties(const llvm::Value *v);
+    VertexProperties(const llvm::Value *V);
     std::string getValueAsString() const;
 
     // Fetching the users for V is expensive, so we cache the result.
-    mutable std::vector<const llvm::User *> users;
+    mutable std::vector<const llvm::User *> Users;
     std::vector<const llvm::User *> getUsers() const;
   };
 
@@ -76,8 +76,8 @@ public:
     /// This may contain a call or invoke instruction.
     const llvm::Value *V = nullptr;
     EdgeProperties() = default;
-    EdgeProperties(const llvm::Value *v);
-    std::string getValueAsString() const;
+    EdgeProperties(const llvm::Value *V);
+    [[nodiscard]] std::string getValueAsString() const;
   };
 
   /// Data structure for holding the points-to graph.
@@ -108,7 +108,8 @@ private:
   std::unordered_set<const llvm::Function *> AnalyzedFunctions;
   LLVMBasedPointsToAnalysis PTA;
   PointsToSetOwner<PointsToSetTy> Owner;
-  std::unordered_map<const llvm::Value *, PointsToSetTy *> Cache;
+  std::unordered_map<const llvm::Value *, DynamicPointsToSetPtr<PointsToSetTy>>
+      Cache;
 
   // void mergeGraph(const LLVMPointsToGraph &Other);
 
@@ -220,8 +221,8 @@ public:
   public:
     PointerVertexOrEdgePrinter(const graph_t &PAG) : PAG(PAG) {}
     template <class VertexOrEdge>
-    void operator()(std::ostream &out, const VertexOrEdge &v) const {
-      out << "[label=\"" << PAG[v].getValueAsString() << "\"]";
+    void operator()(std::ostream &Out, const VertexOrEdge &V) const {
+      Out << "[label=\"" << PAG[V].getValueAsString() << "\"]";
     }
 
   private:
@@ -230,7 +231,7 @@ public:
 
   static inline PointerVertexOrEdgePrinter
   makePointerVertexOrEdgePrinter(const graph_t &PAG) {
-    return PointerVertexOrEdgePrinter(PAG);
+    return {PAG};
   }
 
   /**

@@ -22,7 +22,7 @@ function(add_phasar_unittest test_name)
     phasar_experimental
     # phasar_clang
     phasar_passes
-    # FIXME: cmake variable ${PHASAR_PLUGINS_LIB} is empty although it should contain phasar_plugins 
+    # FIXME: cmake variable ${PHASAR_PLUGINS_LIB} is empty although it should contain phasar_plugins
     phasar_plugins
     # ${PHASAR_PLUGINS_LIB}
     phasar_pointer
@@ -47,7 +47,7 @@ function(add_phasar_unittest test_name)
 endfunction()
 
 function(generate_ll_file)
-  set(options MEM2REG DEBUG)
+  set(options MEM2REG DEBUG O1 O2 O3)
   set(testfile FILE)
   cmake_parse_arguments(GEN_LL "${options}" "${testfile}" "" ${ARGN} )
   # get file extension
@@ -88,6 +88,21 @@ function(generate_ll_file)
     list(APPEND GEN_CXX_FLAGS -g)
     list(APPEND GEN_C_FLAGS -g)
     set(GEN_CMD_COMMENT "${GEN_CMD_COMMENT}[DBG]")
+  endif()
+  if(GEN_LL_O1)
+    list(APPEND GEN_CXX_FLAGS -O1)
+    list(APPEND GEN_C_FLAGS -O1)
+    set(GEN_CMD_COMMENT "${GEN_CMD_COMMENT}[O1]")
+  endif()
+  if(GEN_LL_O2)
+    list(APPEND GEN_CXX_FLAGS -O2)
+    list(APPEND GEN_C_FLAGS -O2)
+    set(GEN_CMD_COMMENT "${GEN_CMD_COMMENT}[O2]")
+  endif()
+  if(GEN_LL_03)
+    list(APPEND GEN_CXX_FLAGS -O3)
+    list(APPEND GEN_C_FLAGS -O3)
+    set(GEN_CMD_COMMENT "${GEN_CMD_COMMENT}[O3]")
   endif()
   set(GEN_CMD_COMMENT "${GEN_CMD_COMMENT} ${GEN_LL_FILE}")
 
@@ -194,14 +209,14 @@ macro(add_phasar_library name)
   else()
     install(TARGETS ${name}
       EXPORT phasarTargets
-      LIBRARY DESTINATION lib
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+      LIBRARY DESTINATION ${PHASAR_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${PHASAR_INSTALL_LIBDIR})
     install(TARGETS ${name}
       EXPORT ${name}-targets
       COMPONENT ${component_name}
       DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/phasar
-      LIBRARY DESTINATION lib
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+      LIBRARY DESTINATION ${PHASAR_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${PHASAR_INSTALL_LIBDIR})
     install(EXPORT ${name}-targets
       FILE ${name}-targets.cmake
       NAMESPACE phasar::

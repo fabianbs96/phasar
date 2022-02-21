@@ -56,6 +56,14 @@ public:
     return NumSeeds;
   }
 
+  [[nodiscard]] size_t countInitialSeeds(N Node) const {
+    auto Search = Seeds.find(Node);
+    if (Search != Seeds.end()) {
+      return Search->second.size();
+    }
+    return 0;
+  }
+
   [[nodiscard]] bool containsInitialSeedsFor(N Node) const {
     return Seeds.count(Node);
   }
@@ -67,7 +75,7 @@ public:
 
   void dump(std::ostream &OS = std::cerr) {
 
-    auto printNode = [&](auto &&Node) {
+    auto printNode = [&](auto &&Node) { // NOLINT
       if constexpr (std::is_same_v<const llvm::Instruction *, N>) {
         OS << llvmIRToString(Node);
       } else {
@@ -75,7 +83,7 @@ public:
       }
     };
 
-    auto printFact = [&](auto &&Node) {
+    auto printFact = [&](auto &&Node) { // NOLINT
       if constexpr (std::is_same_v<const llvm::Value *, D>) {
         OS << llvmIRToString(Node);
       } else {
