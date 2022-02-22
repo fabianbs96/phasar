@@ -8,8 +8,9 @@
  *****************************************************************************/
 
 #include <chrono>
-#include <fstream>
-#include <iostream>
+
+#include "llvm/Support/Format.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "boost/filesystem/operations.hpp"
 
@@ -23,7 +24,6 @@
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/Utils/Logger.h"
 
-#include "llvm/Support/GraphWriter.h"
 namespace llvm {
 class Value;
 } // namespace llvm
@@ -34,9 +34,9 @@ int main(int Argc, const char **Argv) {
   initializeLogger(false);
   if (Argc < 2 || !boost::filesystem::exists(Argv[1]) ||
       boost::filesystem::is_directory(Argv[1])) {
-    std::cerr << "myphasartool\n"
-                 "A small PhASAR-based example program\n\n"
-                 "Usage: myphasartool <LLVM IR file>\n";
+    llvm::errs() << "myphasartool\n"
+                    "A small PhASAR-based example program\n\n"
+                    "Usage: myphasartool <LLVM IR file>\n";
     return 1;
   }
   ProjectIRDB DB({Argv[1]});
@@ -46,14 +46,20 @@ int main(int Argc, const char **Argv) {
     LLVMPointsToSet P(DB);
     LLVMBasedICFG I(DB, CallGraphAnalysisType::OTF, {"main"}, &H, &P);
 
+    llvm::errs() << "ICFG constructed\n";
+
     {
       auto Start = std::chrono::high_resolution_clock::now();
       auto ICFGStr = I.exportICFGAsSourceCodeJsonString();
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "New export: " << (End - Start).count() << '\n';
+      llvm::outs() << "New export: "
+                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
-                   << ICFGStr.capacity() << '\n';
+                   << ICFGStr.capacity() << '('
+                   << llvm::format("%.3f", float(ICFGStr.size()) /
+                                               float(ICFGStr.capacity()))
+                   << ")\n";
       // llvm::outs() << ICFGStr << '\n';
     }
 
@@ -62,27 +68,39 @@ int main(int Argc, const char **Argv) {
       auto ICFGStr = I.exportICFGAsSourceCodeDotString();
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "Dot export: " << (End - Start).count() << '\n';
+      llvm::outs() << "Dot export: "
+                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
-                   << ICFGStr.capacity() << '\n';
+                   << ICFGStr.capacity() << '('
+                   << llvm::format("%.3f", float(ICFGStr.size()) /
+                                               float(ICFGStr.capacity()))
+                   << ")\n";
       // llvm::outs() << ICFGStr << '\n';
     }
 
     {
       auto Start = std::chrono::high_resolution_clock::now();
       auto ICFGJson = I.exportICFGAsSourceCodeJson();
+      llvm::errs() << "> After exportICFGAsSourceCodeJson()\n";
       auto Mid = std::chrono::high_resolution_clock::now();
       auto ICFGStr = ICFGJson.dump();
+      llvm::errs() << "> After dump()\n";
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "Old export: " << (End - Start).count() << '\n';
-      llvm::outs() << "> To JSON took: " << (Mid - Start).count() << '\n';
-      llvm::outs() << "> To Str took: " << (End - Mid).count() << '\n';
+      llvm::outs() << "Old export:\t"
+                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
+      llvm::outs() << "> To JSON took:\t"
+                   << llvm::formatv("{0:N}", (Mid - Start).count()) << '\n';
+      llvm::outs() << "> To Str took:\t"
+                   << llvm::formatv("{0:N}", (End - Mid).count()) << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
-                   << ICFGStr.capacity() << '\n';
+                   << ICFGStr.capacity() << '('
+                   << llvm::format("%.3f", float(ICFGStr.size()) /
+                                               float(ICFGStr.capacity()))
+                   << ")\n";
     }
   } else {
-    std::cerr << "error: file does not contain a 'main' function!\n";
+    llvm::errs() << "error: file does not contain a 'main' function!\n";
   }
   return 0;
 }

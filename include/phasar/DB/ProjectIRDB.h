@@ -10,11 +10,13 @@
 #ifndef PHASAR_DB_PROJECTIRDB_H_
 #define PHASAR_DB_PROJECTIRDB_H_
 
+#include <functional>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "llvm/IR/LLVMContext.h"
@@ -119,8 +121,18 @@ public:
     return ModuleSet;
   }
 
+  template <typename CallBack, typename = std::enable_if_t<std::is_invocable_v<
+                                   CallBack &&, const llvm::Function *>>>
+  void forEachFunction(CallBack &&CB) const noexcept(
+      std::is_nothrow_invocable_v<CallBack &&, const llvm::Function *>) {
+    for (const auto &[File, Module] : Modules) {
+      for (const auto &F : *Module) {
+        std::invoke(CB, &F);
+      }
+    }
+  }
+
   [[nodiscard]] std::set<const llvm::Function *> getAllFunctions() const;
-  [[nodiscard]] std::vector<const llvm::Function *> getAllFunctionsVec() const;
 
   [[nodiscard]] const llvm::Function *getFunctionById(unsigned Id);
 

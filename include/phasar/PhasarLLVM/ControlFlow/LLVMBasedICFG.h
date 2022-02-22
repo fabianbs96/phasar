@@ -23,6 +23,7 @@
 #include <set>
 #include <stack>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -356,13 +357,19 @@ public:
   [[nodiscard]] const llvm::Function *
   getRegisteredDtorsCallerOrNull(const llvm::Module *Mod);
 
-  template <typename Fn> void forEachGlobalCtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalCtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalCtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
-  template <typename Fn> void forEachGlobalDtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalDtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalDtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }

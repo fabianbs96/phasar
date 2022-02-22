@@ -155,17 +155,10 @@ void LLVMBasedCFG::getAllControlFlowEdges(
     const llvm::Function *Fun,
     std::vector<std::pair<const llvm::Instruction *, const llvm::Instruction *>>
         &Dest) const {
-  llvm::SmallVector<const llvm::Instruction *> Successors;
-  for (const auto &I : llvm::instructions(Fun)) {
-    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
-      continue;
-    }
-    Successors.clear();
-    getSuccsOf(&I, Successors);
-    for (const auto *Successor : Successors) {
-      Dest.emplace_back(&I, Successor);
-    }
-  }
+
+  forEachControlFlowEdge(Fun, [&Dest](const auto *From, const auto *To) {
+    Dest.emplace_back(From, To);
+  });
 }
 
 std::vector<const llvm::Instruction *>
