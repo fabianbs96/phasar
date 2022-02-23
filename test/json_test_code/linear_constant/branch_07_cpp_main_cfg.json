@@ -4,15 +4,15 @@
             "IR": "%retval = alloca i32, align 4 | ID: 1",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
         "to": {
             "IR": "%j = alloca i32, align 4 | ID: 2",
-            "column": 6,
+            "column": 7,
             "line": 3,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int j = 10;"
         }
@@ -20,9 +20,9 @@
     {
         "from": {
             "IR": "%j = alloca i32, align 4 | ID: 2",
-            "column": 6,
+            "column": 7,
             "line": 3,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int j = 10;"
         },
@@ -30,7 +30,7 @@
             "IR": "%i = alloca i32, align 4 | ID: 3",
             "column": 7,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         }
@@ -40,7 +40,7 @@
             "IR": "%i = alloca i32, align 4 | ID: 3",
             "column": 7,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         },
@@ -48,7 +48,7 @@
             "IR": "store i32 0, i32* %retval, align 4 | ID: 4",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         }
@@ -58,15 +58,15 @@
             "IR": "store i32 0, i32* %retval, align 4 | ID: 4",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 10, i32* %j, align 4 | ID: 6",
-            "column": 6,
+            "column": 7,
             "line": 3,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int j = 10;"
         }
@@ -74,9 +74,9 @@
     {
         "from": {
             "IR": "store i32 10, i32* %j, align 4 | ID: 6",
-            "column": 6,
+            "column": 7,
             "line": 3,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int j = 10;"
         },
@@ -84,7 +84,7 @@
             "IR": "%0 = load i32, i32* %j, align 4 | ID: 8",
             "column": 11,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         }
@@ -94,7 +94,7 @@
             "IR": "%0 = load i32, i32* %j, align 4 | ID: 8",
             "column": 11,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         },
@@ -102,7 +102,7 @@
             "IR": "%add = add nsw i32 %0, 20 | ID: 9",
             "column": 13,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         }
@@ -112,7 +112,7 @@
             "IR": "%add = add nsw i32 %0, 20 | ID: 9",
             "column": 13,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         },
@@ -120,7 +120,7 @@
             "IR": "store i32 %add, i32* %i, align 4 | ID: 10",
             "column": 7,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         }
@@ -130,15 +130,15 @@
             "IR": "store i32 %add, i32* %i, align 4 | ID: 10",
             "column": 7,
             "line": 4,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "int i = j + 20;"
         },
         "to": {
             "IR": "%1 = load i8, i8* @cond, align 1 | ID: 11",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         }
@@ -146,17 +146,17 @@
     {
         "from": {
             "IR": "%1 = load i8, i8* @cond, align 1 | ID: 11",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         },
         "to": {
             "IR": "%tobool = trunc i8 %1 to i1 | ID: 12",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         }
@@ -164,17 +164,17 @@
     {
         "from": {
             "IR": "%tobool = trunc i8 %1 to i1 | ID: 12",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         },
         "to": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         }
@@ -182,9 +182,9 @@
     {
         "from": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         },
@@ -192,7 +192,7 @@
             "IR": "%2 = load i32, i32* %j, align 4 | ID: 14",
             "column": 9,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         }
@@ -200,9 +200,9 @@
     {
         "from": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "if (cond) {"
         },
@@ -210,7 +210,7 @@
             "IR": "ret i32 0 | ID: 18",
             "column": 3,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "return 0;"
         }
@@ -220,7 +220,7 @@
             "IR": "%2 = load i32, i32* %j, align 4 | ID: 14",
             "column": 9,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         },
@@ -228,7 +228,7 @@
             "IR": "%add1 = add nsw i32 %2, 20 | ID: 15",
             "column": 11,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         }
@@ -238,7 +238,7 @@
             "IR": "%add1 = add nsw i32 %2, 20 | ID: 15",
             "column": 11,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         },
@@ -246,7 +246,7 @@
             "IR": "store i32 %add1, i32* %i, align 4 | ID: 16",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         }
@@ -256,7 +256,7 @@
             "IR": "store i32 %add1, i32* %i, align 4 | ID: 16",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "i = j + 20;"
         },
@@ -264,7 +264,7 @@
             "IR": "br label %if.end | ID: 17",
             "column": 3,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "}"
         }
@@ -274,7 +274,7 @@
             "IR": "br label %if.end | ID: 17",
             "column": 3,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "}"
         },
@@ -282,7 +282,7 @@
             "IR": "ret i32 0 | ID: 18",
             "column": 3,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": "return 0;"
         }
