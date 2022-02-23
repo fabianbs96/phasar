@@ -17,3 +17,4 @@ SOUNDNESS_FLAG_TYPE("Unsound", Unsound)
 SOUNDNESS_FLAG_TYPE("Unused", Unused)
 
 #undef SOUNDNESS_FLAG_TYPE
+

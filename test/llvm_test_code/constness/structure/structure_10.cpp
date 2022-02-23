@@ -2,7 +2,6 @@
 class A {
 private:
   int i = 42;
-
 public:
   void foo(int p) { i = p; }
 };

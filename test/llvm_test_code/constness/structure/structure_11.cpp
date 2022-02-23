@@ -2,7 +2,6 @@
 class A {
 private:
   int i;
-
 public:
   A(int a) : i(a) {}
   void foo(int p) { i = p; }

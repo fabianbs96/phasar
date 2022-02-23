@@ -3,3 +3,4 @@
 void derived::foo() {}
 
 int derived::bar() { return 20; }
+
