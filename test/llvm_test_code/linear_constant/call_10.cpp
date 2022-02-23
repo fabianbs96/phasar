@@ -1,8 +1,6 @@
 void bar(int b) {}
 
-void foo(int a) {
-  bar(a);
-}
+void foo(int a) { bar(a); }
 
 int main() {
   int i;

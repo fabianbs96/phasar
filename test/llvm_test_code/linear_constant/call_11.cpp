@@ -1,10 +1,6 @@
-int bar(int b) {
-  return b;
-}
+int bar(int b) { return b; }
 
-int foo(int a) {
-  return bar(a);
-}
+int foo(int a) { return bar(a); }
 
 int main() {
   int i;

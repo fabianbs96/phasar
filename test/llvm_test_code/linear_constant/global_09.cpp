@@ -10,15 +10,13 @@ int bar(int b) {
   return b + 1;
 }
 
-int baz(int c) {
-  return c + 3;
-}
+int baz(int c) { return c + 3; }
 
 int main() {
-	g1 += 1;
+  g1 += 1;
   int i = 0;
   i = foo(10);
   i = bar(3);
   i = baz(39);
-	return 0;
+  return 0;
 }
