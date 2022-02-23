@@ -59,7 +59,7 @@ protected:
 public:
   ~ICFG() override = default;
 
-  [[nodiscard]] virtual std::set<F> getAllFunctions() const = 0;
+  [[nodiscard]] virtual std::vector<F> getAllFunctions() const = 0;
 
   [[nodiscard]] virtual F getFunction(const std::string &Fun) const = 0;
 

@@ -200,7 +200,7 @@ public:
    * \return all of the functions in the IRDB, this may include some not in the
    * callgraph
    */
-  [[nodiscard]] std::set<const llvm::Function *>
+  [[nodiscard]] std::vector<const llvm::Function *>
   getAllFunctions() const override;
 
   /**

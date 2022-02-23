@@ -550,7 +550,7 @@ const llvm::Function *LLVMBasedICFG::getLastGlobalDtorOrNull() const {
   return nullptr;
 }
 
-set<const llvm::Function *> LLVMBasedICFG::getAllFunctions() const {
+vector<const llvm::Function *> LLVMBasedICFG::getAllFunctions() const {
   return IRDB.getAllFunctions();
 }
 

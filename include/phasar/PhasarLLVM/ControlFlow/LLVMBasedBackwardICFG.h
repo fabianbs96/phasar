@@ -68,7 +68,7 @@ public:
 
   ~LLVMBasedBackwardsICFG() override = default;
 
-  std::set<const llvm::Function *> getAllFunctions() const override;
+  std::vector<const llvm::Function *> getAllFunctions() const override;
 
   bool isIndirectFunctionCall(const llvm::Instruction *Stmt) const override;
 

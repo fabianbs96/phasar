@@ -8,7 +8,6 @@
  *****************************************************************************/
 
 #include <algorithm>
-#include <boost/log/sources/severity_feature.hpp>
 #include <cassert>
 #include <memory>
 #include <ostream>
@@ -28,9 +27,11 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils.h"
 
 #include "boost/filesystem.hpp"
+#include "boost/log/sources/severity_feature.hpp"
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/DB/ProjectIRDB.h"
@@ -65,7 +66,7 @@ ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
 }
 
 ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
-                         IRDBOptions Options)
+                         IRDBOptions Options, llvm::Linker::Flags LinkerFlags)
     : ProjectIRDB(Options | IRDBOptions::OWNS) {
 
   Context = std::make_unique<llvm::LLVMContext>();
@@ -96,33 +97,34 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
     }
   }
   if (Options & IRDBOptions::WPA) {
-    linkForWPA();
+    linkForWPA(LinkerFlags);
   }
   preprocessAllModules();
 }
 
 ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
-                         IRDBOptions Options)
+                         IRDBOptions Options, llvm::Linker::Flags LinkerFlags)
     : ProjectIRDB(Options) {
   for (auto *M : Modules) {
     insertModule(M);
   }
   if (Options & IRDBOptions::WPA) {
-    linkForWPA();
+    linkForWPA(LinkerFlags);
   }
 }
 
 ProjectIRDB::~ProjectIRDB() {
-  for (auto &[File, Module] : Modules) {
-    ModulesToSlotTracker::deleteMSTForModule(Module.get());
+  for (auto &Entry : Modules) {
+    ModulesToSlotTracker::deleteMSTForModule(Entry.getValue().get());
   }
   // release resources if IRDB does not own
   if (!(Options & IRDBOptions::OWNS)) {
     // for (auto &Context : Contexts) {
     Context.release(); // NOLINT Just prevent the Context to be deleted
     //}
-    for (auto &[File, Module] : Modules) {
-      Module.release(); // NOLINT Just prevent the Module to be deleted
+    for (auto &Entry : Modules) {
+      // NOLINTNEXTLINE Just prevent the Module to be deleted
+      Entry.getValue().release();
     }
   }
   MAM.clear();
@@ -148,7 +150,7 @@ void ProjectIRDB::preprocessModule(llvm::Module *M) {
   ModulesToSlotTracker::updateMSTForModule(M);
 }
 
-void ProjectIRDB::linkForWPA() {
+void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
   // Linking llvm modules:
   // Unfortunately linking between different contexts is currently not possible.
   // Therefore we must load all modules into one single context and then perform
@@ -161,16 +163,16 @@ void ProjectIRDB::linkForWPA() {
       MainMod = Modules.begin()->second.get();
     }
     llvm::Linker Link(*MainMod);
-    const auto Flags = llvm::Linker::Flags::LinkOnlyNeeded;
 
-    for (auto &[File, Module] : Modules) {
+    for (auto &Entry : Modules) {
+      auto &Module = Entry.getValue();
       // we do not want to link a module with itself!
       if (Module.get() == MainMod) {
         continue;
       }
 
       if (&Module->getContext() == &MainMod->getContext()) {
-        if (Link.linkInModule(std::move(Module), Flags)) {
+        if (Link.linkInModule(std::move(Module), LinkerFlags)) {
           llvm::report_fatal_error(
               "Error: trying to link modules into single WPA module failed!");
         }
@@ -180,7 +182,7 @@ void ProjectIRDB::linkForWPA() {
       // reload the modules into the module containing the main function
       std::string IRBuffer;
       llvm::raw_string_ostream RSO(IRBuffer);
-      llvm::WriteBitcodeToFile(*Module.get(), RSO);
+      llvm::WriteBitcodeToFile(*Module, RSO);
       RSO.flush();
       llvm::SMDiagnostic ErrorDiagnostics;
       auto MemBuffer = llvm::MemoryBuffer::getMemBuffer(IRBuffer);
@@ -198,7 +200,7 @@ void ProjectIRDB::linkForWPA() {
                       << "' lead to broken debug info!");
       }
       // now we can safely perform the linking
-      if (Link.linkInModule(std::move(TmpMod), Flags)) {
+      if (Link.linkInModule(std::move(TmpMod), LinkerFlags)) {
         llvm::report_fatal_error(
             "Error: trying to link modules into single WPA module failed!");
       }
@@ -209,10 +211,9 @@ void ProjectIRDB::linkForWPA() {
     // delete every other module
 
     for (auto It = Modules.begin(); It != Modules.end();) {
-      if (It->second.get() != MainMod) {
-        It = Modules.erase(It);
-      } else {
-        ++It;
+      auto Old = It++;
+      if (Old->second.get() != MainMod) {
+        Modules.erase(Old);
       }
     }
     // delete every other context
@@ -233,8 +234,8 @@ void ProjectIRDB::linkForWPA() {
 }
 
 void ProjectIRDB::preprocessAllModules() {
-  for (auto &[File, Module] : Modules) {
-    preprocessModule(Module.get());
+  for (auto &Entry : Modules) {
+    preprocessModule(Entry.getValue().get());
   }
 }
 
@@ -255,17 +256,17 @@ void ProjectIRDB::buildIDModuleMapping(llvm::Module *M) {
   }
 }
 
-llvm::Module *ProjectIRDB::getModule(const std::string &ModuleName) {
-  if (Modules.count(ModuleName)) {
-    return Modules[ModuleName].get();
+llvm::Module *ProjectIRDB::getModule(llvm::StringRef ModuleName) {
+  if (auto It = Modules.find(ModuleName); It != Modules.end()) {
+    return It->getValue().get();
   }
   return nullptr;
 }
 
 std::size_t ProjectIRDB::getNumGlobals() const {
   std::size_t Ret = 0;
-  for (const auto &[File, Module] : Modules) {
-    Ret += Module->global_size();
+  for (const auto &Entry : Modules) {
+    Ret += Entry.getValue()->global_size();
   }
   return Ret;
 }
@@ -287,15 +288,18 @@ std::size_t ProjectIRDB::getInstructionID(const llvm::Instruction *I) {
 }
 
 void ProjectIRDB::print() const {
-  for (const auto &[File, Module] : Modules) {
-    std::cout << "Module: " << File << std::endl;
-    llvm::outs() << *Module;
+  for (const auto &Entry : Modules) {
+    llvm::outs() << "Module: " << Entry.getKey() << '\n';
+    llvm::outs() << *Entry.getValue();
     llvm::outs().flush();
   }
 }
 
-void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
-  for (const auto &[File, Module] : Modules) {
+void ProjectIRDB::emitPreprocessedIR(llvm::raw_ostream &OS,
+                                     bool ShortenIR) const {
+  for (const auto &Entry : Modules) {
+    auto File = Entry.getKey();
+    auto *Module = Entry.getValue().get();
     OS << "IR module: " << File << '\n';
     // print globals
     for (auto &Glob : Module->globals()) {
@@ -309,7 +313,7 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
     OS << '\n';
     for (const auto *F : getAllFunctions()) {
       if (!F->isDeclaration() && Module->getFunction(F->getName())) {
-        OS << F->getName().str();
+        OS << F->getName();
         if (auto FId = getFunctionId(F)) {
           OS << " | FunID: " << *FId << " {\n";
         } else {
@@ -318,11 +322,9 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
         for (const auto &BB : *F) {
           // do not print the label of the first BB
           if (BB.getPrevNode()) {
-            std::string BBLabel;
-            llvm::raw_string_ostream RSO(BBLabel);
-            BB.printAsOperand(RSO, false);
-            RSO.flush();
-            OS << "\n<label " << BBLabel << ">\n";
+            OS << "\n<label ";
+            BB.printAsOperand(OS, false);
+            OS << ">\n";
           }
           // print all instructions
           for (const auto &I : BB) {
@@ -344,8 +346,8 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
 
 llvm::Function *
 ProjectIRDB::internalGetFunctionDefinition(llvm::StringRef FunctionName) const {
-  for (const auto &[File, Module] : Modules) {
-    auto *F = Module->getFunction(FunctionName);
+  for (const auto &Entry : Modules) {
+    auto *F = Entry.getValue()->getFunction(FunctionName);
     if (F && !F->isDeclaration()) {
       return F;
     }
@@ -353,20 +355,10 @@ ProjectIRDB::internalGetFunctionDefinition(llvm::StringRef FunctionName) const {
   return nullptr;
 }
 
-const llvm::Function *
-ProjectIRDB::getFunctionDefinition(llvm::StringRef FunctionName) const {
-  return internalGetFunctionDefinition(FunctionName);
-}
-
-llvm::Function *
-ProjectIRDB::getFunctionDefinition(llvm::StringRef FunctionName) {
-  return internalGetFunctionDefinition(FunctionName);
-}
-
 llvm::Function *
 ProjectIRDB::internalGetFunction(llvm::StringRef FunctionName) const {
-  for (const auto &[File, Module] : Modules) {
-    auto *F = Module->getFunction(FunctionName);
+  for (const auto &Entry : Modules) {
+    auto *F = Entry.getValue()->getFunction(FunctionName);
     if (F) {
       return F;
     }
@@ -374,19 +366,10 @@ ProjectIRDB::internalGetFunction(llvm::StringRef FunctionName) const {
   return nullptr;
 }
 
-const llvm::Function *
-ProjectIRDB::getFunction(llvm::StringRef FunctionName) const {
-  return internalGetFunction(FunctionName);
-}
-
-llvm::Function *ProjectIRDB::getFunction(llvm::StringRef FunctionName) {
-  return internalGetFunction(FunctionName);
-}
-
 const llvm::GlobalVariable *ProjectIRDB::getGlobalVariableDefinition(
-    const std::string &GlobalVariableName) const {
-  for (const auto &[File, Module] : Modules) {
-    auto *G = Module->getGlobalVariable(GlobalVariableName);
+    llvm::StringRef GlobalVariableName) const {
+  for (const auto &Entry : Modules) {
+    auto *G = Entry.getValue()->getGlobalVariable(GlobalVariableName);
     if (G && !G->isDeclaration()) {
       return G;
     }
@@ -394,30 +377,19 @@ const llvm::GlobalVariable *ProjectIRDB::getGlobalVariableDefinition(
   return nullptr;
 }
 
-llvm::Module *
-ProjectIRDB::getModuleDefiningFunction(const std::string &FunctionName) {
-  for (auto &[File, Module] : Modules) {
-    auto *F = Module->getFunction(FunctionName);
+llvm::Module *ProjectIRDB::internalGetModuleDefiningFunction(
+    llvm::StringRef FunctionName) const {
+  for (const auto &Entry : Modules) {
+    auto *F = Entry.getValue()->getFunction(FunctionName);
     if (F && !F->isDeclaration()) {
-      return Module.get();
-    }
-  }
-  return nullptr;
-}
-
-const llvm::Module *
-ProjectIRDB::getModuleDefiningFunction(const std::string &FunctionName) const {
-  for (const auto &[File, Module] : Modules) {
-    auto *F = Module->getFunction(FunctionName);
-    if (F && !F->isDeclaration()) {
-      return Module.get();
+      return Entry.getValue().get();
     }
   }
   return nullptr;
 }
 
 std::string ProjectIRDB::valueToPersistedString(const llvm::Value *V) {
-  if (LLVMZeroValue::getInstance()->isLLVMZeroValue(V)) {
+  if (LLVMZeroValue::isLLVMZeroValue(V)) {
     return LLVMZeroValue::getInstance()->getName().str();
   }
   if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
@@ -505,11 +477,11 @@ ProjectIRDB::persistedStringToValue(const std::string &S) const {
   return nullptr;
 }
 
-std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
-  std::set<const llvm::Function *> Functions;
-  for (const auto &[File, Module] : Modules) {
-    for (auto &F : *Module) {
-      Functions.insert(&F);
+std::vector<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
+  std::vector<const llvm::Function *> Functions;
+  for (const auto &Entry : Modules) {
+    for (auto &F : *Entry.getValue()) {
+      Functions.push_back(&F);
     }
   }
   return Functions;
@@ -517,8 +489,8 @@ std::set<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
 
 const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
   /// Maybe cache this mapping later on
-  for (const auto &[File, Module] : Modules) {
-    for (auto &F : *Module) {
+  for (const auto &Entry : Modules) {
+    for (auto &F : *Entry.getValue()) {
       auto FId = getFunctionId(&F);
       if (FId && *FId == Id) {
         return &F;
@@ -530,13 +502,13 @@ const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
 
 void ProjectIRDB::insertModule(llvm::Module *M) {
   // Contexts.push_back(std::unique_ptr<llvm::LLVMContext>(&M->getContext()));
-  Modules.insert(std::make_pair(M->getModuleIdentifier(), M));
+  Modules.try_emplace(M->getModuleIdentifier(), M);
   preprocessModule(M);
 }
 
-std::set<const llvm::StructType *>
+llvm::DenseSet<const llvm::StructType *>
 ProjectIRDB::getAllocatedStructTypes() const {
-  std::set<const llvm::StructType *> StructTypes;
+  llvm::DenseSet<const llvm::StructType *> StructTypes;
   for (const auto *Ty : AllocatedTypes) {
     if (const auto *StructTy = llvm::dyn_cast<llvm::StructType>(Ty)) {
       StructTypes.insert(StructTy);
@@ -560,8 +532,8 @@ set<const llvm::Value *> ProjectIRDB::getAllMemoryLocations() const {
                                     "typeinfo"};
   // add global varibales to the memory location set, except the llvm
   // intrinsic global variables
-  for (const auto &[File, Module] : Modules) {
-    for (auto &GV : Module->globals()) {
+  for (const auto &Entry : Modules) {
+    for (auto &GV : Entry.getValue()->globals()) {
       if (GV.hasName()) {
         string GVName = llvm::demangle(GV.getName().str());
         if (!IgnoredGlobalNames.count(GVName.substr(0, GVName.find(' ')))) {
@@ -579,8 +551,8 @@ bool ProjectIRDB::debugInfoAvailable() const {
   }
   // During unittests WPAMOD might not be set
   if (!Modules.empty()) {
-    for (const auto &[File, Module] : Modules) {
-      if (!wasCompiledWithDebugInfo(Module.get())) {
+    for (const auto &Entry : Modules) {
+      if (!wasCompiledWithDebugInfo(Entry.getValue().get())) {
         return false;
       }
     }
