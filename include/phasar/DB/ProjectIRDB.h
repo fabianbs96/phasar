@@ -56,7 +56,7 @@ private:
   // Return or resum instructions
   std::set<const llvm::Instruction *> RetOrResInstructions;
   // Stores the contexts
-  std::vector<std::unique_ptr<llvm::LLVMContext>> Contexts;
+  std::unique_ptr<llvm::LLVMContext> Context;
   // Contains all modules that correspond to a project and owns them
   std::map<std::string, std::unique_ptr<llvm::Module>> Modules;
   // Maps an id to its corresponding instruction

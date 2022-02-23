@@ -8,8 +8,9 @@
  *****************************************************************************/
 
 #include <algorithm>
+#include <boost/log/sources/severity_feature.hpp>
 #include <cassert>
-#include <iostream>
+#include <memory>
 #include <ostream>
 #include <string>
 
@@ -66,6 +67,9 @@ ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
 ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
                          IRDBOptions Options)
     : ProjectIRDB(Options | IRDBOptions::OWNS) {
+
+  Context = std::make_unique<llvm::LLVMContext>();
+
   for (const auto &File : IRFiles) {
     // if we have a file that is already compiled to llvm ir
 
@@ -73,8 +77,7 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
          File.find(".bc") != std::string::npos) &&
         boost::filesystem::exists(File)) {
       llvm::SMDiagnostic Diag;
-      std::unique_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-      std::unique_ptr<llvm::Module> M = llvm::parseIRFile(File, Diag, *C);
+      std::unique_ptr<llvm::Module> M = llvm::parseIRFile(File, Diag, *Context);
       bool BrokenDebugInfo = false;
       if (M == nullptr) {
         Diag.print(File.c_str(), llvm::errs());
@@ -85,10 +88,9 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
         throw std::runtime_error(File + " could not be parsed correctly");
       }
       if (BrokenDebugInfo) {
-        std::cout << "caution: debug info is broken\n";
+        llvm::errs() << "caution: debug info is broken\n";
       }
       Modules.insert(std::make_pair(File, std::move(M)));
-      Contexts.push_back(std::move(C));
     } else {
       throw std::invalid_argument(File + " is not a valid llvm module");
     }
@@ -116,9 +118,9 @@ ProjectIRDB::~ProjectIRDB() {
   }
   // release resources if IRDB does not own
   if (!(Options & IRDBOptions::OWNS)) {
-    for (auto &Context : Contexts) {
-      Context.release(); // NOLINT Just prevent the Context to be deleted
-    }
+    // for (auto &Context : Contexts) {
+    Context.release(); // NOLINT Just prevent the Context to be deleted
+    //}
     for (auto &[File, Module] : Modules) {
       Module.release(); // NOLINT Just prevent the Module to be deleted
     }
@@ -155,39 +157,57 @@ void ProjectIRDB::linkForWPA() {
   // all modules.
   if (Modules.size() > 1) {
     llvm::Module *MainMod = getModuleDefiningFunction("main");
-    assert(MainMod && "could not find main function");
+    if (!MainMod) {
+      MainMod = Modules.begin()->second.get();
+    }
+    llvm::Linker Link(*MainMod);
+    const auto Flags = llvm::Linker::Flags::LinkOnlyNeeded;
+
     for (auto &[File, Module] : Modules) {
       // we do not want to link a module with itself!
-      if (MainMod != Module.get()) {
-        // reload the modules into the module containing the main function
-        std::string IRBuffer;
-        llvm::raw_string_ostream RSO(IRBuffer);
-        llvm::WriteBitcodeToFile(*Module.get(), RSO);
-        RSO.flush();
-        llvm::SMDiagnostic ErrorDiagnostics;
-        std::unique_ptr<llvm::MemoryBuffer> MemBuffer =
-            llvm::MemoryBuffer::getMemBuffer(IRBuffer);
-        std::unique_ptr<llvm::Module> TmpMod =
-            llvm::parseIR(*MemBuffer, ErrorDiagnostics, MainMod->getContext());
-        bool BrokenDebugInfo = false;
-        if (TmpMod == nullptr ||
-            llvm::verifyModule(*TmpMod, &llvm::errs(), &BrokenDebugInfo)) {
-          llvm::report_fatal_error("Error: module is broken!");
-        }
-        if (BrokenDebugInfo) {
-          // FIXME at least log this incident
-        }
-        // now we can safely perform the linking
-        if (llvm::Linker::linkModules(*MainMod, std::move(TmpMod),
-                                      llvm::Linker::LinkOnlyNeeded)) {
+      if (Module.get() == MainMod) {
+        continue;
+      }
+
+      if (&Module->getContext() == &MainMod->getContext()) {
+        if (Link.linkInModule(std::move(Module), Flags)) {
           llvm::report_fatal_error(
               "Error: trying to link modules into single WPA module failed!");
         }
+        continue;
+      }
+
+      // reload the modules into the module containing the main function
+      std::string IRBuffer;
+      llvm::raw_string_ostream RSO(IRBuffer);
+      llvm::WriteBitcodeToFile(*Module.get(), RSO);
+      RSO.flush();
+      llvm::SMDiagnostic ErrorDiagnostics;
+      auto MemBuffer = llvm::MemoryBuffer::getMemBuffer(IRBuffer);
+      auto TmpMod =
+          llvm::parseIR(*MemBuffer, ErrorDiagnostics, MainMod->getContext());
+      bool BrokenDebugInfo = false;
+      if (!TmpMod ||
+          llvm::verifyModule(*TmpMod, &llvm::errs(), &BrokenDebugInfo)) {
+        llvm::report_fatal_error("Error: module is broken!");
+      }
+      if (BrokenDebugInfo) {
+        // at least log this incident
+        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), WARNING)
+                      << "Reloading the module '" << Module->getName().str()
+                      << "' lead to broken debug info!");
+      }
+      // now we can safely perform the linking
+      if (Link.linkInModule(std::move(TmpMod), Flags)) {
+        llvm::report_fatal_error(
+            "Error: trying to link modules into single WPA module failed!");
       }
     }
+
     // Update the IRDB reflecting that we now only need 'MainMod' and its
     // corresponding context!
     // delete every other module
+
     for (auto It = Modules.begin(); It != Modules.end();) {
       if (It->second.get() != MainMod) {
         It = Modules.erase(It);
@@ -196,20 +216,20 @@ void ProjectIRDB::linkForWPA() {
       }
     }
     // delete every other context
-    for (auto It = Contexts.begin(); It != Contexts.end();) {
-      if (It->get() != &MainMod->getContext()) {
-        It = Contexts.erase(It);
-      } else {
-        ++It;
-      }
-    }
+    // for (auto It = Contexts.begin(); It != Contexts.end();) {
+    //   if (It->get() != &MainMod->getContext()) {
+    //     It = Contexts.erase(It);
+    //   } else {
+    //     ++It;
+    //   }
+    // }
     WPAModule = MainMod;
+    ModulesToSlotTracker::updateMSTForModule(WPAModule);
   } else if (Modules.size() == 1) {
     // In this case we only have one module anyway, so we do not have
     // to link at all. But we have to update the WPAMOD pointer!
     WPAModule = Modules.begin()->second.get();
   }
-  ModulesToSlotTracker::updateMSTForModule(WPAModule);
 }
 
 void ProjectIRDB::preprocessAllModules() {
@@ -509,7 +529,7 @@ const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
 }
 
 void ProjectIRDB::insertModule(llvm::Module *M) {
-  Contexts.push_back(std::unique_ptr<llvm::LLVMContext>(&M->getContext()));
+  // Contexts.push_back(std::unique_ptr<llvm::LLVMContext>(&M->getContext()));
   Modules.insert(std::make_pair(M->getModuleIdentifier(), M));
   preprocessModule(M);
 }
