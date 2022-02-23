@@ -27,6 +27,6 @@ void C::foo()
 int main()
 {
 	field = new A();
-	field->foo();	
+	field->foo();
 	return 0;
 }

@@ -6,7 +6,7 @@ int baz(int i) { return quk(i); }
 
 int bar(int i) { return baz(i); }
 
-int foo(int i) { 
+int foo(int i) {
 	return bar(i);
 }
 

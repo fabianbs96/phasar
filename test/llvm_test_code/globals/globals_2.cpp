@@ -1,8 +1,8 @@
 int globalInt = 10;
 
 struct Base {
-	virtual void foo(int &a) { 
-		a = globalInt; 
+	virtual void foo(int &a) {
+		a = globalInt;
 	}
 };
 

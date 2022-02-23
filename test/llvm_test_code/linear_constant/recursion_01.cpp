@@ -1,5 +1,5 @@
 extern bool cond;
-int decrement(int i) { 
+int decrement(int i) {
 	if (cond) {
 		return decrement(--i);
 	}

@@ -7,4 +7,3 @@ int main() {
 	free(i);
 	return 0;
 }
-

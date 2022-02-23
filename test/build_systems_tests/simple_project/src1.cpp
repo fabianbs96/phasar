@@ -4,4 +4,3 @@ int function(int i)
 {
 	return i + i;
 }
-

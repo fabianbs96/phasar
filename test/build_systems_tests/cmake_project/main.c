@@ -6,7 +6,7 @@
 int main (int argc, char **argv)
 {
   int product = my_mult(5, 2);
-  printf("the value is %d\n", product);  
-  
+  printf("the value is %d\n", product);
+
   return 0;
 }

@@ -21,4 +21,3 @@ int main() {
 	delete j;
 	return 0;
 }
-

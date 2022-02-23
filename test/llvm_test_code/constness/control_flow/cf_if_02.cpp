@@ -5,7 +5,7 @@ int main() {
   if (cond) {
     // moved to virtual register
     int j = 20;
-    j++;		
+    j++;
 	} else {
 		i = new int(30);
 	}

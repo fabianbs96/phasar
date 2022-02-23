@@ -12,4 +12,3 @@ int A::foo(int &i) {
 void A::bar(double &d) {
 	double a = 20.12 + d;
 }
-

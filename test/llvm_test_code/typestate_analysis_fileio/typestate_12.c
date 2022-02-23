@@ -15,6 +15,6 @@ int main() {
   FILE *f;
   f = foo();
   fclose(f);
-  
+
   return 0;
 }

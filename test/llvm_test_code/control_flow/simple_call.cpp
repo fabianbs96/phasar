@@ -1,5 +1,5 @@
 void foo(int i) {
-	
+
 }
 
 int main() {

@@ -25,5 +25,3 @@ void use() {
 
   delete c;
 }
-
-

@@ -1,5 +1,5 @@
-int increment(int a) { 
-  return ++a; 
+int increment(int a) {
+  return ++a;
 }
 
 int main() {

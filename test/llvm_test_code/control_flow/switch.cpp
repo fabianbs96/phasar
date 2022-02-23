@@ -12,7 +12,7 @@ int main() {
 			break;
 		case 'D' :
 			i = 30;
-		default: 
+		default:
 			i = -1;
 	}
 	return 0;
