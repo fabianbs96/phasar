@@ -114,8 +114,8 @@ ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
 }
 
 ProjectIRDB::~ProjectIRDB() {
-  for (auto &Entry : Modules) {
-    ModulesToSlotTracker::deleteMSTForModule(Entry.getValue().get());
+  for (auto *Mod : getAllModules()) {
+    ModulesToSlotTracker::deleteMSTForModule(Mod);
   }
   // release resources if IRDB does not own
   if (!(Options & IRDBOptions::OWNS)) {
@@ -234,8 +234,8 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
 }
 
 void ProjectIRDB::preprocessAllModules() {
-  for (auto &Entry : Modules) {
-    preprocessModule(Entry.getValue().get());
+  for (auto *Mod : getAllModules()) {
+    preprocessModule(Mod);
   }
 }
 
@@ -265,8 +265,8 @@ llvm::Module *ProjectIRDB::getModule(llvm::StringRef ModuleName) {
 
 std::size_t ProjectIRDB::getNumGlobals() const {
   std::size_t Ret = 0;
-  for (const auto &Entry : Modules) {
-    Ret += Entry.getValue()->global_size();
+  for (const auto *Mod : getAllModules()) {
+    Ret += Mod->global_size();
   }
   return Ret;
 }
@@ -346,8 +346,8 @@ void ProjectIRDB::emitPreprocessedIR(llvm::raw_ostream &OS,
 
 llvm::Function *
 ProjectIRDB::internalGetFunctionDefinition(llvm::StringRef FunctionName) const {
-  for (const auto &Entry : Modules) {
-    auto *F = Entry.getValue()->getFunction(FunctionName);
+  for (const auto *Mod : getAllModules()) {
+    auto *F = Mod->getFunction(FunctionName);
     if (F && !F->isDeclaration()) {
       return F;
     }
@@ -357,8 +357,8 @@ ProjectIRDB::internalGetFunctionDefinition(llvm::StringRef FunctionName) const {
 
 llvm::Function *
 ProjectIRDB::internalGetFunction(llvm::StringRef FunctionName) const {
-  for (const auto &Entry : Modules) {
-    auto *F = Entry.getValue()->getFunction(FunctionName);
+  for (const auto *Mod : getAllModules()) {
+    auto *F = Mod->getFunction(FunctionName);
     if (F) {
       return F;
     }
@@ -368,8 +368,8 @@ ProjectIRDB::internalGetFunction(llvm::StringRef FunctionName) const {
 
 const llvm::GlobalVariable *ProjectIRDB::getGlobalVariableDefinition(
     llvm::StringRef GlobalVariableName) const {
-  for (const auto &Entry : Modules) {
-    auto *G = Entry.getValue()->getGlobalVariable(GlobalVariableName);
+  for (const auto *Mod : getAllModules()) {
+    auto *G = Mod->getGlobalVariable(GlobalVariableName);
     if (G && !G->isDeclaration()) {
       return G;
     }
@@ -379,10 +379,10 @@ const llvm::GlobalVariable *ProjectIRDB::getGlobalVariableDefinition(
 
 llvm::Module *ProjectIRDB::internalGetModuleDefiningFunction(
     llvm::StringRef FunctionName) const {
-  for (const auto &Entry : Modules) {
-    auto *F = Entry.getValue()->getFunction(FunctionName);
+  for (auto *Mod : getAllModules()) {
+    auto *F = Mod->getFunction(FunctionName);
     if (F && !F->isDeclaration()) {
-      return Entry.getValue().get();
+      return Mod;
     }
   }
   return nullptr;
@@ -479,8 +479,8 @@ ProjectIRDB::persistedStringToValue(const std::string &S) const {
 
 std::vector<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
   std::vector<const llvm::Function *> Functions;
-  for (const auto &Entry : Modules) {
-    for (auto &F : *Entry.getValue()) {
+  for (const auto *Mod : getAllModules()) {
+    for (const auto &F : *Mod) {
       Functions.push_back(&F);
     }
   }
@@ -489,8 +489,8 @@ std::vector<const llvm::Function *> ProjectIRDB::getAllFunctions() const {
 
 const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
   /// Maybe cache this mapping later on
-  for (const auto &Entry : Modules) {
-    for (auto &F : *Entry.getValue()) {
+  for (const auto *Mod : getAllModules()) {
+    for (const auto &F : *Mod) {
       auto FId = getFunctionId(&F);
       if (FId && *FId == Id) {
         return &F;
@@ -532,8 +532,8 @@ set<const llvm::Value *> ProjectIRDB::getAllMemoryLocations() const {
                                     "typeinfo"};
   // add global varibales to the memory location set, except the llvm
   // intrinsic global variables
-  for (const auto &Entry : Modules) {
-    for (auto &GV : Entry.getValue()->globals()) {
+  for (const auto *Mod : getAllModules()) {
+    for (const auto &GV : Mod->globals()) {
       if (GV.hasName()) {
         string GVName = llvm::demangle(GV.getName().str());
         if (!IgnoredGlobalNames.count(GVName.substr(0, GVName.find(' ')))) {
@@ -551,8 +551,8 @@ bool ProjectIRDB::debugInfoAvailable() const {
   }
   // During unittests WPAMOD might not be set
   if (!Modules.empty()) {
-    for (const auto &Entry : Modules) {
-      if (!wasCompiledWithDebugInfo(Entry.getValue().get())) {
+    for (const auto *Mod : getAllModules()) {
+      if (!wasCompiledWithDebugInfo(Mod)) {
         return false;
       }
     }

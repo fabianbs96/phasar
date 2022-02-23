@@ -10,7 +10,6 @@
 #ifndef PHASAR_DB_PROJECTIRDB_H_
 #define PHASAR_DB_PROJECTIRDB_H_
 
-#include <llvm-12/llvm/ADT/StringRef.h>
 #include <map>
 #include <memory>
 #include <set>
@@ -19,6 +18,7 @@
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -72,7 +72,7 @@ private:
   void buildIDModuleMapping(llvm::Module *M);
 
   void preprocessModule(llvm::Module *M);
-  static bool wasCompiledWithDebugInfo(llvm::Module *M) {
+  static bool wasCompiledWithDebugInfo(const llvm::Module *M) {
     return M->getNamedMetadata("llvm.dbg.cu") != nullptr;
   };
 
@@ -123,14 +123,9 @@ public:
 
   llvm::Module *getModule(llvm::StringRef ModuleName);
 
-  [[nodiscard]] inline llvm::SmallPtrSet<llvm::Module *, 2>
-  getAllModules() const {
-    llvm::SmallPtrSet<llvm::Module *, 2> ModuleSet;
-
-    for (const auto &Entry : Modules) {
-      ModuleSet.insert(Entry.getValue().get());
-    }
-    return ModuleSet;
+  [[nodiscard]] inline auto getAllModules() const noexcept {
+    return llvm::map_range(
+        Modules, [](const auto &Entry) { return Entry.getValue().get(); });
   }
 
   [[nodiscard]] std::vector<const llvm::Function *> getAllFunctions() const;
