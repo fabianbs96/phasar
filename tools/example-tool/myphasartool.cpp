@@ -63,6 +63,21 @@ int main(int Argc, const char **Argv) {
       // llvm::outs() << ICFGStr << '\n';
     }
 
+    // {
+    //   auto Start = std::chrono::high_resolution_clock::now();
+    //   auto ICFGStr = I.exportICFGAsSourceCodeJsonString2();
+    //   auto End = std::chrono::high_resolution_clock::now();
+
+    //   llvm::outs() << "New export2: "
+    //                << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
+    //   llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
+    //                << ICFGStr.capacity() << '('
+    //                << llvm::format("%.3f", float(ICFGStr.size()) /
+    //                                            float(ICFGStr.capacity()))
+    //                << ")\n";
+    //   // llvm::outs() << ICFGStr << '\n';
+    // }
+
     {
       auto Start = std::chrono::high_resolution_clock::now();
       auto ICFGStr = I.exportICFGAsSourceCodeDotString();
@@ -99,6 +114,7 @@ int main(int Argc, const char **Argv) {
                                                float(ICFGStr.capacity()))
                    << ")\n";
     }
+
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }

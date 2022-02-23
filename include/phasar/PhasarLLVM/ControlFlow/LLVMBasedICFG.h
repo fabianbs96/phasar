@@ -174,6 +174,9 @@ private:
 
   struct dependency_visitor;
 
+  template <typename EdgeCallBack>
+  void exportICFGAsSourceCodeImpl(EdgeCallBack &&CreateEdge) const;
+
 public:
   static constexpr llvm::StringLiteral GlobalCRuntimeModelName =
       "__psrCRuntimeGlobalCtorsModel";
@@ -339,6 +342,13 @@ public:
   /// Usually faster than exportICFGAsSourceCodeJson().dump()
   [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
   void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
+
+  /// Create a JSON export of the whole ICFG similar to
+  /// exportICFGAsSourceCodeJson() but without creating intermediate
+  /// nlohmann::json objects.
+  /// Usually faster than exportICFGAsSourceCodeJson().dump()
+  [[nodiscard]] std::string exportICFGAsSourceCodeJsonString2() const;
+  void exportICFGAsSourceCodeJson2(llvm::raw_ostream &OS) const;
 
   [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
   void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;

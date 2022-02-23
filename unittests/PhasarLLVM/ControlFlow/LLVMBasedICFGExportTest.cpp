@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "llvm/ADT/DenseMap.h"
@@ -50,13 +51,21 @@ protected:
                        Soundness::Soundy, false);
 
     auto Ret =
-        AsSrcCode ? ICFG.exportICFGAsSourceCodeJson() : ICFG.exportICFGAsJson();
+        AsSrcCode
+            ? nlohmann::json::parse(ICFG.exportICFGAsSourceCodeJsonString())
+            : ICFG.exportICFGAsJson();
 
     if (AsSrcCode) {
-      auto AsString = ICFG.exportICFGAsSourceCodeJsonString();
-      llvm::errs() << AsString << "\n";
-      auto AsJson = nlohmann::json::parse(AsString);
-      assert(AsJson == Ret);
+      std::error_code EC;
+
+      llvm::raw_fd_ostream OS("New1.json", EC);
+      OS << Ret.dump();
+
+      // auto New2 = ICFG.exportICFGAsSourceCodeJsonString2();
+      // [New2 = nlohmann::json::parse(New2), &Ret] { EXPECT_EQ(Ret, New2); }();
+
+      // auto New3 = ICFG.exportICFGAsSourceCodeJson2();
+      // [&New3, &Ret] { EXPECT_EQ(Ret, New3); }();
     }
 
     return Ret;

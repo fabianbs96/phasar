@@ -230,6 +230,19 @@ void ProjectIRDB::buildIDModuleMapping(llvm::Module *M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         IDInstructionMapping[stol(getMetaDataID(&I))] = &I;
+        AllInstructions.push_back(&I);
+        if (AllInstructions.size() > 1) {
+          auto PrevId =
+              stol(getMetaDataID(AllInstructions[AllInstructions.size() - 2]));
+          auto Id = stol(getMetaDataID(&I));
+          if (PrevId + 1 != Id) {
+            llvm::report_fatal_error("Invalid Id->Instruction mapping!");
+          }
+        } else {
+          auto Id = stol(getMetaDataID(&I));
+          FirstInstId = Id;
+          assert(Id >= 0);
+        }
       }
     }
   }
@@ -250,8 +263,10 @@ std::size_t ProjectIRDB::getNumGlobals() const {
   return Ret;
 }
 
-llvm::Instruction *ProjectIRDB::getInstruction(std::size_t Id) {
+const llvm::Instruction *ProjectIRDB::getInstruction(std::size_t Id) {
   if (IDInstructionMapping.count(Id)) {
+    assert(Id >= FirstInstId);
+    assert(AllInstructions.at(Id - FirstInstId) == IDInstructionMapping[Id]);
     return IDInstructionMapping[Id];
   }
   return nullptr;
@@ -319,6 +334,14 @@ void ProjectIRDB::emitPreprocessedIR(std::ostream &OS, bool ShortenIR) const {
       }
     }
     OS << '\n';
+  }
+}
+
+void ProjectIRDB::addFunctionToDB(const llvm::Function *F) {
+  for (const auto &I : llvm::instructions(F)) {
+    AllInstructions.push_back(&I);
+    /// TODO: Should we add metadata IDs to them?
+    /// TODO: Should we add them to AllocaInstructions and RetOrResInstructions?
   }
 }
 

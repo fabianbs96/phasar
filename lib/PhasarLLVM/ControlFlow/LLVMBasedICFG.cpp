@@ -19,7 +19,9 @@
 #include <cstdint>
 #include <initializer_list>
 #include <iomanip>
+#include <iterator>
 #include <memory>
+#include <memory_resource>
 #include <ostream>
 #include <string>
 
@@ -940,6 +942,8 @@ llvm::Function *LLVMBasedICFG::buildCRuntimeGlobalDtorsModel(llvm::Module &M) {
 
   IRB.CreateRetVoid();
 
+  IRDB.addFunctionToDB(Cleanup);
+
   return Cleanup;
 }
 
@@ -989,16 +993,21 @@ LLVMBasedICFG::buildCRuntimeGlobalCtorsDtorsModel(llvm::Module &M) {
       break;
     case 2:
       if (UEntry->getName() != "main") {
-        std::cerr << "ERROR: The only entrypoint, where parameters are "
-                     "supported, is main\n";
+        llvm::errs() << "ERROR: The only entrypoint, where parameters are "
+                        "supported, is main. If you need this entrypoint '"
+                     << UEntry->getName()
+                     << "' please disable global ctor/dtor handling\n";
         break;
       }
 
       IRB.CreateCall(UEntry, {GlobModel->getArg(0), GlobModel->getArg(1)});
       break;
     default:
-      std::cerr << "ERROR: Entrypoints with parameters are not supported, "
-                   "except for argc and argv in main\n";
+      llvm::errs()
+          << "ERROR: Entrypoints with parameters are not supported, "
+             "except for argc and argv in main. If you need this entrypoint '"
+          << UEntry->getName()
+          << "' please disable global ctor/dtor handling\n";
       break;
     }
 
@@ -1051,6 +1060,7 @@ LLVMBasedICFG::buildCRuntimeGlobalCtorsDtorsModel(llvm::Module &M) {
   }
 
   ModulesToSlotTracker::updateMSTForModule(&M);
+  IRDB.addFunctionToDB(GlobModel);
 
   return GlobModel;
 }
@@ -1261,83 +1271,9 @@ nlohmann::json LLVMBasedICFG::exportICFGAsJson() const {
   return J;
 }
 
-nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
-  nlohmann::json J;
-
-  auto isRetVoid = // NOLINT
-      [](const llvm::Instruction *Inst) noexcept {
-        const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(Inst);
-        return Ret && !Ret->getReturnValue();
-      };
-
-  auto getLastNonEmpty = // NOLINT
-      [&](const llvm::Instruction *Inst) noexcept -> SourceCodeInfoWithIR {
-    if (!isRetVoid(Inst) || !Inst->getPrevNode()) {
-      return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
-    }
-    for (const auto *Prev = Inst->getPrevNode(); Prev;
-         Prev = Prev->getPrevNode()) {
-      auto Src = getSrcCodeInfoFromIR(Prev);
-      if (!Src.empty()) {
-        return {Src, llvmIRToStableString(Prev)};
-      }
-    }
-
-    return {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)};
-  };
-
-  auto createInterEdges = // NOLINT
-      [&](const llvm::Instruction *CS, const SourceCodeInfoWithIR &From,
-          const SourceCodeInfoWithIR &To) {
-        bool HasDecl = false;
-        auto Callees = internalGetCalleesOfCallAt(CS);
-        for (const auto *Callee : Callees) {
-          if (Callee->isDeclaration()) {
-            HasDecl = true;
-            continue;
-          }
-          // Call Edge
-          auto InterTo = getFirstNonEmpty(&Callee->front());
-          J.push_back({{"from", From}, {"to", std::move(InterTo)}});
-
-          // Return Edges
-          for (const auto *ExitInst : getAllExitPoints(Callee)) {
-            J.push_back({{"from", getLastNonEmpty(ExitInst)}, {"to", To}});
-          }
-        }
-        if (HasDecl || Callees.empty()) {
-          J.push_back({{"from", From}, {"to", To}});
-        }
-      };
-
-  IRDB.forEachFunction([&](const auto *F) {
-    forEachControlFlowEdge(F, [&](const auto *From, const auto *To) {
-      if (llvm::isa<llvm::UnreachableInst>(From)) {
-        return;
-      }
-
-      if (const auto *CB = llvm::dyn_cast<llvm::CallBase>(From)) {
-        createInterEdges(From,
-                         SourceCodeInfoWithIR{getSrcCodeInfoFromIR(From),
-                                              llvmIRToStableString(From)},
-                         SourceCodeInfoWithIR{getSrcCodeInfoFromIR(To),
-                                              llvmIRToStableString(To)});
-      } else {
-        J.push_back({{"from", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(From),
-                                                   llvmIRToStableString(From)}},
-                     {"to", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(To),
-                                                 llvmIRToStableString(To)}}});
-      }
-    });
-  });
-
-  return J;
-}
-
-void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
-  OS << "[";
-  scope_exit CloseBrace = [&OS]() { OS << "]"; };
-
+template <typename EdgeCallBack>
+void LLVMBasedICFG::exportICFGAsSourceCodeImpl(
+    EdgeCallBack &&CreateEdge) const {
   struct GetSCIFn {
     std::vector<SourceCodeInfoWithIR> SCI;
     llvm::DenseMap<const llvm::Instruction *, SourceCodeInfoWithIR *> Inst2SCI;
@@ -1389,6 +1325,72 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
   };
 
   // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createInterEdges = [this, &CreateEdge,
+                           &getLastNonEmpty](const llvm::Instruction *CS,
+                                             const SourceCodeInfoWithIR &From,
+                                             const SourceCodeInfoWithIR &To) {
+    bool NeedCTREdge = false;
+    auto Callees = internalGetCalleesOfCallAt(CS);
+    for (const auto *Callee : Callees) {
+      if (Callee->isDeclaration()) {
+        NeedCTREdge = true;
+        continue;
+      }
+      // Call Edge
+      auto InterTo = getFirstNonEmpty(&Callee->front());
+      std::invoke(CreateEdge, From, InterTo);
+
+      // Return Edges
+      for (const auto *ExitInst : getAllExitPoints(Callee)) {
+        std::invoke(CreateEdge, getLastNonEmpty(ExitInst), To);
+      }
+    }
+
+    if (NeedCTREdge || Callees.empty()) {
+      std::invoke(CreateEdge, From, To);
+    }
+  };
+
+  llvm::SmallVector<const llvm::Instruction *, 2> Successors;
+
+  for (const auto *Inst : IRDB.instructions()) {
+    const auto &I = *Inst;
+    if (llvm::isa<llvm::UnreachableInst>(&I)) {
+      continue;
+    }
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
+      continue;
+    }
+
+    Successors.clear();
+    getSuccsOf(&I, Successors);
+    const auto &FromSCI = getSCI(&I);
+
+    for (const auto *Successor : Successors) {
+      const auto &ToSCI = getSCI(Successor);
+
+      if (llvm::isa<llvm::CallBase>(&I)) {
+        createInterEdges(&I, FromSCI, ToSCI);
+      } else {
+        std::invoke(CreateEdge, FromSCI, ToSCI);
+      }
+    }
+  }
+}
+nlohmann::json LLVMBasedICFG::exportICFGAsSourceCodeJson() const {
+  nlohmann::json J;
+  exportICFGAsSourceCodeImpl(
+      [&J](const SourceCodeInfoWithIR &From, const SourceCodeInfoWithIR &To) {
+        J.push_back({{"from", From}, {"to", To}});
+      });
+  return J;
+}
+
+void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
+  OS << "[";
+  scope_exit CloseBrace = [&OS]() { OS << "]"; };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
   auto writeSCI = [](llvm::raw_ostream &OS, const SourceCodeInfoWithIR &SCI) {
     OS << "{\"sourceCodeLine\":" << psr::quoted(SCI.SourceCodeLine)
        << ",\"sourceCodeFileName\":" << psr::quoted(SCI.SourceCodeFilename)
@@ -1399,77 +1401,116 @@ void LLVMBasedICFG::exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const {
   };
 
   bool IsFirstEdge = true;
-  // NOLINTNEXTLINE(readability-identifier-naming)
-  auto createEdge = [&OS, &IsFirstEdge,
-                     writeSCI](const SourceCodeInfoWithIR &From,
-                               const SourceCodeInfoWithIR &To) {
+
+  auto CreateEdge = [&OS, &IsFirstEdge](llvm::StringRef From,
+                                        llvm::StringRef To) {
     if (IsFirstEdge) {
       IsFirstEdge = false;
     } else {
       OS << ",";
     }
 
-    OS << "{\"from\":";
-    writeSCI(OS, From);
-    OS << ",\"to\":";
-    writeSCI(OS, To);
-    OS << "}";
+    OS << "{\"from\":" << From << ",\"to\":" << To << "}";
+  };
+
+  auto SerializeSCI = [writeSCI](const SourceCodeInfoWithIR &SCI,
+                                 std::pmr::memory_resource *MRes) {
+    llvm::SmallString<512> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+
+    writeSCI(OS, SCI);
+    auto *RetData = (char *)MRes->allocate(Buffer.size(), 1);
+    memcpy(RetData, Buffer.data(), Buffer.size());
+
+    return llvm::StringRef(RetData, Buffer.size());
+  };
+
+  llvm::DenseMap<const llvm::Instruction *, llvm::StringRef> Inst2SCI;
+  Inst2SCI.reserve(IRDB.getNumInstructions());
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto getSCI = [Inst2SCI = std::move(Inst2SCI),
+                 MRes = std::pmr::monotonic_buffer_resource(),
+                 SerializeSCI](const llvm::Instruction *Inst) mutable {
+    auto &Ret = Inst2SCI[Inst];
+    if (Ret.empty()) {
+      Ret = SerializeSCI(
+          {getSrcCodeInfoFromIR(Inst), llvmIRToStableString(Inst)}, &MRes);
+    }
+    return Ret;
   };
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  auto createInterEdges = [this, &createEdge,
-                           &getLastNonEmpty](const llvm::Instruction *CS,
-                                             const SourceCodeInfoWithIR &From,
-                                             const SourceCodeInfoWithIR &To) {
+  auto isRetVoid = [](const llvm::Instruction *Inst) noexcept {
+    const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(Inst);
+    return Ret && !Ret->getReturnValue();
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto getLastNonEmpty = [isRetVoid, &getSCI](const llvm::Instruction *Inst) {
+    if (!isRetVoid(Inst) || !Inst->getPrevNode()) {
+      return getSCI(Inst);
+    }
+    if (const auto *Prev = Inst->getPrevNode()) {
+      return getSCI(Prev);
+    }
+
+    return getSCI(Inst);
+  };
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  auto createInterEdges = [this, &CreateEdge, &getLastNonEmpty,
+                           &getSCI](const llvm::Instruction *CS,
+                                    llvm::StringRef From, llvm::StringRef To) {
     bool NeedCTREdge = false;
-    bool HasInterEdge = false;
     auto Callees = internalGetCalleesOfCallAt(CS);
     for (const auto *Callee : Callees) {
       if (Callee->isDeclaration()) {
         NeedCTREdge = true;
-        return;
+        continue;
       }
       // Call Edge
-      auto InterTo = getFirstNonEmpty(&Callee->front());
-      createEdge(From, InterTo);
+      const auto *InterTo = &Callee->front().front();
+      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(InterTo)) {
+        InterTo = InterTo->getNextNonDebugInstruction(false);
+      }
+      std::invoke(CreateEdge, From, getSCI(InterTo));
 
       // Return Edges
       for (const auto *ExitInst : getAllExitPoints(Callee)) {
-        createEdge(getLastNonEmpty(ExitInst), To);
+        std::invoke(CreateEdge, getLastNonEmpty(ExitInst), To);
       }
     }
 
-    if (NeedCTREdge || !Callees.empty()) {
-      createEdge(From, To);
+    if (NeedCTREdge || Callees.empty()) {
+      std::invoke(CreateEdge, From, To);
     }
   };
 
   llvm::SmallVector<const llvm::Instruction *, 2> Successors;
 
-  IRDB.forEachFunction([&](const auto *F) {
-    for (const auto &I : llvm::instructions(F)) {
-      if (llvm::isa<llvm::UnreachableInst>(&I)) {
-        continue;
-      }
-      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
-        continue;
-      }
+  for (const auto *Inst : IRDB.instructions()) {
+    const auto &I = *Inst;
+    if (llvm::isa<llvm::UnreachableInst>(&I)) {
+      continue;
+    }
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
+      continue;
+    }
 
-      Successors.clear();
-      getSuccsOf(&I, Successors);
-      const auto &FromSCI = getSCI(&I);
+    Successors.clear();
+    getSuccsOf(&I, Successors);
+    auto FromSCI = getSCI(&I);
 
-      for (const auto *Successor : Successors) {
-        const auto &ToSCI = getSCI(Successor);
+    for (const auto *Successor : Successors) {
+      auto ToSCI = getSCI(Successor);
 
-        if (llvm::isa<llvm::CallBase>(&I)) {
-          createInterEdges(&I, FromSCI, ToSCI);
-        } else {
-          createEdge(FromSCI, ToSCI);
-        }
+      if (llvm::isa<llvm::CallBase>(&I)) {
+        createInterEdges(&I, FromSCI, ToSCI);
+      } else {
+        std::invoke(CreateEdge, FromSCI, ToSCI);
       }
     }
-  });
+  }
 }
 
 std::string LLVMBasedICFG::exportICFGAsSourceCodeJsonString() const {
@@ -1520,16 +1561,16 @@ void LLVMBasedICFG::exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const {
   // NOLINTNEXTLINE(readability-identifier-naming)
   auto writeSCI = [](llvm::raw_ostream &OS, const llvm::Instruction *Inst) {
     auto SCI = getSrcCodeInfoFromIR(Inst);
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    auto writeAll = [](llvm::raw_ostream &OS, auto &&...Strs) {
-      (OS.write_escaped(Strs), ...);
-    };
-    writeAll(OS, "File: ", SCI.SourceCodeFilename,
-             "\nFunction: ", SCI.SourceCodeFunctionName,
-             "\nIR: ", llvmIRToStableString(Inst));
+
+    OS << "File: ";
+    OS.write_escaped(SCI.SourceCodeFilename);
+    OS << "\nFunction: ";
+    OS.write_escaped(SCI.SourceCodeFunctionName);
+    OS << "\nIR: ";
+    OS.write_escaped(llvmIRToStableString(Inst));
+
     if (SCI.Line) {
-      writeAll(OS, "\nLine: ", std::to_string(SCI.Line),
-               "\nColumn: ", std::to_string(SCI.Column));
+      OS << "\nLine: " << SCI.Line << "\nColumn: " << SCI.Column;
     }
   };
 
@@ -1573,47 +1614,43 @@ void LLVMBasedICFG::exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const {
 
   llvm::SmallVector<const llvm::Instruction *, 4> Successors;
 
-  IRDB.forEachFunction([&](const auto *F) {
-    for (const auto &Inst : llvm::instructions(F)) {
-      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&Inst)) {
-        continue;
+  for (const auto *Inst : IRDB.instructions()) {
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(Inst)) {
+      continue;
+    }
+
+    OS << intptr_t(Inst) << "[label=\"";
+    writeSCI(OS, Inst);
+    OS << "\"];\n";
+
+    if (llvm::isa<llvm::UnreachableInst>(Inst)) {
+      continue;
+    }
+
+    Successors.clear();
+    getSuccsOf(Inst, Successors);
+
+    if (Successors.size() == 2) {
+      if (llvm::isa<llvm::InvokeInst>(Inst)) {
+        createInterEdges(Inst, intptr_t(Successors[0]), "[label=\"normal\"]");
+        createInterEdges(Inst, intptr_t(Successors[1]), "[label=\"unwind\"]");
+      } else {
+        OS << intptr_t(Inst) << "->" << intptr_t(Successors[0])
+           << "[label=\"true\"];\n";
+        OS << intptr_t(Inst) << "->" << intptr_t(Successors[1])
+           << "[label=\"false\"];\n";
       }
+      continue;
+    }
 
-      OS << intptr_t(&Inst) << "[label=\"";
-      writeSCI(OS, &Inst);
-      OS << "\"];\n";
-
-      if (llvm::isa<llvm::UnreachableInst>(Inst)) {
-        continue;
-      }
-
-      Successors.clear();
-      getSuccsOf(&Inst, Successors);
-
-      if (Successors.size() == 2) {
-        if (llvm::isa<llvm::InvokeInst>(Inst)) {
-          createInterEdges(&Inst, intptr_t(Successors[0]),
-                           "[label=\"normal\"]");
-          createInterEdges(&Inst, intptr_t(Successors[1]),
-                           "[label=\"unwind\"]");
-        } else {
-          OS << intptr_t(&Inst) << "->" << intptr_t(Successors[0])
-             << "[label=\"true\"];\n";
-          OS << intptr_t(&Inst) << "->" << intptr_t(Successors[1])
-             << "[label=\"false\"];\n";
-        }
-        continue;
-      }
-
-      for (const auto *Successor : Successors) {
-        if (llvm::isa<llvm::CallBase>(Inst)) {
-          createInterEdges(&Inst, intptr_t(Successor), "");
-        } else {
-          OS << intptr_t(&Inst) << "->" << intptr_t(Successor) << ";\n";
-        }
+    for (const auto *Successor : Successors) {
+      if (llvm::isa<llvm::CallBase>(Inst)) {
+        createInterEdges(Inst, intptr_t(Successor), "");
+      } else {
+        OS << intptr_t(Inst) << "->" << intptr_t(Successor) << ";\n";
       }
     }
-  });
+  }
 }
 
 std::string LLVMBasedICFG::exportICFGAsSourceCodeDotString() const {
@@ -1623,7 +1660,6 @@ std::string LLVMBasedICFG::exportICFGAsSourceCodeDotString() const {
   llvm::raw_string_ostream OS(Ret);
   exportICFGAsSourceCodeDot(OS);
   OS.flush();
-  Ret.shrink_to_fit();
   return Ret;
 }
 

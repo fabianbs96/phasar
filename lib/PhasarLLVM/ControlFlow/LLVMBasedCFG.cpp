@@ -429,7 +429,7 @@ auto LLVMBasedCFG::getFirstNonEmpty(llvm::BasicBlock::const_iterator &It,
     Ret = getSrcCodeInfoFromIR(Inst);
   }
 
-  return {Ret, llvmIRToString(Inst)};
+  return {Ret, llvmIRToStableString(Inst)};
 }
 
 auto LLVMBasedCFG::getFirstNonEmpty(const llvm::BasicBlock *BB)
