@@ -41,11 +41,10 @@ template <typename V, typename N> class PointsToInfo;
 
 template <typename AnalysisDomainTy,
           typename Container = std::set<typename AnalysisDomainTy::d_t>>
-class IFDSTabulationProblem
-    : public virtual FlowFunctions<AnalysisDomainTy, Container>,
-      public virtual NodePrinter<AnalysisDomainTy>,
-      public virtual DataFlowFactPrinter<AnalysisDomainTy>,
-      public virtual FunctionPrinter<AnalysisDomainTy> {
+class IFDSTabulationProblem : public FlowFunctions<AnalysisDomainTy, Container>,
+                              public NodePrinter<AnalysisDomainTy>,
+                              public DataFlowFactPrinter<AnalysisDomainTy>,
+                              public FunctionPrinter<AnalysisDomainTy> {
 public:
   using ProblemAnalysisDomain = AnalysisDomainTy;
 

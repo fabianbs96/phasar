@@ -17,7 +17,6 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_ICFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_ICFG_H_
 
-#include <iostream>
 #include <map>
 #include <set>
 #include <string>
@@ -43,7 +42,7 @@ CallGraphAnalysisType toCallGraphAnalysisType(const std::string &S);
 
 std::ostream &operator<<(std::ostream &OS, const CallGraphAnalysisType &CGA);
 
-template <typename N, typename F> class ICFG : public virtual CFG<N, F> {
+template <typename N, typename F> class ICFG /*: public virtual CFG<N, F> */ {
 
 protected:
   std::vector<F> GlobalInitializers;
@@ -57,7 +56,7 @@ protected:
   virtual void collectRegisteredDtors() = 0;
 
 public:
-  ~ICFG() override = default;
+  virtual ~ICFG() = default;
 
   [[nodiscard]] virtual std::vector<F> getAllFunctions() const = 0;
 
@@ -81,10 +80,11 @@ public:
     return GlobalInitializers;
   }
 
-  using CFG<N, F>::print; // tell the compiler we wish to have both prints
-  virtual void print(std::ostream &OS = std::cout) const = 0;
+  // using CFG<N, F>::print; // tell the compiler we wish to have both prints
+  virtual void print(std::ostream &OS) const = 0;
 
-  using CFG<N, F>::getAsJson; // tell the compiler we wish to have both prints
+  // using CFG<N, F>::getAsJson; // tell the compiler we wish to have both
+  // prints
   [[nodiscard]] virtual nlohmann::json getAsJson() const = 0;
 };
 

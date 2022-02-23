@@ -176,7 +176,10 @@ public:
    */
   [[nodiscard]] std::set<const llvm::Value *> getAllMemoryLocations() const;
 
-  [[nodiscard]] std::set<std::string> getAllSourceFiles() const;
+  [[nodiscard]] inline auto getAllSourceFiles() const {
+    return llvm::map_range(Modules,
+                           [](const auto &Entry) { return Entry.getKey(); });
+  }
 
   [[nodiscard]] llvm::DenseSet<const llvm::Type *> getAllocatedTypes() const {
     return AllocatedTypes;

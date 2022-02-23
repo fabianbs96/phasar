@@ -18,6 +18,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/ICFG.h"
@@ -42,7 +43,7 @@ class LLVMPointsToGraph;
 
 class LLVMBasedBackwardsICFG
     : public ICFG<const llvm::Instruction *, const llvm::Function *>,
-      public virtual LLVMBasedBackwardCFG {
+      public LLVMBasedBackwardCFG {
 private:
   LLVMBasedICFG &ForwardICFG;
   static inline const std::unique_ptr<llvm::LLVMContext> LLVMBackwardRetCTX =

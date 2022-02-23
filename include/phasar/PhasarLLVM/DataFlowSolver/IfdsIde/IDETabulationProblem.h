@@ -37,9 +37,9 @@ template <typename AnalysisDomainTy,
           typename Container = std::set<typename AnalysisDomainTy::d_t>>
 class IDETabulationProblem
     : public IFDSTabulationProblem<AnalysisDomainTy, Container>,
-      public virtual EdgeFunctions<AnalysisDomainTy>,
-      public virtual JoinLattice<AnalysisDomainTy>,
-      public virtual EdgeFactPrinter<AnalysisDomainTy> {
+      public EdgeFunctions<AnalysisDomainTy>,
+      public JoinLattice<AnalysisDomainTy>,
+      public EdgeFactPrinter<AnalysisDomainTy> {
 public:
   using d_t = typename AnalysisDomainTy::d_t;
   using n_t = typename AnalysisDomainTy::n_t;

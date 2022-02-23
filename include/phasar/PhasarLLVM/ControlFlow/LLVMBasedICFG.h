@@ -18,7 +18,6 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 
 #include <iosfwd>
-#include <iostream>
 #include <memory>
 #include <set>
 #include <stack>
@@ -58,7 +57,7 @@ class LLVMTypeHierarchy;
 
 class LLVMBasedICFG
     : public ICFG<const llvm::Instruction *, const llvm::Function *>,
-      public virtual LLVMBasedCFG {
+      public LLVMBasedCFG {
   friend class LLVMBasedBackwardsICFG;
 
   using GlobalCtorTy = std::multimap<size_t, llvm::Function *>;
@@ -66,10 +65,7 @@ class LLVMBasedICFG
 
 private:
   ProjectIRDB &IRDB;
-  CallGraphAnalysisType CGType;
-  Soundness S;
-  bool UserTHInfos = true;
-  bool UserPTInfos = true;
+
   LLVMTypeHierarchy *TH;
   LLVMPointsToInfo *PT;
   std::unique_ptr<Resolver> Res;
@@ -86,7 +82,7 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
-  std::set<const llvm::Instruction *> UnsoundCallSites;
+  llvm::DenseSet<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
@@ -94,6 +90,11 @@ private:
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
   // Counter to store the number of runtime edges added
   unsigned int TotalRuntimeEdgesAdded = 0;
+  Soundness S;
+  CallGraphAnalysisType CGType;
+  bool UserTHInfos = true;
+  bool UserPTInfos = true;
+
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -127,7 +128,7 @@ private:
   bidigraph_t CallGraph;
 
   /// Maps functions to the corresponding vertex id.
-  std::unordered_map<const llvm::Function *, vertex_t> FunctionVertexMap;
+  llvm::DenseMap<const llvm::Function *, vertex_t> FunctionVertexMap;
 
   void processFunction(const llvm::Function *F, Resolver &Resolver,
                        bool &FixpointReached);
@@ -323,8 +324,13 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
-  [[nodiscard]] const std::set<const llvm::Instruction *> &
-  getUnsoundCallSites();
+  [[nodiscard]] inline auto getUnsoundCallSites() {
+    return llvm::make_range(UnsoundCallSites.begin(), UnsoundCallSites.end());
+  }
+
+  [[nodiscard]] inline size_t getNumUnsoundCallSites() const noexcept {
+    return UnsoundCallSites.size();
+  }
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 
