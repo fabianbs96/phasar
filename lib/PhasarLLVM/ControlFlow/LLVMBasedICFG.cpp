@@ -822,11 +822,9 @@ void LLVMBasedICFG::collectGlobalDtors() {
 void LLVMBasedICFG::collectGlobalInitializers() {
   // get all functions used to initialize global variables
   forEachGlobalCtor([this](auto *GlobalCtor) {
-    for (const auto &BB : *GlobalCtor) {
-      for (const auto &I : BB) {
-        if (auto Call = llvm::dyn_cast<llvm::CallInst>(&I)) {
-          GlobalInitializers.push_back(Call->getCalledFunction());
-        }
+    for (const auto &I : llvm::instructions(*GlobalCtor)) {
+      if (auto Call = llvm::dyn_cast<llvm::CallInst>(&I)) {
+        GlobalInitializers.push_back(Call->getCalledFunction());
       }
     }
   });
@@ -1097,17 +1095,13 @@ void LLVMBasedICFG::collectRegisteredDtors() {
  */
 set<const llvm::Instruction *> LLVMBasedICFG::allNonCallStartNodes() const {
   set<const llvm::Instruction *> NonCallStartNodes;
-  for (auto *M : IRDB.getAllModules()) {
-    for (auto &F : *M) {
-      for (auto &BB : F) {
-        for (auto &I : BB) {
-          if (!llvm::isa<llvm::CallBase>(&I) && !isStartPoint(&I)) {
-            NonCallStartNodes.insert(&I);
-          }
-        }
-      }
+
+  for (const auto *Inst : IRDB.instructions()) {
+    if (!llvm::isa<llvm::CallBase>(Inst) && !isStartPoint(Inst)) {
+      NonCallStartNodes.insert(Inst);
     }
   }
+
   return NonCallStartNodes;
 }
 

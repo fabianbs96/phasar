@@ -65,12 +65,7 @@ private:
   std::unique_ptr<llvm::LLVMContext> Context;
   // Contains all modules that correspond to a project and owns them
   llvm::StringMap<std::unique_ptr<llvm::Module>> Modules;
-  /// NOTE: IDInstructionMapping is improved in the
-  /// IntelliSecPhasar-ImproveICFGExportPerformance branch. So, to avoid even
-  /// more merge conflicts, don't change it here!
-  // Maps an id to its corresponding instruction
-  // std::map<std::size_t, llvm::Instruction *> IDInstructionMapping;
-  llvm::DenseMap<size_t, const llvm::Instruction *> IDInstructionMapping;
+
   std::vector<const llvm::Instruction *> AllInstructions;
   unsigned FirstInstId = 0;
 
@@ -148,15 +143,6 @@ public:
     }
   }
 
-  template <typename CallBack, typename = std::enable_if_t<std::is_invocable_v<
-                                   CallBack &&, const llvm::Instruction *>>>
-  void forEachInstruction(CallBack &&CB) const noexcept(
-      std::is_nothrow_invocable_v<CallBack &&, const llvm::Instruction *>) {
-    for (const auto &[Id, Inst] : IDInstructionMapping) {
-      std::invoke(CB, Inst);
-    }
-  }
-
   [[nodiscard]] std::vector<const llvm::Instruction *>::const_iterator
   inst_begin() const noexcept {
     return AllInstructions.cbegin();
@@ -183,8 +169,10 @@ public:
   void forEachIdAndInstruction(CallBack &&CB) const
       noexcept(std::is_nothrow_invocable_v<CallBack &&, size_t,
                                            const llvm::Instruction *>) {
-    for (const auto &[Id, Inst] : IDInstructionMapping) {
+    unsigned Id = FirstInstId;
+    for (const auto *Inst : AllInstructions) {
       std::invoke(CB, Id, Inst);
+      ++Id;
     }
   }
 

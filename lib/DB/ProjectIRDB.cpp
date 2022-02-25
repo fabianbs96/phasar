@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <llvm-12/llvm/IR/InstIterator.h>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -216,14 +217,6 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
         Modules.erase(Old);
       }
     }
-    // delete every other context
-    // for (auto It = Contexts.begin(); It != Contexts.end();) {
-    //   if (It->get() != &MainMod->getContext()) {
-    //     It = Contexts.erase(It);
-    //   } else {
-    //     ++It;
-    //   }
-    // }
     WPAModule = MainMod;
     ModulesToSlotTracker::updateMSTForModule(WPAModule);
   } else if (Modules.size() == 1) {
@@ -248,22 +241,19 @@ llvm::Module *ProjectIRDB::getWPAModule() {
 
 void ProjectIRDB::buildIDModuleMapping(llvm::Module *M) {
   for (auto &F : *M) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        IDInstructionMapping[stol(getMetaDataID(&I))] = &I;
-        AllInstructions.push_back(&I);
-        if (AllInstructions.size() > 1) {
-          auto PrevId =
-              stol(getMetaDataID(AllInstructions[AllInstructions.size() - 2]));
-          auto Id = stol(getMetaDataID(&I));
-          if (PrevId + 1 != Id) {
-            llvm::report_fatal_error("Invalid Id->Instruction mapping!");
-          }
-        } else {
-          auto Id = stol(getMetaDataID(&I));
-          FirstInstId = Id;
-          assert(Id >= 0);
+    for (auto &I : llvm::instructions(F)) {
+      AllInstructions.push_back(&I);
+      if (AllInstructions.size() > 1) {
+        auto PrevId =
+            stol(getMetaDataID(AllInstructions[AllInstructions.size() - 2]));
+        auto Id = stol(getMetaDataID(&I));
+        if (PrevId + 1 != Id) {
+          llvm::report_fatal_error("Invalid Id->Instruction mapping!");
         }
+      } else {
+        auto Id = stol(getMetaDataID(&I));
+        FirstInstId = Id;
+        assert(Id >= 0);
       }
     }
   }
@@ -285,12 +275,10 @@ std::size_t ProjectIRDB::getNumGlobals() const {
 }
 
 const llvm::Instruction *ProjectIRDB::getInstruction(std::size_t Id) {
-  if (IDInstructionMapping.count(Id)) {
-    assert(Id >= FirstInstId);
-    assert(AllInstructions.at(Id - FirstInstId) == IDInstructionMapping[Id]);
-    return IDInstructionMapping[Id];
+  if (Id < FirstInstId || Id - FirstInstId >= AllInstructions.size()) {
+    return nullptr;
   }
-  return nullptr;
+  return AllInstructions[Id - FirstInstId];
 }
 
 std::size_t ProjectIRDB::getInstructionID(const llvm::Instruction *I) {
@@ -326,7 +314,8 @@ void ProjectIRDB::emitPreprocessedIR(llvm::raw_ostream &OS,
       OS << '\n';
     }
     OS << '\n';
-    for (const auto *F : getAllFunctions()) {
+    for (const auto &Fun : *Module) {
+      const auto *F = &Fun;
       if (!F->isDeclaration() && Module->getFunction(F->getName())) {
         OS << F->getName();
         if (auto FId = getFunctionId(F)) {
