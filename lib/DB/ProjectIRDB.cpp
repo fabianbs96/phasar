@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <llvm-12/llvm/IR/InstIterator.h>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -19,6 +18,7 @@
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
