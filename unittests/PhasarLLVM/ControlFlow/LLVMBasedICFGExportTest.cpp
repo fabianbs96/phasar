@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iomanip>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "llvm/ADT/DenseMap.h"
@@ -50,7 +51,22 @@ protected:
                        Soundness::Soundy, false);
 
     auto Ret =
-        AsSrcCode ? ICFG.exportICFGAsSourceCodeJson() : ICFG.exportICFGAsJson();
+        AsSrcCode
+            ? nlohmann::json::parse(ICFG.exportICFGAsSourceCodeJsonString())
+            : ICFG.exportICFGAsJson();
+
+    if (AsSrcCode) {
+      std::error_code EC;
+
+      llvm::raw_fd_ostream OS("New1.json", EC);
+      OS << Ret.dump();
+
+      // auto New2 = ICFG.exportICFGAsSourceCodeJsonString2();
+      // [New2 = nlohmann::json::parse(New2), &Ret] { EXPECT_EQ(Ret, New2); }();
+
+      // auto New3 = ICFG.exportICFGAsSourceCodeJson2();
+      // [&New3, &Ret] { EXPECT_EQ(Ret, New3); }();
+    }
 
     return Ret;
   }
@@ -66,6 +82,8 @@ protected:
     // ASSERT_NE(nullptr, F);
     auto Ret =
         AsSrcCode ? CFG.exportCFGAsSourceCodeJson(F) : CFG.exportCFGAsJson(F);
+
+    llvm::errs() << Ret.dump(4) << '\n';
 
     return Ret;
   }
@@ -290,7 +308,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
 
-TEST_F(LLVMBasedICFGExportTest, DISABLED_ExportICFGSource03) {
+TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
   auto Results =
       exportICFG("exceptions/exceptions_01_cpp_dbg.ll", /*asSrcCode*/ true);
   // std::cerr << Results.dump(4) << std::endl;

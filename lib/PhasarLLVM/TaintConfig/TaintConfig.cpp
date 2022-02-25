@@ -228,32 +228,28 @@ TaintConfig::TaintConfig(const psr::ProjectIRDB &Code, // NOLINT
     // add corresponding Allocas or getElementPtr instructions to the taint
     // category
     for (const auto &VarDesc : Config["variables"]) {
-      for (const auto &Fun : Code.getAllFunctions()) {
-        for (const auto &I : llvm::instructions(Fun)) {
-          if (const auto *DbgDeclare =
-                  llvm::dyn_cast<llvm::DbgDeclareInst>(&I)) {
-            const llvm::DILocalVariable *LocalVar = DbgDeclare->getVariable();
-            // matching line number with for Allocas
-            if (LocalVar->getName().equals(
-                    VarDesc["name"].get<std::string>()) &&
-                LocalVar->getLine() == VarDesc["line"].get<unsigned int>()) {
-              addTaintCategory(DbgDeclare->getAddress(),
-                               VarDesc["cat"].get<std::string>());
-            }
-          } else if (!StructConfigMap.empty()) {
-            // Ignorning line numbers for getElementPtr instructions
-            if (const auto *Gep = llvm::dyn_cast<llvm::GetElementPtrInst>(&I)) {
-              const auto *StType = llvm::dyn_cast<llvm::StructType>(
-                  Gep->getPointerOperandType()->getPointerElementType());
-              if (StType && StructConfigMap.count(StType)) {
-                const auto VarDesc = StructConfigMap.at(StType);
-                auto VarName = VarDesc["name"].get<std::string>();
-                // using substr to cover the edge case in which same variable
-                // name is present as a local variable and also as a struct
-                // member variable. (Ex. JsonConfig/fun_member_02.cpp)
-                if (Gep->getName().substr(0, VarName.size()).equals(VarName)) {
-                  addTaintCategory(Gep, VarDesc["cat"].get<std::string>());
-                }
+      for (const auto *I : Code.instructions()) {
+        if (const auto *DbgDeclare = llvm::dyn_cast<llvm::DbgDeclareInst>(I)) {
+          const llvm::DILocalVariable *LocalVar = DbgDeclare->getVariable();
+          // matching line number with for Allocas
+          if (LocalVar->getName().equals(VarDesc["name"].get<std::string>()) &&
+              LocalVar->getLine() == VarDesc["line"].get<unsigned int>()) {
+            addTaintCategory(DbgDeclare->getAddress(),
+                             VarDesc["cat"].get<std::string>());
+          }
+        } else if (!StructConfigMap.empty()) {
+          // Ignorning line numbers for getElementPtr instructions
+          if (const auto *Gep = llvm::dyn_cast<llvm::GetElementPtrInst>(I)) {
+            const auto *StType = llvm::dyn_cast<llvm::StructType>(
+                Gep->getPointerOperandType()->getPointerElementType());
+            if (StType && StructConfigMap.count(StType)) {
+              const auto VarDesc = StructConfigMap.at(StType);
+              auto VarName = VarDesc["name"].get<std::string>();
+              // using substr to cover the edge case in which same variable
+              // name is present as a local variable and also as a struct
+              // member variable. (Ex. JsonConfig/fun_member_02.cpp)
+              if (Gep->getName().substr(0, VarName.size()).equals(VarName)) {
+                addTaintCategory(Gep, VarDesc["cat"].get<std::string>());
               }
             }
           }

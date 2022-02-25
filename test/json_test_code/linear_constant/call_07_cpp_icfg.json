@@ -6,7 +6,7 @@
             "line": 1,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) { // clang-format off"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %a, i32* %a.addr, align 4 | ID: 1",
@@ -32,7 +32,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -42,7 +42,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%inc = add nsw i32 %0, 1 | ID: 4",
@@ -50,7 +50,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -60,7 +60,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %inc, i32* %a.addr, align 4 | ID: 5",
@@ -68,7 +68,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -78,7 +78,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret i32 %inc | ID: 6",
@@ -86,7 +86,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -104,7 +104,7 @@
             "line": 6,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -114,7 +114,7 @@
             "line": 6,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%j = alloca i32, align 4 | ID: 9",
@@ -122,7 +122,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -132,7 +132,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%k = alloca i32, align 4 | ID: 10",
@@ -140,7 +140,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -150,7 +150,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 0, i32* %retval, align 4 | ID: 11",
@@ -176,7 +176,7 @@
             "line": 6,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -186,7 +186,7 @@
             "line": 6,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%0 = load i32, i32* %i, align 4 | ID: 15",
@@ -194,7 +194,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -204,7 +204,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%call = call i32 @_Z9incrementi(i32 %0) | ID: 16",
@@ -212,7 +212,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -222,7 +222,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%a.addr = alloca i32, align 4, !psr.id !13 | ID: 0",
@@ -230,7 +230,7 @@
             "line": 1,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) { // clang-format off"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -240,7 +240,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %call, i32* %j, align 4 | ID: 17",
@@ -248,7 +248,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -258,7 +258,7 @@
             "line": 7,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%1 = load i32, i32* %j, align 4 | ID: 19",
@@ -266,7 +266,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -276,7 +276,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%call1 = call i32 @_Z9incrementi(i32 %1) | ID: 20",
@@ -284,7 +284,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -294,7 +294,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%a.addr = alloca i32, align 4, !psr.id !13 | ID: 0",
@@ -302,7 +302,7 @@
             "line": 1,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) { // clang-format off"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -312,7 +312,7 @@
             "line": 2,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %call1, i32* %k, align 4 | ID: 21",
@@ -320,7 +320,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -330,7 +330,7 @@
             "line": 8,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret i32 0 | ID: 22",
@@ -338,7 +338,7 @@
             "line": 9,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "return 0;"
+            "sourceCodeLine": ""
         }
     }
 ]

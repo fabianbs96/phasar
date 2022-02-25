@@ -14,11 +14,13 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -63,11 +65,9 @@ private:
   std::unique_ptr<llvm::LLVMContext> Context;
   // Contains all modules that correspond to a project and owns them
   llvm::StringMap<std::unique_ptr<llvm::Module>> Modules;
-  /// NOTE: IDInstructionMapping is improved in the
-  /// IntelliSecPhasar-ImproveICFGExportPerformance branch. So, to avoid even
-  /// more merge conflicts, don't change it here!
-  // Maps an id to its corresponding instruction
-  std::map<std::size_t, llvm::Instruction *> IDInstructionMapping;
+
+  std::vector<const llvm::Instruction *> AllInstructions;
+  unsigned FirstInstId = 0;
 
   void buildIDModuleMapping(llvm::Module *M);
 
@@ -84,6 +84,10 @@ private:
   internalGetFunctionDefinition(llvm::StringRef FunctionName) const;
   [[nodiscard]] llvm::Module *
   internalGetModuleDefiningFunction(llvm::StringRef FunctionName) const;
+
+  friend class LLVMBasedICFG;
+
+  void addFunctionToDB(const llvm::Function *F);
 
 public:
   /// Constructs an empty ProjectIRDB
@@ -126,6 +130,50 @@ public:
   [[nodiscard]] inline auto getAllModules() const noexcept {
     return llvm::map_range(
         Modules, [](const auto &Entry) { return Entry.getValue().get(); });
+  }
+
+  template <typename CallBack, typename = std::enable_if_t<std::is_invocable_v<
+                                   CallBack &&, const llvm::Function *>>>
+  void forEachFunction(CallBack &&CB) const noexcept(
+      std::is_nothrow_invocable_v<CallBack &&, const llvm::Function *>) {
+    for (const auto *Module : getAllModules()) {
+      for (const auto &F : *Module) {
+        std::invoke(CB, &F);
+      }
+    }
+  }
+
+  [[nodiscard]] std::vector<const llvm::Instruction *>::const_iterator
+  inst_begin() const noexcept {
+    return AllInstructions.cbegin();
+  }
+  [[nodiscard]] std::vector<const llvm::Instruction *>::const_iterator
+  inst_end() const noexcept {
+    return AllInstructions.cend();
+  }
+  [[nodiscard]] bool inst_empty() const noexcept {
+    return AllInstructions.empty();
+  }
+  [[nodiscard]] size_t inst_size() const noexcept {
+    return AllInstructions.size();
+  }
+  [[nodiscard]] llvm::iterator_range<
+      std::vector<const llvm::Instruction *>::const_iterator>
+  instructions() const noexcept {
+    return {inst_begin(), inst_end()};
+  }
+
+  template <typename CallBack,
+            typename = std::enable_if_t<std::is_invocable_v<
+                CallBack &&, size_t, const llvm::Instruction *>>>
+  void forEachIdAndInstruction(CallBack &&CB) const
+      noexcept(std::is_nothrow_invocable_v<CallBack &&, size_t,
+                                           const llvm::Instruction *>) {
+    unsigned Id = FirstInstId;
+    for (const auto *Inst : AllInstructions) {
+      std::invoke(CB, Id, Inst);
+      ++Id;
+    }
   }
 
   [[nodiscard]] std::vector<const llvm::Function *> getAllFunctions() const;
@@ -198,12 +246,12 @@ public:
   };
 
   [[nodiscard]] inline std::size_t getNumInstructions() const {
-    return IDInstructionMapping.size();
+    return inst_size();
   }
 
   [[nodiscard]] std::size_t getNumGlobals() const;
 
-  [[nodiscard]] llvm::Instruction *getInstruction(std::size_t Id);
+  [[nodiscard]] const llvm::Instruction *getInstruction(std::size_t Id);
 
   [[nodiscard]] static std::size_t getInstructionID(const llvm::Instruction *I);
 

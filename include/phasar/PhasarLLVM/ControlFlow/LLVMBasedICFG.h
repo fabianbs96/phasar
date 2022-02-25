@@ -22,6 +22,7 @@
 #include <set>
 #include <stack>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -29,12 +30,16 @@
 #include "boost/container/flat_set.hpp"
 #include "boost/graph/adjacency_list.hpp"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/ICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
@@ -170,6 +175,9 @@ private:
 
   struct dependency_visitor;
 
+  template <typename EdgeCallBack>
+  void exportICFGAsSourceCodeImpl(EdgeCallBack &&CreateEdge) const;
+
 public:
   static constexpr llvm::StringLiteral GlobalCRuntimeModelName =
       "__psrCRuntimeGlobalCtorsModel";
@@ -274,6 +282,11 @@ public:
   [[nodiscard]] std::set<const llvm::Function *>
   getCalleesOfCallAt(const llvm::Instruction *N) const override;
 
+private:
+  [[nodiscard]] llvm::SmallPtrSet<const llvm::Function *, 8>
+  internalGetCalleesOfCallAt(const llvm::Instruction *N) const;
+
+public:
   void forEachCalleeOfCallAt(
       const llvm::Instruction *I,
       llvm::function_ref<void(const llvm::Function *)> Callback) const;
@@ -324,6 +337,16 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
+  /// Create a JSON export of the whole ICFG similar to
+  /// exportICFGAsSourceCodeJson() but without creating intermediate
+  /// nlohmann::json objects.
+  /// Usually faster than exportICFGAsSourceCodeJson().dump()
+  [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
+  void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
+
+  [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
+  void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;
+
   [[nodiscard]] inline auto getUnsoundCallSites() {
     return llvm::make_range(UnsoundCallSites.begin(), UnsoundCallSites.end());
   }
@@ -343,13 +366,19 @@ public:
   [[nodiscard]] const llvm::Function *
   getRegisteredDtorsCallerOrNull(const llvm::Module *Mod);
 
-  template <typename Fn> void forEachGlobalCtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalCtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalCtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
-  template <typename Fn> void forEachGlobalDtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalDtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalDtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }

@@ -254,7 +254,9 @@ std::string getModuleIDFromIR(const llvm::Value *V) {
   return "";
 }
 
-bool SourceCodeInfo::empty() const noexcept { return SourceCodeLine.empty(); }
+bool SourceCodeInfo::empty() const noexcept {
+  return /*SourceCodeLine.empty()*/ false;
+}
 
 bool SourceCodeInfo::operator==(const SourceCodeInfo &Other) const noexcept {
   // don't compare the SourceCodeFunctionName. It is directly derivable from
@@ -305,7 +307,7 @@ void to_json(nlohmann::json &J, const SourceCodeInfo &Info) {
 
 SourceCodeInfo getSrcCodeInfoFromIR(const llvm::Value *V) {
   return SourceCodeInfo{
-      getSrcCodeFromIR(V),
+      "" /*getSrcCodeFromIR(V)*/,
       getFilePathFromIR(V),
       llvm::demangle(getFunctionNameFromIR(V)),
       getLineFromIR(V),
