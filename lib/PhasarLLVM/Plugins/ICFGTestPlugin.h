@@ -89,7 +89,7 @@ public:
 
   // ICFG parts
 
-  [[nodiscard]] std::set<f_t> getAllFunctions() const override;
+  [[nodiscard]] std::vector<f_t> getAllFunctions() const override;
 
   [[nodiscard]] f_t getFunction(const std::string &Fun) const override;
 

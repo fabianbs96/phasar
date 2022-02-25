@@ -18,7 +18,6 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 
 #include <iosfwd>
-#include <iostream>
 #include <memory>
 #include <set>
 #include <stack>
@@ -63,7 +62,7 @@ class LLVMTypeHierarchy;
 
 class LLVMBasedICFG
     : public ICFG<const llvm::Instruction *, const llvm::Function *>,
-      public virtual LLVMBasedCFG {
+      public LLVMBasedCFG {
   friend class LLVMBasedBackwardsICFG;
 
   using GlobalCtorTy = std::multimap<size_t, llvm::Function *>;
@@ -71,10 +70,7 @@ class LLVMBasedICFG
 
 private:
   ProjectIRDB &IRDB;
-  CallGraphAnalysisType CGType;
-  Soundness S;
-  bool UserTHInfos = true;
-  bool UserPTInfos = true;
+
   LLVMTypeHierarchy *TH;
   LLVMPointsToInfo *PT;
   std::unique_ptr<Resolver> Res;
@@ -91,7 +87,7 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
-  std::set<const llvm::Instruction *> UnsoundCallSites;
+  llvm::DenseSet<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
@@ -99,6 +95,11 @@ private:
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
   // Counter to store the number of runtime edges added
   unsigned int TotalRuntimeEdgesAdded = 0;
+  Soundness S;
+  CallGraphAnalysisType CGType;
+  bool UserTHInfos = true;
+  bool UserPTInfos = true;
+
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -208,7 +209,7 @@ public:
    * \return all of the functions in the IRDB, this may include some not in the
    * callgraph
    */
-  [[nodiscard]] std::set<const llvm::Function *>
+  [[nodiscard]] std::vector<const llvm::Function *>
   getAllFunctions() const override;
 
   /**
@@ -343,18 +344,16 @@ public:
   [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
   void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
 
-  /// Create a JSON export of the whole ICFG similar to
-  /// exportICFGAsSourceCodeJson() but without creating intermediate
-  /// nlohmann::json objects.
-  /// Usually faster than exportICFGAsSourceCodeJson().dump()
-  [[nodiscard]] std::string exportICFGAsSourceCodeJsonString2() const;
-  void exportICFGAsSourceCodeJson2(llvm::raw_ostream &OS) const;
-
   [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
   void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;
 
-  [[nodiscard]] const std::set<const llvm::Instruction *> &
-  getUnsoundCallSites();
+  [[nodiscard]] inline auto getUnsoundCallSites() {
+    return llvm::make_range(UnsoundCallSites.begin(), UnsoundCallSites.end());
+  }
+
+  [[nodiscard]] inline size_t getNumUnsoundCallSites() const noexcept {
+    return UnsoundCallSites.size();
+  }
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 

@@ -17,7 +17,6 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCFG_H_
 
-#include <iostream>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -37,7 +36,7 @@
 namespace psr {
 
 class LLVMBasedCFG
-    : public virtual CFG<const llvm::Instruction *, const llvm::Function *> {
+    : public CFG<const llvm::Instruction *, const llvm::Function *> {
 public:
   LLVMBasedCFG(bool IgnoreDbgInstructions = true)
       : IgnoreDbgInstructions(IgnoreDbgInstructions) {}
@@ -137,8 +136,7 @@ public:
   [[nodiscard]] std::string
   getDemangledFunctionName(const llvm::Function *Fun) const override;
 
-  void print(const llvm::Function *Fun,
-             std::ostream &OS = std::cout) const override;
+  void print(const llvm::Function *Fun, std::ostream &OS) const override;
 
   [[nodiscard]] nlohmann::json
   getAsJson(const llvm::Function *Fun) const override;

@@ -136,16 +136,17 @@ std::string LLVMBasedICFG::EdgeProperties::getCallSiteAsString() const {
 // PT in case any of them is allocated within the constructor. To this end, we
 // set UserTHInfos and UserPTInfos to true here.
 LLVMBasedICFG::LLVMBasedICFG(const LLVMBasedICFG &ICF)
-    : IRDB(ICF.IRDB), CGType(ICF.CGType), S(ICF.S), TH(ICF.TH), PT(ICF.PT),
+    : ICFG(ICF), LLVMBasedCFG(ICF), IRDB(ICF.IRDB), TH(ICF.TH), PT(ICF.PT),
       // TODO copy resolver
-      Res(nullptr), VisitedFunctions(ICF.VisitedFunctions),
-      CallGraph(ICF.CallGraph), FunctionVertexMap(ICF.FunctionVertexMap) {}
+      Res(nullptr), VisitedFunctions(ICF.VisitedFunctions), S(ICF.S),
+      CGType(ICF.CGType), CallGraph(ICF.CallGraph),
+      FunctionVertexMap(ICF.FunctionVertexMap) {}
 
 LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                              const std::set<std::string> &EntryPoints,
                              LLVMTypeHierarchy *TH, LLVMPointsToInfo *PT,
                              Soundness S, bool IncludeGlobals)
-    : IRDB(IRDB), CGType(CGType), S(S), TH(TH), PT(PT) {
+    : IRDB(IRDB), TH(TH), PT(PT), S(S), CGType(CGType) {
 
   //   std::chrono::high_resolution_clock::time_point StartTime =
   //       std::chrono::high_resolution_clock::now();
@@ -217,8 +218,8 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
       for (auto &CS : UnsoundIndirectCalls) {
         FixpointReached &= !constructDynamicCall(CS, *Res);
       }
-      std::copy(UnsoundIndirectCalls.begin(), UnsoundIndirectCalls.end(),
-                std::inserter(UnsoundCallSites, UnsoundCallSites.end()));
+      UnsoundCallSites.insert(UnsoundIndirectCalls.begin(),
+                              UnsoundIndirectCalls.end());
       UnsoundIndirectCalls.clear();
     }
 
@@ -563,7 +564,7 @@ const llvm::Function *LLVMBasedICFG::getLastGlobalDtorOrNull() const {
   return nullptr;
 }
 
-set<const llvm::Function *> LLVMBasedICFG::getAllFunctions() const {
+vector<const llvm::Function *> LLVMBasedICFG::getAllFunctions() const {
   return IRDB.getAllFunctions();
 }
 
@@ -1674,11 +1675,6 @@ vector<const llvm::Function *> LLVMBasedICFG::getDependencyOrderedFunctions() {
     }
   }
   return Functions;
-}
-
-const std::set<const llvm::Instruction *> &
-LLVMBasedICFG::getUnsoundCallSites() {
-  return UnsoundCallSites;
 }
 
 unsigned LLVMBasedICFG::getNumOfVertices() const {

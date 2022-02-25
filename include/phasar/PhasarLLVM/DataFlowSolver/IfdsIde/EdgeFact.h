@@ -22,7 +22,7 @@ public:
   virtual void print(std::ostream &OS) const = 0;
 };
 
-static inline std::ostream &operator<<(std::ostream &OS, const EdgeFact &E) {
+inline std::ostream &operator<<(std::ostream &OS, const EdgeFact &E) {
   E.print(OS);
   return OS;
 }

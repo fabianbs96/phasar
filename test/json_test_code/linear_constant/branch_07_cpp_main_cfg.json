@@ -10,7 +10,7 @@
         },
         "to": {
             "IR": "%j = alloca i32, align 4 | ID: 2",
-            "column": 6,
+            "column": 7,
             "line": 3,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -20,7 +20,7 @@
     {
         "from": {
             "IR": "%j = alloca i32, align 4 | ID: 2",
-            "column": 6,
+            "column": 7,
             "line": 3,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -64,7 +64,7 @@
         },
         "to": {
             "IR": "store i32 10, i32* %j, align 4 | ID: 6",
-            "column": 6,
+            "column": 7,
             "line": 3,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -74,7 +74,7 @@
     {
         "from": {
             "IR": "store i32 10, i32* %j, align 4 | ID: 6",
-            "column": 6,
+            "column": 7,
             "line": 3,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -136,7 +136,7 @@
         },
         "to": {
             "IR": "%1 = load i8, i8* @cond, align 1 | ID: 11",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -146,7 +146,7 @@
     {
         "from": {
             "IR": "%1 = load i8, i8* @cond, align 1 | ID: 11",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -154,7 +154,7 @@
         },
         "to": {
             "IR": "%tobool = trunc i8 %1 to i1 | ID: 12",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -164,7 +164,7 @@
     {
         "from": {
             "IR": "%tobool = trunc i8 %1 to i1 | ID: 12",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -172,7 +172,7 @@
         },
         "to": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -182,7 +182,7 @@
     {
         "from": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",
@@ -200,7 +200,7 @@
     {
         "from": {
             "IR": "br i1 %tobool, label %if.then, label %if.end | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 5,
             "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
             "sourceCodeFunctionName": "main",

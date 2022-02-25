@@ -10,8 +10,6 @@
 #ifndef PHASAR_DB_PROJECTIRDB_H_
 #define PHASAR_DB_PROJECTIRDB_H_
 
-#include <functional>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <set>
@@ -19,11 +17,16 @@
 #include <type_traits>
 #include <vector>
 
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/raw_os_ostream.h"
 
 #include "phasar/Utils/EnumFlags.h"
 
@@ -53,15 +56,18 @@ private:
   llvm::ModuleAnalysisManager MAM;
   llvm::ModulePassManager MPM;
   // Stores all allocation instructions
-  std::set<const llvm::Instruction *> AllocaInstructions;
+  llvm::DenseSet<const llvm::Instruction *> AllocaInstructions;
   // Stores all allocated types
-  std::set<const llvm::Type *> AllocatedTypes;
+  llvm::DenseSet<const llvm::Type *> AllocatedTypes;
   // Return or resum instructions
-  std::set<const llvm::Instruction *> RetOrResInstructions;
+  llvm::DenseSet<const llvm::Instruction *> RetOrResInstructions;
   // Stores the contexts
-  std::vector<std::unique_ptr<llvm::LLVMContext>> Contexts;
+  std::unique_ptr<llvm::LLVMContext> Context;
   // Contains all modules that correspond to a project and owns them
-  std::map<std::string, std::unique_ptr<llvm::Module>> Modules;
+  llvm::StringMap<std::unique_ptr<llvm::Module>> Modules;
+  /// NOTE: IDInstructionMapping is improved in the
+  /// IntelliSecPhasar-ImproveICFGExportPerformance branch. So, to avoid even
+  /// more merge conflicts, don't change it here!
   // Maps an id to its corresponding instruction
   // std::map<std::size_t, llvm::Instruction *> IDInstructionMapping;
   llvm::DenseMap<size_t, const llvm::Instruction *> IDInstructionMapping;
@@ -71,7 +77,7 @@ private:
   void buildIDModuleMapping(llvm::Module *M);
 
   void preprocessModule(llvm::Module *M);
-  static bool wasCompiledWithDebugInfo(llvm::Module *M) {
+  static bool wasCompiledWithDebugInfo(const llvm::Module *M) {
     return M->getNamedMetadata("llvm.dbg.cu") != nullptr;
   };
 
@@ -81,6 +87,8 @@ private:
   internalGetFunction(llvm::StringRef FunctionName) const;
   [[nodiscard]] llvm::Function *
   internalGetFunctionDefinition(llvm::StringRef FunctionName) const;
+  [[nodiscard]] llvm::Module *
+  internalGetModuleDefiningFunction(llvm::StringRef FunctionName) const;
 
   friend class LLVMBasedICFG;
 
@@ -91,12 +99,14 @@ public:
   ProjectIRDB(IRDBOptions Options);
   /// Constructs a ProjectIRDB from a bunch of LLVM IR files
   ProjectIRDB(const std::vector<std::string> &IRFiles,
-              IRDBOptions Options = (IRDBOptions::WPA | IRDBOptions::OWNS));
+              IRDBOptions Options = (IRDBOptions::WPA | IRDBOptions::OWNS),
+              llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
   /// Constructs a ProjecIRDB from a bunch of LLVM Modules
   ProjectIRDB(const std::vector<llvm::Module *> &Modules,
-              IRDBOptions Options = IRDBOptions::WPA);
+              IRDBOptions Options = IRDBOptions::WPA,
+              llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
 
-  ProjectIRDB(ProjectIRDB &&) = default;
+  ProjectIRDB(ProjectIRDB &&) noexcept = default;
   ProjectIRDB &operator=(ProjectIRDB &&) = default;
 
   ProjectIRDB(ProjectIRDB &) = delete;
@@ -107,33 +117,31 @@ public:
   void insertModule(llvm::Module *M);
 
   // add WPA support by providing a fat completely linked module
-  void linkForWPA();
+  void
+  linkForWPA(llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
   // get a completely linked module for the WPA_MODE
   llvm::Module *getWPAModule();
 
-  [[nodiscard]] inline bool containsSourceFile(const std::string &File) const {
-    return Modules.find(File) != Modules.end();
+  [[nodiscard]] inline bool containsSourceFile(llvm::StringRef File) const {
+    return Modules.count(File);
   };
 
   [[nodiscard]] inline bool empty() const { return Modules.empty(); };
 
   [[nodiscard]] bool debugInfoAvailable() const;
 
-  llvm::Module *getModule(const std::string &ModuleName);
+  llvm::Module *getModule(llvm::StringRef ModuleName);
 
-  [[nodiscard]] inline std::set<llvm::Module *> getAllModules() const {
-    std::set<llvm::Module *> ModuleSet;
-    for (const auto &[File, Module] : Modules) {
-      ModuleSet.insert(Module.get());
-    }
-    return ModuleSet;
+  [[nodiscard]] inline auto getAllModules() const noexcept {
+    return llvm::map_range(
+        Modules, [](const auto &Entry) { return Entry.getValue().get(); });
   }
 
   template <typename CallBack, typename = std::enable_if_t<std::is_invocable_v<
                                    CallBack &&, const llvm::Function *>>>
   void forEachFunction(CallBack &&CB) const noexcept(
       std::is_nothrow_invocable_v<CallBack &&, const llvm::Function *>) {
-    for (const auto &[File, Module] : Modules) {
+    for (const auto *Module : getAllModules()) {
       for (const auto &F : *Module) {
         std::invoke(CB, &F);
       }
@@ -180,28 +188,43 @@ public:
     }
   }
 
-  [[nodiscard]] std::set<const llvm::Function *> getAllFunctions() const;
+  [[nodiscard]] std::vector<const llvm::Function *> getAllFunctions() const;
 
   [[nodiscard]] const llvm::Function *getFunctionById(unsigned Id);
 
-  [[nodiscard]] const llvm::Function *
-  getFunctionDefinition(llvm::StringRef FunctionName) const;
-  [[nodiscard]] llvm::Function *
-  getFunctionDefinition(llvm::StringRef FunctionName);
+  [[nodiscard]] inline const llvm::Function *
+  getFunctionDefinition(llvm::StringRef FunctionName) const {
+    return internalGetFunctionDefinition(FunctionName);
+  }
 
-  [[nodiscard]] const llvm::Function *
-  getFunction(llvm::StringRef FunctionName) const;
-  [[nodiscard]] llvm::Function *getFunction(llvm::StringRef FunctionName);
+  [[nodiscard]] inline llvm::Function *
+  getFunctionDefinition(llvm::StringRef FunctionName) {
+    return internalGetFunctionDefinition(FunctionName);
+  }
+
+  [[nodiscard]] inline const llvm::Function *
+  getFunction(llvm::StringRef FunctionName) const {
+    return internalGetFunction(FunctionName);
+  }
+  [[nodiscard]] inline llvm::Function *
+  getFunction(llvm::StringRef FunctionName) {
+    return internalGetFunction(FunctionName);
+  }
 
   [[nodiscard]] const llvm::GlobalVariable *
-  getGlobalVariableDefinition(const std::string &GlobalVariableName) const;
+  getGlobalVariableDefinition(llvm::StringRef GlobalVariableName) const;
 
-  llvm::Module *getModuleDefiningFunction(const std::string &FunctionName);
+  [[nodiscard]] inline llvm::Module *
+  getModuleDefiningFunction(llvm::StringRef FunctionName) {
+    return internalGetModuleDefiningFunction(FunctionName);
+  }
 
-  [[nodiscard]] const llvm::Module *
-  getModuleDefiningFunction(const std::string &FunctionName) const;
+  [[nodiscard]] inline const llvm::Module *
+  getModuleDefiningFunction(llvm::StringRef FunctionName) const {
+    return internalGetModuleDefiningFunction(FunctionName);
+  }
 
-  [[nodiscard]] inline const std::set<const llvm::Instruction *> &
+  [[nodiscard]] inline const llvm::DenseSet<const llvm::Instruction *> &
   getAllocaInstructions() const {
     return AllocaInstructions;
   };
@@ -213,16 +236,19 @@ public:
    */
   [[nodiscard]] std::set<const llvm::Value *> getAllMemoryLocations() const;
 
-  [[nodiscard]] std::set<std::string> getAllSourceFiles() const;
+  [[nodiscard]] inline auto getAllSourceFiles() const {
+    return llvm::map_range(Modules,
+                           [](const auto &Entry) { return Entry.getKey(); });
+  }
 
-  [[nodiscard]] std::set<const llvm::Type *> getAllocatedTypes() const {
+  [[nodiscard]] llvm::DenseSet<const llvm::Type *> getAllocatedTypes() const {
     return AllocatedTypes;
   };
 
-  [[nodiscard]] std::set<const llvm::StructType *>
+  [[nodiscard]] llvm::DenseSet<const llvm::StructType *>
   getAllocatedStructTypes() const;
 
-  [[nodiscard]] inline std::set<const llvm::Instruction *>
+  [[nodiscard]] inline llvm::DenseSet<const llvm::Instruction *>
   getRetOrResInstructions() const {
     return RetOrResInstructions;
   };
@@ -243,9 +269,13 @@ public:
 
   void print() const;
 
-  void emitPreprocessedIR(std::ostream &OS = std::cout,
+  inline void emitPreprocessedIR(std::ostream &OS,
+                                 bool ShortenIR = false) const {
+    llvm::raw_os_ostream ROS(OS);
+    emitPreprocessedIR(ROS, ShortenIR);
+  }
+  void emitPreprocessedIR(llvm::raw_ostream &OS = llvm::outs(),
                           bool ShortenIR = false) const;
-
   /**
    * Allows the (de-)serialization of Instructions, Arguments, GlobalValues and
    * Operands into unique Hexastore string representation.

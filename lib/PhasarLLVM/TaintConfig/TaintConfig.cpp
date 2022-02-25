@@ -265,8 +265,9 @@ TaintConfig::TaintConfig(const psr::ProjectIRDB &Code, // NOLINT
 
 TaintConfig::TaintConfig(const psr::ProjectIRDB &AnnotatedCode) { // NOLINT
   // handle "local" annotation declarations
-  const auto *Annotation = AnnotatedCode.getFunction("llvm.var.annotation");
-  if (Annotation) {
+
+  if (const auto *Annotation =
+          AnnotatedCode.getFunction("llvm.var.annotation")) {
     for (const auto *VarAnnotationUser : Annotation->users()) {
       if (const auto *AnnotationCall =
               llvm::dyn_cast<llvm::CallBase>(VarAnnotationUser)) {
@@ -281,9 +282,9 @@ TaintConfig::TaintConfig(const psr::ProjectIRDB &AnnotatedCode) { // NOLINT
     }
   }
   // handle "global" annotation declarations
-  const auto *GlobalAnnotations =
-      AnnotatedCode.getGlobalVariableDefinition("llvm.global.annotations");
-  if (GlobalAnnotations) {
+
+  if (const auto *GlobalAnnotations = AnnotatedCode.getGlobalVariableDefinition(
+          "llvm.global.annotations")) {
     for (const auto &Op : GlobalAnnotations->operands()) {
       if (auto *Array = llvm::dyn_cast<llvm::ConstantArray>(Op)) {
         for (auto &ArrayElem : Array->operands()) {
@@ -304,10 +305,13 @@ TaintConfig::TaintConfig(const psr::ProjectIRDB &AnnotatedCode) { // NOLINT
   }
 
   std::vector<const llvm::Function *> PtrAnnotations{};
-  PtrAnnotations.reserve(AnnotatedCode.getAllFunctions().size());
-  for (const auto *F : AnnotatedCode.getAllFunctions()) {
-    if (F->getName().startswith("llvm.ptr.annotation")) {
-      PtrAnnotations.push_back(F);
+  {
+    auto AllFuns = AnnotatedCode.getAllFunctions();
+    PtrAnnotations.reserve(AllFuns.size());
+    for (const auto *F : AllFuns) {
+      if (F->getName().startswith("llvm.ptr.annotation")) {
+        PtrAnnotations.push_back(F);
+      }
     }
   }
 
