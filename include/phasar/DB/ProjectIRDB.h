@@ -90,16 +90,39 @@ private:
   void addFunctionToDB(const llvm::Function *F);
 
 public:
+  static llvm::PassManager<llvm::Module> createDefaultPassManager();
+  static constexpr IRDBOptions DefaultIRDBOptionsIRFiles =
+      IRDBOptions::WPA | IRDBOptions::OWNS;
+  static constexpr IRDBOptions DefaultIRDBOptionsModules = IRDBOptions::WPA;
+  static constexpr llvm::Linker::Flags DefaultLinkerFlags =
+      llvm::Linker::LinkOnlyNeeded;
+
   /// Constructs an empty ProjectIRDB
-  ProjectIRDB(IRDBOptions Options);
+  ProjectIRDB(IRDBOptions Options, llvm::PassManager<llvm::Module> Passes =
+                                       createDefaultPassManager());
+
   /// Constructs a ProjectIRDB from a bunch of LLVM IR files
   ProjectIRDB(const std::vector<std::string> &IRFiles,
-              IRDBOptions Options = (IRDBOptions::WPA | IRDBOptions::OWNS),
-              llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
+              llvm::PassManager<llvm::Module> Passes);
+
+  ProjectIRDB(const std::vector<std::string> &IRFiles, IRDBOptions Options,
+              llvm::PassManager<llvm::Module> Passes);
+
+  ProjectIRDB(
+      const std::vector<std::string> &IRFiles,
+      IRDBOptions Options = DefaultIRDBOptionsIRFiles,
+      llvm::Linker::Flags LinkerFlags = DefaultLinkerFlags,
+      llvm::PassManager<llvm::Module> Passes = createDefaultPassManager());
+
   /// Constructs a ProjecIRDB from a bunch of LLVM Modules
-  ProjectIRDB(const std::vector<llvm::Module *> &Modules,
-              IRDBOptions Options = IRDBOptions::WPA,
-              llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
+  ProjectIRDB(const std::vector<llvm::Module *> &Modules, IRDBOptions Options,
+              llvm::Linker::Flags LinkerFlags);
+
+  ProjectIRDB(
+      const std::vector<llvm::Module *> &Modules,
+      IRDBOptions Options = DefaultIRDBOptionsModules,
+      llvm::PassManager<llvm::Module> Passes = createDefaultPassManager(),
+      llvm::Linker::Flags LinkerFlags = DefaultLinkerFlags);
 
   ProjectIRDB(ProjectIRDB &&) noexcept = default;
   ProjectIRDB &operator=(ProjectIRDB &&) = default;
@@ -112,8 +135,7 @@ public:
   void insertModule(llvm::Module *M);
 
   // add WPA support by providing a fat completely linked module
-  void
-  linkForWPA(llvm::Linker::Flags LinkerFlags = llvm::Linker::LinkOnlyNeeded);
+  void linkForWPA(llvm::Linker::Flags LinkerFlags = DefaultLinkerFlags);
   // get a completely linked module for the WPA_MODE
   llvm::Module *getWPAModule();
 

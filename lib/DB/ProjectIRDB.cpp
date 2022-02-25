@@ -52,23 +52,44 @@ using namespace std;
 
 namespace psr {
 
-ProjectIRDB::ProjectIRDB(IRDBOptions Options) : Options(Options) {
+llvm::PassManager<llvm::Module> ProjectIRDB::createDefaultPassManager() {
+  llvm::PassManager<llvm::Module> PassManager;
+  PassManager.addPass(ValueAnnotationPass());
+  PassManager.addPass(FunctionAnnotationPass());
+  return PassManager;
+}
+
+/// Constructs an empty ProjectIRDB
+ProjectIRDB::ProjectIRDB(IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> ModulePasses)
+    : Options(Options) {
   // register the GeneralStaticsPass analysis pass to the ModuleAnalysisManager
   // such that we can query its results later on
-  GeneralStatisticsAnalysis GSP;
-  MAM.registerPass([&]() { return std::move(GSP); });
+  MAM.registerPass([&]() { return GeneralStatisticsAnalysis(); });
   PB.registerModuleAnalyses(MAM);
+
   // add the transformation pass ValueAnnotationPass
-  MPM.addPass(ValueAnnotationPass());
-  MPM.addPass(FunctionAnnotationPass());
+  MPM.addPass(std::move(ModulePasses));
+
   // just to be sure that none of the passes messed up the module!
   MPM.addPass(llvm::VerifierPass());
   ModulesToSlotTracker::updateMSTForModule(LLVMZeroValueMod.get());
 }
 
+/// Constructs a ProjectIRDB from a bunch of LLVM IR files
 ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
-                         IRDBOptions Options, llvm::Linker::Flags LinkerFlags)
-    : ProjectIRDB(Options | IRDBOptions::OWNS) {
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(IRFiles, DefaultIRDBOptionsIRFiles, std::move(Passes)){};
+
+ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
+                         IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(IRFiles, Options, DefaultLinkerFlags, std::move(Passes)) {}
+
+ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
+                         IRDBOptions Options, llvm::Linker::Flags LinkerFlags,
+                         llvm::PassManager<llvm::Module> Passes)
+    : ProjectIRDB(Options, std::move(Passes)) {
 
   Context = std::make_unique<llvm::LLVMContext>();
 
@@ -105,7 +126,14 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
 
 ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
                          IRDBOptions Options, llvm::Linker::Flags LinkerFlags)
-    : ProjectIRDB(Options) {
+    : ProjectIRDB(Modules, Options, createDefaultPassManager(), LinkerFlags) {}
+
+ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
+                         IRDBOptions Options,
+                         llvm::PassManager<llvm::Module> Passes,
+                         llvm::Linker::Flags LinkerFlags)
+    : ProjectIRDB(Options, std::move(Passes)) {
+
   for (auto *M : Modules) {
     insertModule(M);
   }
@@ -160,6 +188,7 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
   // all modules.
   if (Modules.size() > 1) {
     llvm::Module *MainMod = getModuleDefiningFunction("main");
+
     if (!MainMod) {
       MainMod = Modules.begin()->second.get();
     }
@@ -167,6 +196,7 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
 
     for (auto &Entry : Modules) {
       auto &Module = Entry.getValue();
+
       // we do not want to link a module with itself!
       if (Module.get() == MainMod) {
         continue;

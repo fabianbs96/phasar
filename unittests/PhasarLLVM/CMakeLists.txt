@@ -1,7 +1,8 @@
 add_subdirectory(ControlFlow)
 add_subdirectory(DataFlowSolver)
 add_subdirectory(Utils)
-add_subdirectory(WPDS)
+# disabled to remove wali
+# add_subdirectory(WPDS)
 # add_subdirectory(Passes)
 # add_subdirectory(Plugins)
 add_subdirectory(Pointer)

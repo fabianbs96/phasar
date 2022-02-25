@@ -6,14 +6,10 @@ function(add_phasar_unittest test_name)
   )
   add_dependencies(PhasarUnitTests ${test})
 
-  if(USE_LLVM_FAT_LIB)
-    llvm_config(${test} USE_SHARED ${LLVM_LINK_COMPONENTS})
-  else()
-    llvm_config(${test} ${LLVM_LINK_COMPONENTS})
-  endif()
-
+  list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
   target_link_libraries(${test}
     LINK_PUBLIC
+    ${LLVM_LINK_COMPONENTS}
     phasar_config
     phasar_controller
     phasar_controlflow
@@ -31,14 +27,15 @@ function(add_phasar_unittest test_name)
     # ${PHASAR_PLUGINS_LIB}
     phasar_pointer
     phasar_typehierarchy
-    phasar_taintconfig
-    nlohmann_json_schema_validator
-    ${SQLITE3_LIBRARY}
+    ${SQLite3_LIBRARIES}
     ${Boost_LIBRARIES}
     ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
-    curl
-    gtest
+
+    # if you want to use default main method, use gtestd_main
+    gtestd
+    gmockd
+    ${CONAN_LIBS}
   )
 
   add_test(NAME "${test}"
@@ -142,6 +139,7 @@ function(generate_ll_file)
 endfunction()
 
 macro(add_phasar_executable name)
+  list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
   set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
   set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
   add_llvm_executable( ${name} ${ARGN} )
@@ -182,20 +180,16 @@ macro(add_phasar_library name)
 
   if(PHASAR_LINK_LIBS)
     foreach(lib ${PHASAR_LINK_LIBS})
-      if(PHASAR_DEBUG_LIBDEPS)
-        target_link_libraries(${name} LINK_PRIVATE ${lib})
-      else()
-        target_link_libraries(${name} LINK_PUBLIC ${lib})
-      endif(PHASAR_DEBUG_LIBDEPS)
+    if(PHASAR_DEBUG_LIBDEPS)
+      target_link_libraries(${name} LINK_PRIVATE ${lib})
+    else()
+      target_link_libraries(${name} LINK_PUBLIC ${lib})
+    endif(PHASAR_DEBUG_LIBDEPS)
     endforeach(lib)
   endif(PHASAR_LINK_LIBS)
-
+  list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
   if( LLVM_LINK_COMPONENTS )
-    if( USE_LLVM_FAT_LIB )
-      llvm_config(${name} USE_SHARED ${LLVM_LINK_COMPONENTS})
-    else()
-      llvm_config(${name} ${LLVM_LINK_COMPONENTS})
-    endif()
+    target_link_libraries(${name} PUBLIC ${LLVM_LINK_COMPONENTS})
   endif( LLVM_LINK_COMPONENTS )
   if(MSVC)
     get_target_property(cflag ${name} COMPILE_FLAGS)

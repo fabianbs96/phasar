@@ -1,7 +1,7 @@
 file(GLOB_RECURSE DB_SRC *.h *.cpp)
 
 include_directories(
-  ${SQLITE3_INCLUDE_DIR}
+  ${SQLite3_LIBRARIES}
 )
 
 set(PHASAR_LINK_LIBS
@@ -42,7 +42,7 @@ endif()
 
 target_link_libraries(phasar_db
   LINK_PUBLIC
-  ${SQLITE3_LIBRARY}
+  ${SQLite3_LIBRARIES}
 )
 
 set_target_properties(phasar_db

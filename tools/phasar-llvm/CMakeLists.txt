@@ -30,19 +30,17 @@ target_link_libraries(phasar-llvm
   # ${PHASAR_PLUGINS_LIB}
   phasar_pointer
   phasar_typehierarchy
-  ${SQLITE3_LIBRARY}
+  ${SQLite3_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CMAKE_DL_LIBS}
   ${CMAKE_THREAD_LIBS_INIT}
+  ${CONAN_LIBS}
   LINK_PRIVATE
   ${PHASAR_STD_FILESYSTEM}
 )
 
-if(USE_LLVM_FAT_LIB)
-  llvm_config(phasar-llvm USE_SHARED ${LLVM_LINK_COMPONENTS})
-else()
-  llvm_config(phasar-llvm ${LLVM_LINK_COMPONENTS})
-endif()
+list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
+target_link_libraries(phasar-llvm PUBLIC ${LLVM_LINK_COMPONENTS})
 
 set(LLVM_LINK_COMPONENTS
 )
