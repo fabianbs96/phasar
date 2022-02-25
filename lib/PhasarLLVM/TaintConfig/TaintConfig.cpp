@@ -582,7 +582,7 @@ TaintConfig::makeInitialSeeds() const {
     if (const auto *Inst = llvm::dyn_cast<llvm::Instruction>(SourceValue)) {
       InitialSeeds[Inst].insert(Inst);
     } else if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(SourceValue);
-               Arg->getParent() && !Arg->getParent()->isDeclaration()) {
+               Arg && Arg->getParent() && !Arg->getParent()->isDeclaration()) {
       const auto *FunFirstInst = &Arg->getParent()->front().front();
       InitialSeeds[FunFirstInst].insert(Arg);
     }
