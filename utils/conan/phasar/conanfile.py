@@ -76,10 +76,10 @@ class PhasarConan(ConanFile):
     def _patch_sources(self):
         for patch in self.conan_data.get("patches", {}).get(self.version, []):
             tools.patch(**patch)
-        
+
         if not self.options.plugins_shared:
             tools.replace_in_file(self._source_subfolder + "/lib/PhasarLLVM/Plugins/CMakeLists.txt", "plugin_name} SHARED", "plugin_name} STATIC")
-        
+
         if self.options.plugins_removed:
             tools.replace_in_file(self._source_subfolder + "/lib/PhasarLLVM/Plugins/CMakeLists.txt", "file(GLOB_RECURSE PLUGINS_SO ", "#file(GLOB_RECURSE PLUGINS_SO ")
 
@@ -88,7 +88,7 @@ class PhasarConan(ConanFile):
         # self._patch_sources()
         tools.replace_in_file(self._source_subfolder + "/CMakeLists.txt", "add_subdirectory(tools)", "#add_subdirectory(tools)")
         cmake = CMake(self)
-        
+
         if self.options["boost"].shared:
             cmake.definitions['BOOST_ALL_DYN_LINK'] = True # used from patched CMakeLists
         else:

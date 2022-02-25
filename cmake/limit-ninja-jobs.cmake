@@ -9,7 +9,7 @@ cmake_host_system_information(RESULT system_ram QUERY AVAILABLE_PHYSICAL_MEMORY)
 
 # is the current system cpu or memory limited?
 # -> calculate jobs for it
-# 
+#
 # hints:
 # - llvm static needs up to 4GB per job
 # - compile jobs and links jobs can run at the same time

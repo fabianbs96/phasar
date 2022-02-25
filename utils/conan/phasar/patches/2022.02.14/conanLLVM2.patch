@@ -4,7 +4,7 @@ index d93c9ada..a7a1b4a4 100644
 +++ b/CMakeLists.txt
 @@ -162,14 +162,9 @@ find_library(SQLITE3_LIBRARY NAMES sqlite3)
  include_directories(${SQLITE3_INCLUDE_DIR})
- 
+
  # LLVM
 -if (NOT PHASAR_IN_TREE)
 -  # Only search for LLVM if we build out of tree
@@ -17,17 +17,17 @@ index d93c9ada..a7a1b4a4 100644
 +find_package(llvm-core 12 REQUIRED)
 +include_directories(${llvm-core_INCLUDE_DIRS})
 +link_directories(${llvm-core_LIBRARY_DIRS})
- 
+
  if (NOT PHASAR_IN_TREE)
    find_library(LLVM_LIBRARY NAMES LLVM PATHS ${LLVM_LIBRARY_DIRS} NO_DEFAULT_PATH)
 @@ -263,9 +258,6 @@ set(LLVM_LINK_COMPONENTS
    vectorize
  )
- 
+
 -llvm_map_components_to_libnames(llvm_libs
 -  ${LLVM_LINK_COMPONENTS}
 -)
- 
+
  # phasar-based binaries
  #add_subdirectory(tools)
 diff --git a/Config.cmake.in b/Config.cmake.in
@@ -55,7 +55,7 @@ index 369297d7..5b330e5c 100644
 @@ -6,14 +6,10 @@ function(add_phasar_unittest test_name)
    )
    add_dependencies(PhasarUnitTests ${test})
- 
+
 -  if(USE_LLVM_FAT_LIB)
 -    llvm_config(${test} USE_SHARED ${LLVM_LINK_COMPONENTS})
 -  else()
@@ -71,14 +71,14 @@ index 369297d7..5b330e5c 100644
      phasar_controlflow
 @@ -125,6 +121,7 @@ function(generate_ll_file)
  endfunction()
- 
+
  macro(add_phasar_executable name)
 +  list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
    set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
    set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
    add_llvm_executable( ${name} ${ARGN} )
 @@ -165,20 +162,16 @@ macro(add_phasar_library name)
- 
+
    if(PHASAR_LINK_LIBS)
      foreach(lib ${PHASAR_LINK_LIBS})
 -      if(PHASAR_DEBUG_LIBDEPS)
@@ -110,8 +110,8 @@ index b35b7bee..1be49df7 100644
 --- a/lib/PhasarLLVM/Plugins/CMakeLists.txt
 +++ b/lib/PhasarLLVM/Plugins/CMakeLists.txt
 @@ -28,11 +28,6 @@ endif()
- 
- 
+
+
  find_package(Boost COMPONENTS log filesystem program_options REQUIRED)
 -if(USE_LLVM_FAT_LIB)
 -  llvm_config(phasar_plugins USE_SHARED ${LLVM_LINK_COMPONENTS})
@@ -122,8 +122,8 @@ index b35b7bee..1be49df7 100644
    LINK_PUBLIC
    ${Boost_LIBRARIES}
 @@ -47,14 +42,11 @@ set_target_properties(phasar_plugins
- 
- 
+
+
  # Handle all plugins
 +list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
  foreach(plugin ${PLUGINS_SO})
@@ -145,7 +145,7 @@ index 873ed5d2..f7aebef5 100644
 @@ -34,11 +34,8 @@ target_link_libraries(boomerang
    ${PHASAR_STD_FILESYSTEM}
  )
- 
+
 -if(USE_LLVM_FAT_LIB)
 -  llvm_config(boomerang USE_SHARED ${LLVM_LINK_COMPONENTS})
 -else()
@@ -153,7 +153,7 @@ index 873ed5d2..f7aebef5 100644
 -endif()
 +list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
 +target_link_libraries(boomerang PUBLIC ${LLVM_LINK_COMPONENTS})
- 
+
  set(LLVM_LINK_COMPONENTS
  )
 diff --git a/tools/example-tool/CMakeLists.txt b/tools/example-tool/CMakeLists.txt
@@ -163,7 +163,7 @@ index 63342bf8..75316991 100644
 @@ -34,11 +34,8 @@ target_link_libraries(myphasartool
    ${PHASAR_STD_FILESYSTEM}
  )
- 
+
 -if(USE_LLVM_FAT_LIB)
 -  llvm_config(myphasartool USE_SHARED ${LLVM_LINK_COMPONENTS})
 -else()
@@ -171,7 +171,7 @@ index 63342bf8..75316991 100644
 -endif()
 +list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
 +target_link_libraries(myphasartool PUBLIC ${LLVM_LINK_COMPONENTS})
- 
+
  set(LLVM_LINK_COMPONENTS
  )
 diff --git a/tools/phasar-clang/CMakeLists.txt b/tools/phasar-clang/CMakeLists.txt
@@ -180,7 +180,7 @@ index 21b9c22d..dc065f91 100644
 +++ b/tools/phasar-clang/CMakeLists.txt
 @@ -10,11 +10,8 @@ else()
  endif()
- 
+
  find_package(Boost COMPONENTS log filesystem program_options graph ${BOOST_THREAD} REQUIRED)
 -if(USE_LLVM_FAT_LIB)
 -  llvm_config(phasar-clang USE_SHARED ${LLVM_LINK_COMPONENTS})
@@ -199,7 +199,7 @@ index 5ac7e402..128fc16d 100644
 @@ -38,11 +38,8 @@ target_link_libraries(phasar-llvm
    ${PHASAR_STD_FILESYSTEM}
  )
- 
+
 -if(USE_LLVM_FAT_LIB)
 -  llvm_config(phasar-llvm USE_SHARED ${LLVM_LINK_COMPONENTS})
 -else()
@@ -207,6 +207,6 @@ index 5ac7e402..128fc16d 100644
 -endif()
 +list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
 +target_link_libraries(phasar-llvm PUBLIC ${LLVM_LINK_COMPONENTS})
- 
+
  set(LLVM_LINK_COMPONENTS
  )

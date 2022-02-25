@@ -10,7 +10,7 @@ if (CONAN_BUILD_IN)
   include(${CMAKE_BINARY_DIR}/conan.cmake)
   conan_cmake_run(
       BASIC_SETUP
-      CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt" 
+      CONANFILE "${CMAKE_SOURCE_DIR}/conanfile.txt"
       BUILD missing)
 endif()
 

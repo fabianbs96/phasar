@@ -9,5 +9,5 @@ index 2c34b469..aa369ca7 100644
 -  nlohmann_json_schema_validator
 +  nlohmann_json_schema_validator::nlohmann_json_schema_validator
  )
- 
+
  set_target_properties(phasar_taintconfig

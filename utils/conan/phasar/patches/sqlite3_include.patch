@@ -4,14 +4,14 @@ index 4643eb3e..ddf3aa7f 100644
 +++ b/CMakeLists.txt
 @@ -157,9 +157,8 @@ else()
  endif()
- 
+
  # SQL
 -find_path(SQLITE3_INCLUDE_DIR NAMES sqlite3.h REQUIRED)
 -find_library(SQLITE3_LIBRARY NAMES sqlite3)
 -include_directories(${SQLITE3_INCLUDE_DIR})
 +include("FindSQLite3.cmake") #find_package(SQLite3 REQUIRED)
 +include_directories(${SQLite3_INCLUDE_DIRS})
- 
+
  # LLVM
  find_package(llvm-core 12 REQUIRED)
 diff --git a/cmake/phasar_macros.cmake b/cmake/phasar_macros.cmake
@@ -33,21 +33,21 @@ index eb2a1d9e..519b13ec 100644
 +++ b/lib/DB/CMakeLists.txt
 @@ -1,7 +1,7 @@
  file(GLOB_RECURSE DB_SRC *.h *.cpp)
- 
+
  include_directories(
 -  ${SQLITE3_INCLUDE_DIR}
 +  ${SQLite3_LIBRARY_LIST}
  )
- 
+
  set(PHASAR_LINK_LIBS
 @@ -44,7 +44,7 @@ endif()
- 
+
  target_link_libraries(phasar_db
    LINK_PUBLIC
 -  ${SQLITE3_LIBRARY}
 +  ${SQLite3_LIBRARY_LIST}
  )
- 
+
  set_target_properties(phasar_db
 diff --git a/tools/phasar-clang/CMakeLists.txt b/tools/phasar-clang/CMakeLists.txt
 index dc065f91..cec1ba5f 100644

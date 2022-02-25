@@ -31,7 +31,7 @@ function(add_phasar_unittest test_name)
     ${Boost_LIBRARIES}
     ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
-    
+
     # if you want to use default main method, use gtestd_main
     gtestd
     gmockd

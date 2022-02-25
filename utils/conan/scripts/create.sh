@@ -96,7 +96,7 @@ for option in "${CONAN_ARGS[@]}"; do
             mkdir logs/failed &> /dev/null || true
             mv "./logs/$log.test.log" "./logs/failed/$log_name.test.log"
             echo "test failed see log $log_path/failed/$log_name.test.log"
-        fi 
+        fi
     fi # no else because its probably an official one, we dont have a test_package folder here
 done
 done

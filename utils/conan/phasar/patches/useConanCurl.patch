@@ -5,7 +5,7 @@ index ddf3aa7f..31af239b 100644
 @@ -160,6 +160,12 @@ endif()
  include("FindSQLite3.cmake") #find_package(SQLite3 REQUIRED)
  include_directories(${SQLite3_INCLUDE_DIRS})
- 
+
 +# Curl
 +find_package(CURL REQUIRED)
 +include_directories("${CURL_INCLUDE_DIRS}")
@@ -23,10 +23,10 @@ index 5b330e5c..3f678201 100644
      ${CMAKE_DL_LIBS}
      ${CMAKE_THREAD_LIBS_INIT}
 -    curl
-+    
++
      gtest
    )
- 
+
 diff --git a/lib/Controller/CMakeLists.txt b/lib/Controller/CMakeLists.txt
 index 8e2b9735..6802b6e2 100644
 --- a/lib/Controller/CMakeLists.txt
@@ -36,7 +36,6 @@ index 8e2b9735..6802b6e2 100644
  target_link_libraries(phasar_controller
    LINK_PUBLIC
 -  curl
-+  
++
    ${Boost_LIBRARIES}
  )
- 
