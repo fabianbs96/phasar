@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include <chrono>
+#include <llvm-12/llvm/Support/raw_ostream.h>
 
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -27,6 +28,25 @@
 namespace llvm {
 class Value;
 } // namespace llvm
+
+struct Elapsed {
+  int64_t Nanos;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Elapsed E) {
+  if (E.Nanos > 60'000'000'000LL) {
+    OS << llvm::format("%.2f", double(E.Nanos) / 60'000'000'000LL) << "m";
+  } else if (E.Nanos > 1'000'000'000LL) {
+    OS << llvm::format("%.2f", double(E.Nanos) / 1'000'000'000LL) << "s";
+  } else if (E.Nanos > 1'000'000LL) {
+    OS << llvm::format("%.2f", float(E.Nanos) / 1'000'000) << "ms";
+  } else if (E.Nanos > 1'000LL) {
+    OS << llvm::format("%.2f", float(E.Nanos) / 1'000) << "us";
+  } else {
+    OS << E.Nanos << "ns";
+  }
+  return OS;
+}
 
 using namespace psr;
 
@@ -53,8 +73,7 @@ int main(int Argc, const char **Argv) {
       auto ICFGStr = I.exportICFGAsSourceCodeJsonString();
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "New export: "
-                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
+      llvm::outs() << "New export: " << Elapsed{(End - Start).count()} << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
                    << ICFGStr.capacity() << '('
                    << llvm::format("%.3f", float(ICFGStr.size()) /
@@ -83,8 +102,7 @@ int main(int Argc, const char **Argv) {
       auto ICFGStr = I.exportICFGAsSourceCodeDotString();
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "Dot export: "
-                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
+      llvm::outs() << "Dot export: " << Elapsed{(End - Start).count()} << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
                    << ICFGStr.capacity() << '('
                    << llvm::format("%.3f", float(ICFGStr.size()) /
@@ -102,12 +120,11 @@ int main(int Argc, const char **Argv) {
       llvm::errs() << "> After dump()\n";
       auto End = std::chrono::high_resolution_clock::now();
 
-      llvm::outs() << "Old export:\t"
-                   << llvm::formatv("{0:N}", (End - Start).count()) << '\n';
-      llvm::outs() << "> To JSON took:\t"
-                   << llvm::formatv("{0:N}", (Mid - Start).count()) << '\n';
-      llvm::outs() << "> To Str took:\t"
-                   << llvm::formatv("{0:N}", (End - Mid).count()) << '\n';
+      llvm::outs() << "Old export:\t" << Elapsed{(End - Start).count()} << '\n';
+      llvm::outs() << "> To JSON took:\t" << Elapsed{(Mid - Start).count()}
+                   << '\n';
+      llvm::outs() << "> To Str took:\t" << Elapsed{(End - Mid).count()}
+                   << '\n';
       llvm::outs() << "> size/capacity: " << ICFGStr.size() << '/'
                    << ICFGStr.capacity() << '('
                    << llvm::format("%.3f", float(ICFGStr.size()) /
