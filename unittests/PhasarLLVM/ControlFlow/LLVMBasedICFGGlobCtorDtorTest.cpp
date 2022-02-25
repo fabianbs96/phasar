@@ -190,9 +190,11 @@ TEST(LLVMBasedICFGGlobCtorDtorTest, CtorTest2) {
   boost::log::core::get()->set_logging_enabled(false);
   ValueAnnotationPass::resetValueID();
 
+  llvm::errs() << "Before linker\n";
   ProjectIRDB IRDB({PathToLLFiles + "globals_ctor_2_1_cpp.ll",
                     PathToLLFiles + "globals_ctor_2_2_cpp.ll"},
                    IRDBOptions::WPA);
+  llvm::errs() << "> After linker\n";
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
   LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,

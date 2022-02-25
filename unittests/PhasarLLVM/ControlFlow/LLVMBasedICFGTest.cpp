@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 
+#include <boost/container/flat_set.hpp>
 #include <string>
 #include <vector>
 
@@ -58,15 +59,13 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2a) {
   ASSERT_TRUE(FOO);
   ASSERT_TRUE(BAR);
 
-  set<const llvm::Function *> FunctionSet;
-  FunctionSet.insert(F);
-  FunctionSet.insert(FOO);
-  FunctionSet.insert(BAR);
-
-  set<const llvm::Function *> FunSet = ICFG.getAllFunctions();
+  vector<const llvm::Function *> FunctionSet{F, FOO, BAR};
+  vector<const llvm::Function *> FunSet = ICFG.getAllFunctions();
+  llvm::sort(FunctionSet);
+  llvm::sort(FunSet);
   ASSERT_EQ(FunctionSet, FunSet);
 
-  set<const llvm::Instruction *> CallsFromWithin = ICFG.getCallsFromWithin(F);
+  auto CallsFromWithin = ICFG.getCallsFromWithin(F);
   ASSERT_EQ(CallsFromWithin.size(), 2U);
 }
 
@@ -90,17 +89,13 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2b) {
   ASSERT_TRUE(CTOR);
   ASSERT_TRUE(DTOR);
 
-  set<const llvm::Function *> FunctionSet;
-  FunctionSet.insert(F);
-  FunctionSet.insert(FOO);
-  FunctionSet.insert(BAR);
-  FunctionSet.insert(CTOR);
-  FunctionSet.insert(DTOR);
-
-  set<const llvm::Function *> FunSet = ICFG.getAllFunctions();
+  vector<const llvm::Function *> FunctionSet{F, FOO, BAR, CTOR, DTOR};
+  vector<const llvm::Function *> FunSet = ICFG.getAllFunctions();
+  llvm::sort(FunctionSet);
+  llvm::sort(FunSet);
   ASSERT_EQ(FunctionSet, FunSet);
 
-  set<const llvm::Instruction *> CallsFromWithin = ICFG.getCallsFromWithin(F);
+  auto CallsFromWithin = ICFG.getCallsFromWithin(F);
   ASSERT_EQ(CallsFromWithin.size(), 2U);
 }
 
@@ -267,12 +262,14 @@ TEST(LLVMBasedICFGTest, StaticCallSite_7) {
   const llvm::Instruction *I = getNthInstruction(FooF, 4);
   const llvm::Instruction *LastInst =
       getLastInstructionOf(IRDB.getFunctionDefinition("_ZN3Foo1fEv"));
-  set<const llvm::Function *> AllMethods = ICFG.getAllFunctions();
+  auto AllFuns = ICFG.getAllFunctions();
+  boost::container::flat_set<const llvm::Function *> AllMethods(AllFuns.begin(),
+                                                                AllFuns.end());
   ASSERT_EQ(LastInst, I);
   ASSERT_EQ(AllMethods.size(), 5U);
-  ASSERT_TRUE(AllMethods.count(Main));
-  ASSERT_TRUE(AllMethods.count(FooF));
-  ASSERT_TRUE(AllMethods.count(F));
+  ASSERT_TRUE(AllMethods.contains(Main));
+  ASSERT_TRUE(AllMethods.contains(FooF));
+  ASSERT_TRUE(AllMethods.contains(F));
 }
 
 TEST(LLVMBasedICFGTest, StaticCallSite_8) {
@@ -293,7 +290,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_8) {
       ICFG.getAllInstructionsOf(IRDB.getFunctionDefinition("_ZN4Foo21fEv"));
   ASSERT_EQ(Insts.size(), Insts1.size());
 
-  set<const llvm::Function *> FunSet = ICFG.getAllFunctions();
+  auto FunSet = ICFG.getAllFunctions();
   ASSERT_EQ(FunSet.size(), 5U);
 
   const llvm::Instruction *I = getNthInstruction(F, 1);

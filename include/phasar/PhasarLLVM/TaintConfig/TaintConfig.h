@@ -12,7 +12,6 @@
 
 #include <filesystem>
 #include <functional>
-#include <iostream>
 #include <set>
 #include <string>
 #include <unordered_set>
@@ -151,9 +150,9 @@ public:
   friend std::ostream &operator<<(std::ostream &OS, const TaintConfig &TC);
 
 private:
-  std::unordered_set<const llvm::Value *> SourceValues;
-  std::unordered_set<const llvm::Value *> SinkValues;
-  std::unordered_set<const llvm::Value *> SanitizerValues;
+  llvm::DenseSet<const llvm::Value *> SourceValues;
+  llvm::DenseSet<const llvm::Value *> SinkValues;
+  llvm::DenseSet<const llvm::Value *> SanitizerValues;
 
   TaintDescriptionCallBackTy SourceCallBack;
   TaintDescriptionCallBackTy SinkCallBack;

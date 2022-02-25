@@ -4,17 +4,17 @@
             "IR": "%a.addr = alloca i32, align 4 | ID: 0",
             "column": 14,
             "line": 1,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "void foo(int a) {"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%b = alloca i32, align 4 | ID: 1",
             "column": 7,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -22,15 +22,15 @@
             "IR": "%b = alloca i32, align 4 | ID: 1",
             "column": 7,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %a, i32* %a.addr, align 4 | ID: 2",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
             "sourceCodeLine": ""
         }
@@ -40,7 +40,7 @@
             "IR": "store i32 %a, i32* %a.addr, align 4 | ID: 2",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
             "sourceCodeLine": ""
         },
@@ -48,9 +48,9 @@
             "IR": "%0 = load i32, i32* %a.addr, align 4 | ID: 5",
             "column": 11,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -58,17 +58,17 @@
             "IR": "%0 = load i32, i32* %a.addr, align 4 | ID: 5",
             "column": 11,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %0, i32* %b, align 4 | ID: 6",
             "column": 7,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -76,17 +76,17 @@
             "IR": "store i32 %0, i32* %b, align 4 | ID: 6",
             "column": 7,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret void | ID: 7",
             "column": 1,
             "line": 3,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "}"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -94,7 +94,7 @@
             "IR": "%retval = alloca i32, align 4 | ID: 8",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
@@ -102,9 +102,9 @@
             "IR": "%i = alloca i32, align 4 | ID: 9",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -112,15 +112,15 @@
             "IR": "%i = alloca i32, align 4 | ID: 9",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 0, i32* %retval, align 4 | ID: 10",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         }
@@ -130,7 +130,7 @@
             "IR": "store i32 0, i32* %retval, align 4 | ID: 10",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
@@ -138,9 +138,9 @@
             "IR": "store i32 42, i32* %i, align 4 | ID: 12",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -148,17 +148,17 @@
             "IR": "store i32 42, i32* %i, align 4 | ID: 12",
             "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%0 = load i32, i32* %i, align 4 | ID: 13",
             "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "foo(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -166,17 +166,17 @@
             "IR": "%0 = load i32, i32* %i, align 4 | ID: 13",
             "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "foo(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "call void @_Z3fooi(i32 %0) | ID: 14",
             "column": 3,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "foo(i);"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -184,17 +184,17 @@
             "IR": "call void @_Z3fooi(i32 %0) | ID: 14",
             "column": 3,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "foo(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%a.addr = alloca i32, align 4, !psr.id !13 | ID: 0",
             "column": 14,
             "line": 1,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "void foo(int a) {"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -202,17 +202,17 @@
             "IR": "store i32 %0, i32* %b, align 4 | ID: 6",
             "column": 7,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "foo(int)",
-            "sourceCodeLine": "int b = a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret i32 0 | ID: 15",
             "column": 3,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_01.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_01.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "return 0;"
+            "sourceCodeLine": ""
         }
     }
 ]

@@ -4,15 +4,15 @@
             "IR": "%a.addr = alloca i32, align 4 | ID: 0",
             "column": 19,
             "line": 1,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) {"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %a, i32* %a.addr, align 4 | ID: 1",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
             "sourceCodeLine": ""
         }
@@ -22,7 +22,7 @@
             "IR": "store i32 %a, i32* %a.addr, align 4 | ID: 1",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
             "sourceCodeLine": ""
         },
@@ -30,9 +30,9 @@
             "IR": "%0 = load i32, i32* %a.addr, align 4 | ID: 3",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -40,17 +40,17 @@
             "IR": "%0 = load i32, i32* %a.addr, align 4 | ID: 3",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%inc = add nsw i32 %0, 1 | ID: 4",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -58,17 +58,17 @@
             "IR": "%inc = add nsw i32 %0, 1 | ID: 4",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %inc, i32* %a.addr, align 4 | ID: 5",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -76,17 +76,17 @@
             "IR": "store i32 %inc, i32* %a.addr, align 4 | ID: 5",
             "column": 10,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret i32 %inc | ID: 6",
             "column": 3,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -94,69 +94,69 @@
             "IR": "%retval = alloca i32, align 4 | ID: 7",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
         "to": {
             "IR": "%i = alloca i32, align 4 | ID: 8",
-            "column": 6,
+            "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%i = alloca i32, align 4 | ID: 8",
-            "column": 6,
+            "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%j = alloca i32, align 4 | ID: 9",
-            "column": 6,
+            "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%j = alloca i32, align 4 | ID: 9",
-            "column": 6,
+            "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%k = alloca i32, align 4 | ID: 10",
-            "column": 6,
+            "column": 7,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%k = alloca i32, align 4 | ID: 10",
-            "column": 6,
+            "column": 7,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 0, i32* %retval, align 4 | ID: 11",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         }
@@ -166,71 +166,71 @@
             "IR": "store i32 0, i32* %retval, align 4 | ID: 11",
             "column": 0,
             "line": 0,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
             "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 42, i32* %i, align 4 | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "store i32 42, i32* %i, align 4 | ID: 13",
-            "column": 6,
+            "column": 7,
             "line": 6,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int i = 42;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%0 = load i32, i32* %i, align 4 | ID: 15",
-            "column": 20,
+            "column": 21,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%0 = load i32, i32* %i, align 4 | ID: 15",
-            "column": 20,
+            "column": 21,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%call = call i32 @_Z9incrementi(i32 %0) | ID: 16",
-            "column": 10,
+            "column": 11,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%call = call i32 @_Z9incrementi(i32 %0) | ID: 16",
-            "column": 10,
+            "column": 11,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%a.addr = alloca i32, align 4, !psr.id !13 | ID: 0",
             "column": 19,
             "line": 1,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) {"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -238,71 +238,71 @@
             "IR": "ret i32 %inc | ID: 6",
             "column": 3,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %call, i32* %j, align 4 | ID: 17",
-            "column": 6,
+            "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "store i32 %call, i32* %j, align 4 | ID: 17",
-            "column": 6,
+            "column": 7,
             "line": 7,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int j = increment(i);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%1 = load i32, i32* %j, align 4 | ID: 19",
-            "column": 20,
+            "column": 21,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%1 = load i32, i32* %j, align 4 | ID: 19",
-            "column": 20,
+            "column": 21,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%call1 = call i32 @_Z9incrementi(i32 %1) | ID: 20",
-            "column": 10,
+            "column": 11,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "%call1 = call i32 @_Z9incrementi(i32 %1) | ID: 20",
-            "column": 10,
+            "column": 11,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "%a.addr = alloca i32, align 4, !psr.id !13 | ID: 0",
             "column": 19,
             "line": 1,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "int increment(int a) {"
+            "sourceCodeLine": ""
         }
     },
     {
@@ -310,35 +310,35 @@
             "IR": "ret i32 %inc | ID: 6",
             "column": 3,
             "line": 2,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "increment(int)",
-            "sourceCodeLine": "return ++a;"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "store i32 %call1, i32* %k, align 4 | ID: 21",
-            "column": 6,
+            "column": 7,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         }
     },
     {
         "from": {
             "IR": "store i32 %call1, i32* %k, align 4 | ID: 21",
-            "column": 6,
+            "column": 7,
             "line": 8,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "int k = increment(j);"
+            "sourceCodeLine": ""
         },
         "to": {
             "IR": "ret i32 0 | ID: 22",
             "column": 3,
             "line": 9,
-            "sourceCodeFileName": "/home/ubuntu/workspace/Phasar/FabianPhasar/test/llvm_test_code/linear_constant/call_07.cpp",
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/call_07.cpp",
             "sourceCodeFunctionName": "main",
-            "sourceCodeLine": "return 0;"
+            "sourceCodeLine": ""
         }
     }
 ]

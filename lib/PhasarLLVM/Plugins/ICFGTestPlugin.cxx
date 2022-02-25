@@ -144,7 +144,7 @@ nlohmann::json ICFGTestPlugin::getAsJson(ICFGTestPlugin::f_t /*F*/) const {
 
 // ICFG parts
 
-std::set<ICFGTestPlugin::f_t> ICFGTestPlugin::getAllFunctions() const {
+std::vector<ICFGTestPlugin::f_t> ICFGTestPlugin::getAllFunctions() const {
   return {};
 }
 

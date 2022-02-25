@@ -17,13 +17,16 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCFG_H_
 
-#include <iostream>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/IntrinsicInst.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/CFG.h"
 #include "phasar/Utils/LLVMIRToSrc.h"
@@ -33,7 +36,7 @@
 namespace psr {
 
 class LLVMBasedCFG
-    : public virtual CFG<const llvm::Instruction *, const llvm::Function *> {
+    : public CFG<const llvm::Instruction *, const llvm::Function *> {
 public:
   LLVMBasedCFG(bool IgnoreDbgInstructions = true)
       : IgnoreDbgInstructions(IgnoreDbgInstructions) {}
@@ -66,6 +69,27 @@ public:
       const llvm::Function *Fun,
       std::vector<std::pair<const llvm::Instruction *,
                             const llvm::Instruction *>> &Dest) const;
+
+  template <
+      typename CallBack,
+      typename = std::enable_if_t<std::is_invocable_v<
+          CallBack &&, const llvm::Instruction *, const llvm::Instruction *>>>
+  void forEachControlFlowEdge(const llvm::Function *Fun, CallBack &&CB) const
+      noexcept(
+          std::is_nothrow_invocable_v<CallBack &&, const llvm::Instruction *,
+                                      const llvm::Instruction *>) {
+    llvm::SmallVector<const llvm::Instruction *> Successors;
+    for (const auto &I : llvm::instructions(Fun)) {
+      if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(&I)) {
+        continue;
+      }
+      Successors.clear();
+      getSuccsOf(&I, Successors);
+      for (const auto *Successor : Successors) {
+        std::invoke(CB, &I, Successor);
+      }
+    }
+  }
 
   [[nodiscard]] std::vector<const llvm::Instruction *>
   getAllInstructionsOf(const llvm::Function *Fun) const override;
@@ -112,8 +136,7 @@ public:
   [[nodiscard]] std::string
   getDemangledFunctionName(const llvm::Function *Fun) const override;
 
-  void print(const llvm::Function *Fun,
-             std::ostream &OS = std::cout) const override;
+  void print(const llvm::Function *Fun, std::ostream &OS) const override;
 
   [[nodiscard]] nlohmann::json
   getAsJson(const llvm::Function *Fun) const override;

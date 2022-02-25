@@ -18,11 +18,11 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 
 #include <iosfwd>
-#include <iostream>
 #include <memory>
 #include <set>
 #include <stack>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -30,12 +30,16 @@
 #include "boost/container/flat_set.hpp"
 #include "boost/graph/adjacency_list.hpp"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/ICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
@@ -58,7 +62,7 @@ class LLVMTypeHierarchy;
 
 class LLVMBasedICFG
     : public ICFG<const llvm::Instruction *, const llvm::Function *>,
-      public virtual LLVMBasedCFG {
+      public LLVMBasedCFG {
   friend class LLVMBasedBackwardsICFG;
 
   using GlobalCtorTy = std::multimap<size_t, llvm::Function *>;
@@ -66,10 +70,7 @@ class LLVMBasedICFG
 
 private:
   ProjectIRDB &IRDB;
-  CallGraphAnalysisType CGType;
-  Soundness S;
-  bool UserTHInfos = true;
-  bool UserPTInfos = true;
+
   LLVMTypeHierarchy *TH;
   LLVMPointsToInfo *PT;
   std::unique_ptr<Resolver> Res;
@@ -86,7 +87,7 @@ private:
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
-  std::set<const llvm::Instruction *> UnsoundCallSites;
+  llvm::DenseSet<const llvm::Instruction *> UnsoundCallSites;
   std::vector<const llvm::Instruction *> UnsoundIndirectCalls;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
@@ -94,6 +95,11 @@ private:
   llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
   // Counter to store the number of runtime edges added
   unsigned int TotalRuntimeEdgesAdded = 0;
+  Soundness S;
+  CallGraphAnalysisType CGType;
+  bool UserTHInfos = true;
+  bool UserPTInfos = true;
+
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -127,7 +133,7 @@ private:
   bidigraph_t CallGraph;
 
   /// Maps functions to the corresponding vertex id.
-  std::unordered_map<const llvm::Function *, vertex_t> FunctionVertexMap;
+  llvm::DenseMap<const llvm::Function *, vertex_t> FunctionVertexMap;
 
   void processFunction(const llvm::Function *F, Resolver &Resolver,
                        bool &FixpointReached);
@@ -169,6 +175,9 @@ private:
 
   struct dependency_visitor;
 
+  template <typename EdgeCallBack>
+  void exportICFGAsSourceCodeImpl(EdgeCallBack &&CreateEdge) const;
+
 public:
   static constexpr llvm::StringLiteral GlobalCRuntimeModelName =
       "__psrCRuntimeGlobalCtorsModel";
@@ -200,7 +209,7 @@ public:
    * \return all of the functions in the IRDB, this may include some not in the
    * callgraph
    */
-  [[nodiscard]] std::set<const llvm::Function *>
+  [[nodiscard]] std::vector<const llvm::Function *>
   getAllFunctions() const override;
 
   /**
@@ -273,6 +282,11 @@ public:
   [[nodiscard]] std::set<const llvm::Function *>
   getCalleesOfCallAt(const llvm::Instruction *N) const override;
 
+private:
+  [[nodiscard]] llvm::SmallPtrSet<const llvm::Function *, 8>
+  internalGetCalleesOfCallAt(const llvm::Instruction *N) const;
+
+public:
   void forEachCalleeOfCallAt(
       const llvm::Instruction *I,
       llvm::function_ref<void(const llvm::Function *)> Callback) const;
@@ -323,8 +337,23 @@ public:
   /// instructions
   [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
 
-  [[nodiscard]] const std::set<const llvm::Instruction *> &
-  getUnsoundCallSites();
+  /// Create a JSON export of the whole ICFG similar to
+  /// exportICFGAsSourceCodeJson() but without creating intermediate
+  /// nlohmann::json objects.
+  /// Usually faster than exportICFGAsSourceCodeJson().dump()
+  [[nodiscard]] std::string exportICFGAsSourceCodeJsonString() const;
+  void exportICFGAsSourceCodeJson(llvm::raw_ostream &OS) const;
+
+  [[nodiscard]] std::string exportICFGAsSourceCodeDotString() const;
+  void exportICFGAsSourceCodeDot(llvm::raw_ostream &OS) const;
+
+  [[nodiscard]] inline auto getUnsoundCallSites() {
+    return llvm::make_range(UnsoundCallSites.begin(), UnsoundCallSites.end());
+  }
+
+  [[nodiscard]] inline size_t getNumUnsoundCallSites() const noexcept {
+    return UnsoundCallSites.size();
+  }
 
   [[nodiscard]] unsigned getNumOfVertices() const;
 
@@ -337,13 +366,19 @@ public:
   [[nodiscard]] const llvm::Function *
   getRegisteredDtorsCallerOrNull(const llvm::Module *Mod);
 
-  template <typename Fn> void forEachGlobalCtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalCtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalCtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
-  template <typename Fn> void forEachGlobalDtor(Fn &&F) const {
+  template <typename Fn, typename = std::enable_if_t<std::is_invocable_v<
+                             Fn &&, const llvm::Function *>>>
+  void forEachGlobalDtor(Fn &&F) const
+      noexcept(std::is_nothrow_invocable_v<Fn &&, const llvm::Function *>) {
     for (auto [Prio, Fun] : GlobalDtors) {
       std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }

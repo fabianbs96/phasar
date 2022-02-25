@@ -57,4 +57,3 @@ foreach(plugin ${PLUGINS_SO})
     phasar_mono
     )
 endforeach()
-
