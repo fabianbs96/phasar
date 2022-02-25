@@ -27,7 +27,8 @@ namespace psr {
 class ProjectIRDB;
 
 class ICFGPlugin
-    : public ICFG<const llvm::Instruction *, const llvm::Function *> {
+    : public ICFG<const llvm::Instruction *, const llvm::Function *>,
+      public CFG<const llvm::Instruction *, const llvm::Function *> {
 private:
   [[maybe_unused]] ProjectIRDB &IRDB;
   const std::vector<std::string> EntryPoints;

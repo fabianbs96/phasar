@@ -17,7 +17,6 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_CFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_CFG_H_
 
-#include <iostream>
 #include <set>
 #include <string>
 #include <utility>

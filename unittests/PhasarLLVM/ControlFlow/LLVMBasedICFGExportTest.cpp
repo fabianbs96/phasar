@@ -277,6 +277,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGIRV9) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
   auto Results =
       exportICFG("linear_constant/call_01_cpp_dbg.ll", /*asSrcCode*/ true);
+  llvm::errs() << "Results: " << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_01_cpp_icfg.json"));
 }
@@ -284,7 +285,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
   auto Results =
       exportICFG("linear_constant/call_07_cpp_dbg.ll", /*asSrcCode*/ true);
-  // std::cerr << Results.dump(4) << std::endl;
+  // llvm::errs() << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
@@ -300,7 +301,7 @@ TEST_F(LLVMBasedICFGExportTest, DISABLED_ExportICFGSource03) {
 TEST_F(LLVMBasedICFGExportTest, ExportCFG01) {
   auto Results = exportCFGFor("linear_constant/branch_07_cpp_dbg.ll", "main",
                               /*asSrcCode*/ true);
-  // std::cerr << Results.dump(4) << std::endl;
+  // llvm::errs() << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/branch_07_cpp_main_cfg.json"));
 }

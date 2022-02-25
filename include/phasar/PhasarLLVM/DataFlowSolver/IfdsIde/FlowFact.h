@@ -36,7 +36,7 @@ public:
   }
 };
 
-static inline std::ostream &operator<<(std::ostream &OS, const FlowFact &F) {
+inline std::ostream &operator<<(std::ostream &OS, const FlowFact &F) {
   F.print(OS);
   return OS;
 }
