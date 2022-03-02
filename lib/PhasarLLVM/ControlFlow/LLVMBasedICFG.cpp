@@ -496,6 +496,29 @@ bool LLVMBasedICFG::addRuntimeEdges(
   return ICFGAugumented;
 }
 
+bool LLVMBasedICFG::addRuntimeEdges(
+    llvm::ArrayRef<CustomCallSiteCallTargetPair<>> CallerCalleeMap) {
+  std::vector<std::pair<unsigned, unsigned>> CallerCalleeIdMap;
+  for (const auto &RuntimeInfo : CallerCalleeMap) {
+    auto CallSite = RuntimeInfo.getCallSite();
+    auto *CallSiteFunc = IRDB.getFunction(CallSite.FunctionName);
+    assert(CallSiteFunc != nullptr &&
+           "Function where CallSite exists is not in this IRDB module");
+    const auto *CallSiteInstruction =
+        getNthInstruction(CallSiteFunc, CallSite.Index);
+    assert(llvm::isa<llvm::CallBase>(CallSiteInstruction) &&
+           "Invalid CallSiteInfo received");
+    auto CalleeId =
+        getFunctionId(IRDB.getFunction(RuntimeInfo.getCallTarget()));
+    if (CalleeId.has_value()) {
+      CallerCalleeIdMap.emplace_back(
+          ProjectIRDB::getInstructionID(CallSiteInstruction), CalleeId.value());
+    }
+  }
+
+  return addRuntimeEdges(CallerCalleeIdMap);
+}
+
 std::unique_ptr<Resolver> LLVMBasedICFG::makeResolver(ProjectIRDB &IRDB,
                                                       LLVMTypeHierarchy &TH,
                                                       LLVMPointsToInfo &PT) {
