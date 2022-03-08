@@ -12,9 +12,6 @@
 
 #include <string_view>
 
-#include "phasar/DB/ProjectIRDB.h"
-#include "phasar/Utils/LLVMShorthands.h"
-
 namespace psr {
 struct CustomCallSite {
   CustomCallSite(unsigned Id, std::string_view FuncName) noexcept
@@ -23,21 +20,19 @@ struct CustomCallSite {
   std::string_view FunctionName;
 };
 
-template <typename CallSiteTy = CustomCallSite,
-          typename CallTargetTy = std::string_view>
 class CustomCallSiteCallTargetPair {
 public:
-  CustomCallSiteCallTargetPair(CallSiteTy CallSite,
-                               CallTargetTy CallTarget) noexcept
+  CustomCallSiteCallTargetPair(CustomCallSite CallSite,
+                               std::string_view CallTarget) noexcept
       : CallSite(CallSite), CallTarget(CallTarget){};
   ~CustomCallSiteCallTargetPair() = default;
 
-  CallSiteTy getCallSite() const { return CallSite; }
-  CallTargetTy getCallTarget() const { return CallTarget; }
+  CustomCallSite getCallSite() const { return CallSite; }
+  std::string_view getCallTarget() const { return CallTarget; }
 
 private:
-  CallSiteTy CallSite;
-  CallTargetTy CallTarget;
+  CustomCallSite CallSite;
+  std::string_view CallTarget;
 };
 } // namespace psr
 

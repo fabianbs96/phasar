@@ -135,11 +135,14 @@ ProjectIRDB::ProjectIRDB(const std::vector<llvm::Module *> &Modules,
     : ProjectIRDB(Options, std::move(Passes)) {
 
   for (auto *M : Modules) {
-    insertModule(M);
+    this->Modules.try_emplace(M->getModuleIdentifier(), M);
   }
+
   if (Options & IRDBOptions::WPA) {
     linkForWPA(LinkerFlags);
   }
+
+  preprocessAllModules();
 }
 
 ProjectIRDB::~ProjectIRDB() {
@@ -540,12 +543,6 @@ const llvm::Function *ProjectIRDB::getFunctionById(unsigned Id) {
     }
   }
   return nullptr;
-}
-
-void ProjectIRDB::insertModule(llvm::Module *M) {
-  // Contexts.push_back(std::unique_ptr<llvm::LLVMContext>(&M->getContext()));
-  Modules.try_emplace(M->getModuleIdentifier(), M);
-  preprocessModule(M);
 }
 
 llvm::DenseSet<const llvm::StructType *>

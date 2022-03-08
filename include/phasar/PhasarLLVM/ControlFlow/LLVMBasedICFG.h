@@ -249,6 +249,12 @@ public:
   OutEdgesAndTargets getOutEdgeAndTarget(const llvm::Function *Fun) const;
 
   /**
+   * Helper function to add runtime edges to the callgraph
+   */
+  bool addEdgesToICFG(const llvm::Instruction *CallSite,
+                      const llvm::Function *CallTarget);
+
+  /**
    * For the given pair of (callsite id - function id), if there are no edges
    * in the callgraph, this function adds the edges
    *
@@ -263,8 +269,8 @@ public:
    *
    * \return boolean flag that tells if the callgraph is modified
    */
-  bool addRuntimeEdges(
-      llvm::ArrayRef<CustomCallSiteCallTargetPair<>> CallerCalleeMap);
+  bool
+  addRuntimeEdges(llvm::ArrayRef<CustomCallSiteCallTargetPair> CallerCalleeMap);
 
   /**
    * Removes all edges found for the given instruction within the
