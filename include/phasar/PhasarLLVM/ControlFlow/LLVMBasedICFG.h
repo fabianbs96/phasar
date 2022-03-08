@@ -41,6 +41,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "phasar/PhasarLLVM/ControlFlow/CustomCallSiteCallTargetPair.h"
 #include "phasar/PhasarLLVM/ControlFlow/ICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
@@ -248,6 +249,12 @@ public:
   OutEdgesAndTargets getOutEdgeAndTarget(const llvm::Function *Fun) const;
 
   /**
+   * Helper function to add runtime edges to the callgraph
+   */
+  bool addEdgeToICFG(const llvm::Instruction *CallSite,
+                     const llvm::Function *CallTarget);
+
+  /**
    * For the given pair of (callsite id - function id), if there are no edges
    * in the callgraph, this function adds the edges
    *
@@ -255,6 +262,15 @@ public:
    */
   bool addRuntimeEdges(
       llvm::ArrayRef<std::pair<unsigned, unsigned>> CallerCalleeMap);
+
+  /**
+   *  For the given pair of callsite - calltarget (in custom format), if there
+   *  are no edges in the callgraph, this function adds the edges
+   *
+   * \return boolean flag that tells if the callgraph is modified
+   */
+  bool
+  addRuntimeEdges(llvm::ArrayRef<CustomCallSiteCallTargetPair> CallerCalleeMap);
 
   /**
    * Removes all edges found for the given instruction within the

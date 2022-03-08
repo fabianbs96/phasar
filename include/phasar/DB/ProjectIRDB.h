@@ -132,8 +132,6 @@ public:
 
   ~ProjectIRDB();
 
-  void insertModule(llvm::Module *M);
-
   // add WPA support by providing a fat completely linked module
   void linkForWPA(llvm::Linker::Flags LinkerFlags = DefaultLinkerFlags);
   // get a completely linked module for the WPA_MODE
