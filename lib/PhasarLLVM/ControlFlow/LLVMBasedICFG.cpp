@@ -441,8 +441,8 @@ bool LLVMBasedICFG::constructDynamicCall(const llvm::Instruction *I,
   return NewTargetsFound;
 }
 
-bool LLVMBasedICFG::addEdgesToICFG(const llvm::Instruction *CallSite,
-                                   const llvm::Function *CallTarget) {
+bool LLVMBasedICFG::addEdgeToICFG(const llvm::Instruction *CallSite,
+                                  const llvm::Function *CallTarget) {
   vertex_t CallSiteVertexDescriptor;
   if (auto FvmItr = FunctionVertexMap.find(CallSite->getFunction());
       FvmItr != FunctionVertexMap.end()) {
@@ -508,7 +508,7 @@ bool LLVMBasedICFG::addRuntimeEdges(
       continue;
     }
 
-    ICFGAugumented |= addEdgesToICFG(CallSite, RuntimeCallTarget);
+    ICFGAugumented |= addEdgeToICFG(CallSite, RuntimeCallTarget);
   }
 
   return ICFGAugumented;
@@ -516,8 +516,6 @@ bool LLVMBasedICFG::addRuntimeEdges(
 
 bool LLVMBasedICFG::addRuntimeEdges(
     llvm::ArrayRef<CustomCallSiteCallTargetPair> CallerCalleeMap) {
-  std::vector<std::pair<unsigned, unsigned>> CallerCalleeIdMap;
-  CallerCalleeIdMap.reserve(CallerCalleeMap.size());
   bool ICFGAugumented = false;
 
   for (const auto &RuntimeInfo : CallerCalleeMap) {
@@ -541,7 +539,7 @@ bool LLVMBasedICFG::addRuntimeEdges(
       continue;
     }
 
-    ICFGAugumented |= addEdgesToICFG(CallSiteInstruction, RuntimeCallTarget);
+    ICFGAugumented |= addEdgeToICFG(CallSiteInstruction, RuntimeCallTarget);
   }
 
   return ICFGAugumented;

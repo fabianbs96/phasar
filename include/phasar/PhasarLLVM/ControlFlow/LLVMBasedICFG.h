@@ -251,8 +251,8 @@ public:
   /**
    * Helper function to add runtime edges to the callgraph
    */
-  bool addEdgesToICFG(const llvm::Instruction *CallSite,
-                      const llvm::Function *CallTarget);
+  bool addEdgeToICFG(const llvm::Instruction *CallSite,
+                     const llvm::Function *CallTarget);
 
   /**
    * For the given pair of (callsite id - function id), if there are no edges
