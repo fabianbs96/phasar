@@ -39,6 +39,7 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/WPDS/Problems/WPDSLinearConstantAnalysis.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/WPDS/Problems/WPDSSolverTest.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToSet.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarPass/Options.h"
@@ -46,8 +47,6 @@
 #include "phasar/Utils/EnumFlags.h"
 
 namespace psr {
-
-char PhasarPass::ID = 12;
 
 PhasarPass::PhasarPass() : llvm::ModulePass(ID) {}
 
@@ -114,8 +113,8 @@ bool PhasarPass::runOnModule(llvm::Module &M) {
       LLVMLcaSolver.dumpResults();
     }
   } else if (DataFlowAnalysis == "ifds-taint") {
-    TaintConfiguration<const llvm::Value *> TSF;
-    IFDSTaintAnalysis TaintAnalysisProblem(&DB, &H, &I, &PT, TSF,
+    TaintConfig Config(DB);
+    IFDSTaintAnalysis TaintAnalysisProblem(&DB, &H, &I, &PT, Config,
                                            EntryPointsSet);
     IFDSSolver LLVMTaintSolver(TaintAnalysisProblem);
     LLVMTaintSolver.solve();
@@ -180,9 +179,9 @@ bool PhasarPass::runOnModule(llvm::Module &M) {
   return false;
 }
 
-bool PhasarPass::doInitialization(llvm::Module &M) {
+bool PhasarPass::doInitialization(llvm::Module & /*M*/) {
   llvm::outs() << "PhasarPass::doInitialization()\n";
-  initializeLogger(InitLogger);
+  InitLogger ? Logger::enable() : Logger::disable();
   // check the user's parameters
   if (EntryPoints.empty()) {
     llvm::report_fatal_error("psr error: no entry points provided");
@@ -197,7 +196,7 @@ bool PhasarPass::doInitialization(llvm::Module &M) {
   return false;
 }
 
-bool PhasarPass::doFinalization(llvm::Module &M) {
+bool PhasarPass::doFinalization(llvm::Module & /*M*/) {
   llvm::outs() << "PhasarPass::doFinalization()\n";
   return false;
 }
@@ -206,12 +205,12 @@ void PhasarPass::getAnalysisUsage(llvm::AnalysisUsage &AU) const {}
 
 void PhasarPass::releaseMemory() {}
 
-void PhasarPass::print(llvm::raw_ostream &O, const llvm::Module *M) const {
+void PhasarPass::print(llvm::raw_ostream &O, const llvm::Module * /*M*/) const {
   O << "I am a PhasarPass Analysis Result ;-)\n";
 }
 
-static llvm::RegisterPass<PhasarPass> Phasar("phasar", "PhASAR Pass",
-                                             false /* Only looks at CFG */,
-                                             false /* Analysis Pass */);
+static const llvm::RegisterPass<PhasarPass>
+    Phasar("phasar", "PhASAR Pass", false /* Only looks at CFG */,
+           false /* Analysis Pass */);
 
 } // namespace psr

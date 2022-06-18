@@ -15,11 +15,12 @@
  */
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 
-#include "boost/filesystem.hpp"
+#include "llvm/Support/raw_ostream.h"
 
 #include "nlohmann/json.hpp"
 
@@ -85,7 +86,8 @@ unsigned long PAMM::elapsedTime(const std::string &TimerId) {
     PAMM::TimePoint_t Start = RunningTimer[TimerId];
     auto Duration = std::chrono::duration_cast<Duration_t>(End - Start);
     return Duration.count();
-  } else if (StoppedTimer.count(TimerId)) {
+  }
+  if (StoppedTimer.count(TimerId)) {
     auto Duration = std::chrono::duration_cast<Duration_t>(
         StoppedTimer[TimerId].second - StoppedTimer[TimerId].first);
     return Duration.count();
@@ -201,7 +203,7 @@ void PAMM::addToHistogram(const std::string &HistogramId,
   }
 }
 
-void PAMM::printTimers(std::ostream &Os) {
+void PAMM::printTimers(llvm::raw_ostream &Os) {
   // stop all running timer
   while (!RunningTimer.empty()) {
     stopTimer(RunningTimer.begin()->first);
@@ -235,7 +237,7 @@ void PAMM::printTimers(std::ostream &Os) {
   }
 }
 
-void PAMM::printCounters(std::ostream &Os) {
+void PAMM::printCounters(llvm::raw_ostream &Os) {
   Os << "\nCounter\n";
   Os << "-------\n";
   for (const auto &Counter : Counter) {
@@ -248,7 +250,7 @@ void PAMM::printCounters(std::ostream &Os) {
   }
 }
 
-void PAMM::printHistograms(std::ostream &Os) {
+void PAMM::printHistograms(llvm::raw_ostream &Os) {
   Os << "\nHistograms\n";
   Os << "--------------\n";
   for (const auto &H : Histogram) {
@@ -264,7 +266,7 @@ void PAMM::printHistograms(std::ostream &Os) {
   }
 }
 
-void PAMM::printMeasuredData(std::ostream &Os) {
+void PAMM::printMeasuredData(llvm::raw_ostream &Os) {
   Os << "\n----- START OF EVALUATION DATA -----\n\n";
   printTimers(Os);
   printCounters(Os);
@@ -328,7 +330,7 @@ void PAMM::exportMeasuredData(std::string OutputPath) {
     JsonData["Info"] = JInfo;
   }
 
-  boost::filesystem::path Cfp(OutputPath);
+  std::filesystem::path Cfp(OutputPath);
   if (Cfp.string().find(".json") == std::string::npos) {
     OutputPath.append(".json");
   }

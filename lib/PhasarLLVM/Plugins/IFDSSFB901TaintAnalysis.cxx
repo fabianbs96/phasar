@@ -14,8 +14,9 @@
  *      Author: philipp
  */
 
-#include <iostream>
 #include <utility>
+
+#include "llvm/Support/raw_ostream.h"
 
 #include <phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h>
 #include <phasar/PhasarLLVM/DataFlowSolver/IfdsIde/FlowFunctions.h>
@@ -37,13 +38,13 @@ makeIFDSSFB901TaintAnalysis(const ProjectIRDB *IRDB,
 }
 
 __attribute__((constructor)) void init() {
-  cout << "init - IFDSSFB901TaintAnalysis\n";
+  llvm::outs() << "init - IFDSSFB901TaintAnalysis\n";
   IFDSTabulationProblemPluginFactory["ifds_testplugin"] =
       &makeIFDSSFB901TaintAnalysis;
 }
 
 __attribute__((destructor)) void fini() {
-  cout << "fini - IFDSSFB901TaintAnalysis\n";
+  llvm::outs() << "fini - IFDSSFB901TaintAnalysis\n";
 }
 
 IFDSSFB901TaintAnalysis::IFDSSFB901TaintAnalysis(
@@ -51,54 +52,58 @@ IFDSSFB901TaintAnalysis::IFDSSFB901TaintAnalysis(
     const LLVMBasedICFG *ICF, LLVMPointsToInfo *PT,
     std::set<std::string> EntryPoints)
     : IFDSTabulationProblemPlugin(IRDB, TH, ICF, PT, std::move(EntryPoints)) {
-  ZeroValue = createZeroValue();
+  ZeroValue = IFDSSFB901TaintAnalysis::createZeroValue();
 }
 
 const FlowFact *IFDSSFB901TaintAnalysis::createZeroValue() const {
   // static auto zero =
   //     std::make_unique<ValueFlowFactWrapper>(LLVMZeroValue::getInstance());
   // return zero.get();
-  static auto zero = new ValueFlowFactWrapper(nullptr);
-  return zero;
+  static auto *Zero = new ValueFlowFactWrapper(nullptr);
+  return Zero;
 }
 
 IFDSSFB901TaintAnalysis::FlowFunctionPtrType
-IFDSSFB901TaintAnalysis::getNormalFlowFunction(const llvm::Instruction *Curr,
-                                               const llvm::Instruction *Succ) {
+IFDSSFB901TaintAnalysis::getNormalFlowFunction(
+    const llvm::Instruction * /*Curr*/, const llvm::Instruction * /*Succ*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSSFB901TaintAnalysis::FlowFunctionPtrType
-IFDSSFB901TaintAnalysis::getCallFlowFunction(const llvm::Instruction *CallSite,
-                                             const llvm::Function *DestFun) {
+IFDSSFB901TaintAnalysis::getCallFlowFunction(
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*DestFun*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSSFB901TaintAnalysis::FlowFunctionPtrType
-IFDSSFB901TaintAnalysis::getRetFlowFunction(const llvm::Instruction *CallSite,
-                                            const llvm::Function *CalleeFun,
-                                            const llvm::Instruction *ExitSite,
-                                            const llvm::Instruction *RetSite) {
+IFDSSFB901TaintAnalysis::getRetFlowFunction(
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*CalleeFun*/,
+    const llvm::Instruction * /*ExitSite*/,
+    const llvm::Instruction * /*RetSite*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSSFB901TaintAnalysis::FlowFunctionPtrType
 IFDSSFB901TaintAnalysis::getCallToRetFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Instruction *RetSite,
-    set<const llvm::Function *> Callees) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Instruction * /*RetSite*/,
+    set<const llvm::Function *> /*Callees*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSSFB901TaintAnalysis::FlowFunctionPtrType
 IFDSSFB901TaintAnalysis::getSummaryFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Function *DestFun) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*DestFun*/) {
   return nullptr;
 }
 
 InitialSeeds<IFDSSFB901TaintAnalysis::n_t, IFDSSFB901TaintAnalysis::d_t,
              IFDSSFB901TaintAnalysis::l_t>
 IFDSSFB901TaintAnalysis::initialSeeds() {
-  cout << "IFDSSFB901TaintAnalysis::initialSeeds()\n";
+  llvm::outs() << "IFDSSFB901TaintAnalysis::initialSeeds()\n";
   InitialSeeds<IFDSSFB901TaintAnalysis::n_t, IFDSSFB901TaintAnalysis::d_t,
                IFDSSFB901TaintAnalysis::l_t>
       Seeds;

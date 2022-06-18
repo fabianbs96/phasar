@@ -27,7 +27,7 @@ else()
 endif()
 
 
-find_package(Boost COMPONENTS log filesystem program_options REQUIRED)
+find_package(Boost COMPONENTS program_options filesystem REQUIRED)
 if(USE_LLVM_FAT_LIB)
   llvm_config(phasar_plugins USE_SHARED ${LLVM_LINK_COMPONENTS})
 else()
@@ -65,4 +65,3 @@ foreach(plugin ${PLUGINS_SO})
     phasar_mono
     )
 endforeach()
-

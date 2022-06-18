@@ -7,18 +7,19 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef ICFGTESTPLUGIN_H_
-#define ICFGTESTPLUGIN_H_
+#ifndef ICFGTESTPLUGIN_H
+#define ICFGTESTPLUGIN_H
 
-#include <iostream>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "llvm/Support/raw_ostream.h"
 
-#include <phasar/PhasarLLVM/Plugins/Interfaces/ControlFlow/ICFGPlugin.h>
+#include "nlohmann/json.hpp"
+
+#include "phasar/PhasarLLVM/Plugins/Interfaces/ControlFlow/ICFGPlugin.h"
 
 namespace llvm {
 class Instruction;
@@ -31,8 +32,8 @@ using json = nlohmann::json;
 
 class ICFGTestPlugin : public ICFGPlugin {
 public:
-  typedef const llvm::Instruction *n_t;
-  typedef const llvm::Function *f_t;
+  using n_t = const llvm::Instruction *;
+  using f_t = const llvm::Function *;
 
   ICFGTestPlugin(ProjectIRDB &IRDB,
                  const std::vector<std::string> &EntryPoints);
@@ -83,33 +84,33 @@ public:
 
   std::string getDemangledFunctionName(f_t Fun) const override;
 
-  void print(f_t F, std::ostream &OS = std::cout) const override;
+  void print(f_t F, llvm::raw_ostream &OS = llvm::outs()) const override;
 
   nlohmann::json getAsJson(f_t F) const override;
 
   // ICFG parts
 
-  std::set<f_t> getAllFunctions() const override;
+  [[nodiscard]] std::set<f_t> getAllFunctions() const override;
 
-  f_t getFunction(const std::string &Fun) const override;
+  [[nodiscard]] f_t getFunction(const std::string &Fun) const override;
 
-  bool isIndirectFunctionCall(n_t Inst) const override;
+  [[nodiscard]] bool isIndirectFunctionCall(n_t Inst) const override;
 
-  bool isVirtualFunctionCall(n_t Inst) const override;
+  [[nodiscard]] bool isVirtualFunctionCall(n_t Inst) const override;
 
-  std::set<n_t> allNonCallStartNodes() const override;
+  [[nodiscard]] std::set<n_t> allNonCallStartNodes() const override;
 
-  std::set<f_t> getCalleesOfCallAt(n_t Inst) const override;
+  [[nodiscard]] std::set<f_t> getCalleesOfCallAt(n_t Inst) const override;
 
-  std::set<n_t> getCallersOf(f_t Fun) const override;
+  [[nodiscard]] std::set<n_t> getCallersOf(f_t Fun) const override;
 
-  std::set<n_t> getCallsFromWithin(f_t Fun) const override;
+  [[nodiscard]] std::set<n_t> getCallsFromWithin(f_t Fun) const override;
 
-  std::set<n_t> getReturnSitesOfCallAt(n_t Inst) const override;
+  [[nodiscard]] std::set<n_t> getReturnSitesOfCallAt(n_t Inst) const override;
 
-  void print(std::ostream &OS = std::cout) const override;
+  void print(llvm::raw_ostream &OS = llvm::outs()) const override;
 
-  nlohmann::json getAsJson() const override;
+  [[nodiscard]] nlohmann::json getAsJson() const override;
 
 protected:
   void collectGlobalCtors() override;

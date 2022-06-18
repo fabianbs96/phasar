@@ -20,7 +20,7 @@ bool isTouchVTableInst(const llvm::StoreInst *Store) {
   if (const auto *CE =
           llvm::dyn_cast<llvm::ConstantExpr>(Store->getValueOperand())) {
     // llvm::ConstantExpr *CE = const_cast<llvm::ConstantExpr *>(ConstCE);
-    auto *CEInst = const_cast<llvm::ConstantExpr *>(CE)->getAsInstruction();
+    auto *CEInst = CE->getAsInstruction();
     if (auto *CF = llvm::dyn_cast<llvm::ConstantExpr>(CEInst->getOperand(0))) {
       auto *CFInst = CF->getAsInstruction();
       if (auto *VTable =
@@ -28,9 +28,8 @@ bool isTouchVTableInst(const llvm::StoreInst *Store) {
         if (VTable->hasName() &&
             llvm::demangle(VTable->getName().str()).find("vtable") !=
                 std::string::npos) {
-          LOG_IF_ENABLE(
-              BOOST_LOG_SEV(lg::get(), DEBUG)
-              << "Store Instruction sets up or updates vtable - ignored!");
+          PHASAR_LOG_LEVEL(
+              DEBUG, "Store Instruction sets up or updates vtable - ignored!");
           CEInst->deleteValue();
           CFInst->deleteValue();
           return true;

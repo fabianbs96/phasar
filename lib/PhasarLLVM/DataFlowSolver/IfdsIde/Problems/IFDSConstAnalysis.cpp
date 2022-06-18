@@ -46,12 +46,12 @@ IFDSConstAnalysis::IFDSConstAnalysis(const ProjectIRDB *IRDB,
   REG_HISTOGRAM("Context-relevant Pointer", PAMM_SEVERITY_LEVEL::Full);
   REG_COUNTER("[Calls] getContextRelevantPointsToSet", 0,
               PAMM_SEVERITY_LEVEL::Full);
-  IFDSTabulationProblem::ZeroValue = createZeroValue();
+  IFDSTabulationProblem::ZeroValue = IFDSConstAnalysis::createZeroValue();
 }
 
 IFDSConstAnalysis::FlowFunctionPtrType
 IFDSConstAnalysis::getNormalFlowFunction(IFDSConstAnalysis::n_t Curr,
-                                         IFDSConstAnalysis::n_t Succ) {
+                                         IFDSConstAnalysis::n_t /*Succ*/) {
   // Check all store instructions.
   if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
     // If the store instruction sets up or updates the vtable, i.e. value
@@ -61,10 +61,9 @@ IFDSConstAnalysis::getNormalFlowFunction(IFDSConstAnalysis::n_t Curr,
     }
 
     IFDSConstAnalysis::d_t PointerOp = Store->getPointerOperand();
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Pointer operand of store Instruction: "
-                  << llvmIRToString(PointerOp));
-    const auto PTS = PT->getPointsToSet(PointerOp);
+    PHASAR_LOG_LEVEL(DEBUG, "Pointer operand of store Instruction: "
+                                << llvmIRToString(PointerOp));
+    auto PTS = PT->getPointsToSet(PointerOp);
     std::set<IFDSConstAnalysis::d_t> PointsToSet(PTS->begin(), PTS->end());
     // Check if this store instruction is the second write access to the memory
     // location the pointer operand or it's alias are pointing to.
@@ -75,9 +74,8 @@ IFDSConstAnalysis::getNormalFlowFunction(IFDSConstAnalysis::n_t Curr,
     // NOTE: The points-to set of value x also contains the value x itself!
     for (const auto *Alias : PointsToSet) {
       if (isInitialized(Alias)) {
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                      << "Compute context-relevant points-to "
-                         "information for the pointer operand.");
+        PHASAR_LOG_LEVEL(DEBUG, "Compute context-relevant points-to "
+                                "information for the pointer operand.");
         return make_shared<
             GenAll<IFDSConstAnalysis::d_t>>(/*pointsToSet*/
                                             getContextRelevantPointsToSet(
@@ -91,8 +89,7 @@ IFDSConstAnalysis::getNormalFlowFunction(IFDSConstAnalysis::n_t Curr,
     // small as possible) as initialized by adding it to the Initialized set.
     // We do not generate any new data-flow facts at this point.
     markAsInitialized(PointerOp);
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Pointer operand marked as initialized!");
+    PHASAR_LOG_LEVEL(DEBUG, "Pointer operand marked as initialized!");
   } /* end store instruction */
 
   // Pass everything else as identity
@@ -104,8 +101,7 @@ IFDSConstAnalysis::getCallFlowFunction(IFDSConstAnalysis::n_t CallSite,
                                        IFDSConstAnalysis::f_t DestFun) {
   // Handle one of the three llvm memory intrinsics (memcpy, memmove or memset)
   if (llvm::isa<llvm::MemIntrinsic>(CallSite)) {
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Call statement is a LLVM MemIntrinsic!");
+    PHASAR_LOG_LEVEL(DEBUG, "Call statement is a LLVM MemIntrinsic!");
     return KillAll<IFDSConstAnalysis::d_t>::getInstance();
   }
   // Check if its a Call Instruction or an Invoke Instruction. If so, we
@@ -113,10 +109,8 @@ IFDSConstAnalysis::getCallFlowFunction(IFDSConstAnalysis::n_t CallSite,
   if (llvm::isa<llvm::CallInst>(CallSite) ||
       llvm::isa<llvm::InvokeInst>(CallSite)) {
     // return KillAll<IFDSConstAnalysis::d_t>::getInstance();
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Call statement: " << llvmIRToString(CallSite));
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Destination method: " << DestFun->getName().str());
+    PHASAR_LOG_LEVEL(DEBUG, "Call statement: " << llvmIRToString(CallSite));
+    PHASAR_LOG_LEVEL(DEBUG, "Destination method: " << DestFun->getName());
     return make_shared<MapFactsToCallee<>>(
         llvm::cast<llvm::CallBase>(CallSite), DestFun,
         [](IFDSConstAnalysis::d_t Actual) {
@@ -130,11 +124,11 @@ IFDSConstAnalysis::getCallFlowFunction(IFDSConstAnalysis::n_t CallSite,
 
 IFDSConstAnalysis::FlowFunctionPtrType IFDSConstAnalysis::getRetFlowFunction(
     IFDSConstAnalysis::n_t CallSite, IFDSConstAnalysis::f_t CalleeFun,
-    IFDSConstAnalysis::n_t ExitSite, IFDSConstAnalysis::n_t RetSite) {
+    IFDSConstAnalysis::n_t ExitStmt, IFDSConstAnalysis::n_t /*RetSite*/) {
   // return KillAll<IFDSConstAnalysis::d_t>::getInstance();
   // Map formal parameter back to the actual parameter in the caller.
   return make_shared<MapFactsToCaller<>>(
-      llvm::cast<llvm::CallBase>(CallSite), CalleeFun, ExitSite, true,
+      llvm::cast<llvm::CallBase>(CallSite), CalleeFun, ExitStmt, true,
       [](IFDSConstAnalysis::d_t Formal) {
         return Formal->getType()->isPointerTy();
       },
@@ -146,20 +140,18 @@ IFDSConstAnalysis::FlowFunctionPtrType IFDSConstAnalysis::getRetFlowFunction(
 
 IFDSConstAnalysis::FlowFunctionPtrType
 IFDSConstAnalysis::getCallToRetFlowFunction(
-    IFDSConstAnalysis::n_t CallSite, IFDSConstAnalysis::n_t RetSite,
-    set<IFDSConstAnalysis::f_t> Callees) {
+    IFDSConstAnalysis::n_t CallSite, IFDSConstAnalysis::n_t /*RetSite*/,
+    set<IFDSConstAnalysis::f_t> /*Callees*/) {
   // Process the effects of a llvm memory intrinsic function.
   if (llvm::isa<llvm::MemIntrinsic>(CallSite)) {
     IFDSConstAnalysis::d_t PointerOp = CallSite->getOperand(0);
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Pointer Operand: " << llvmIRToString(PointerOp));
-    const auto PTS = PT->getPointsToSet(PointerOp);
+    PHASAR_LOG_LEVEL(DEBUG, "Pointer Operand: " << llvmIRToString(PointerOp));
+    auto PTS = PT->getPointsToSet(PointerOp);
     std::set<IFDSConstAnalysis::d_t> PointsToSet(PTS->begin(), PTS->end());
     for (const auto *Alias : PointsToSet) {
       if (isInitialized(Alias)) {
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                      << "Compute context-relevant points-to "
-                         "information of the pointer operand.");
+        PHASAR_LOG_LEVEL(DEBUG, "Compute context-relevant points-to "
+                                "information of the pointer operand.");
         return make_shared<
             GenAll<IFDSConstAnalysis::d_t>>(/*pointsToSet*/
                                             getContextRelevantPointsToSet(
@@ -169,8 +161,7 @@ IFDSConstAnalysis::getCallToRetFlowFunction(
       }
     }
     markAsInitialized(PointerOp);
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Pointer operand marked as initialized!");
+    PHASAR_LOG_LEVEL(DEBUG, "Pointer operand marked as initialized!");
   }
 
   // Pass everything else as identity
@@ -178,8 +169,8 @@ IFDSConstAnalysis::getCallToRetFlowFunction(
 }
 
 IFDSConstAnalysis::FlowFunctionPtrType
-IFDSConstAnalysis::getSummaryFlowFunction(IFDSConstAnalysis::n_t CallSite,
-                                          IFDSConstAnalysis::f_t DestFun) {
+IFDSConstAnalysis::getSummaryFlowFunction(IFDSConstAnalysis::n_t /*CallSite*/,
+                                          IFDSConstAnalysis::f_t /*DestFun*/) {
   return nullptr;
 }
 
@@ -198,37 +189,36 @@ IFDSConstAnalysis::initialSeeds() {
 }
 
 IFDSConstAnalysis::d_t IFDSConstAnalysis::createZeroValue() const {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "IFDSConstAnalysis::createZeroValue()");
+  PHASAR_LOG_LEVEL(DEBUG, "IFDSConstAnalysis::createZeroValue()");
   // create a special value to represent the zero value!
   return LLVMZeroValue::getInstance();
 }
 
-bool IFDSConstAnalysis::isZeroValue(IFDSConstAnalysis::d_t D) const {
-  return LLVMZeroValue::getInstance()->isLLVMZeroValue(D);
+bool IFDSConstAnalysis::isZeroValue(IFDSConstAnalysis::d_t Fact) const {
+  return LLVMZeroValue::isLLVMZeroValue(Fact);
 }
 
-void IFDSConstAnalysis::printNode(ostream &OS, IFDSConstAnalysis::n_t N) const {
-  OS << llvmIRToString(N);
+void IFDSConstAnalysis::printNode(llvm::raw_ostream &OS,
+                                  IFDSConstAnalysis::n_t Stmt) const {
+  OS << llvmIRToString(Stmt);
 }
 
-void IFDSConstAnalysis::printDataFlowFact(ostream &OS,
-                                          IFDSConstAnalysis::d_t D) const {
-  OS << llvmIRToString(D);
+void IFDSConstAnalysis::printDataFlowFact(llvm::raw_ostream &OS,
+                                          IFDSConstAnalysis::d_t Fact) const {
+  OS << llvmIRToString(Fact);
 }
 
-void IFDSConstAnalysis::printFunction(ostream &OS,
-                                      IFDSConstAnalysis::f_t M) const {
-  OS << M->getName().str();
+void IFDSConstAnalysis::printFunction(llvm::raw_ostream &OS,
+                                      IFDSConstAnalysis::f_t Func) const {
+  OS << Func->getName();
 }
 
 void IFDSConstAnalysis::printInitMemoryLocations() {
-  LOG_IF_ENABLE(
-      BOOST_LOG_SEV(lg::get(), DEBUG)
-      << "Printing all initialized memory location (or one of its alias)");
+  PHASAR_LOG_LEVEL(
+      DEBUG, "Printing all initialized memory location (or one of its alias)");
 #ifdef DYNAMIC_LOG
   for (const auto *Stmt : IFDSConstAnalysis::Initialized) {
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG) << llvmIRToString(Stmt));
+    PHASAR_LOG_LEVEL(DEBUG, llvmIRToString(Stmt));
   }
 #endif
 }
@@ -243,31 +233,28 @@ set<IFDSConstAnalysis::d_t> IFDSConstAnalysis::getContextRelevantPointsToSet(
               PAMM_SEVERITY_LEVEL::Full);
   set<IFDSConstAnalysis::d_t> ToGenerate;
   for (const auto *Alias : PointsToSet) {
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Alias: " << llvmIRToString(Alias));
+    PHASAR_LOG_LEVEL(DEBUG, "Alias: " << llvmIRToString(Alias));
     // Case (i + ii)
     if (const auto *I = llvm::dyn_cast<llvm::Instruction>(Alias)) {
       if (isAllocaInstOrHeapAllocaFunction(Alias)) {
         ToGenerate.insert(Alias);
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                      << "alloca inst will be generated as a new fact!");
+        PHASAR_LOG_LEVEL(DEBUG, "alloca inst will be generated as a new fact!");
       } else if (I->getFunction() == CurrentContext) {
         ToGenerate.insert(Alias);
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                      << "instruction within current function will "
-                         "be generated as a new fact!");
+        PHASAR_LOG_LEVEL(DEBUG, "instruction within current function will "
+                                "be generated as a new fact!");
       }
     } // Case (ii)
     else if (llvm::isa<llvm::GlobalValue>(Alias)) {
       ToGenerate.insert(Alias);
-      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                    << "global variable will be generated as a new fact!");
+      PHASAR_LOG_LEVEL(DEBUG,
+                       "global variable will be generated as a new fact!");
     } // Case (iii)
     else if (const auto *A = llvm::dyn_cast<llvm::Argument>(Alias)) {
       if (A->getParent() == CurrentContext) {
         ToGenerate.insert(Alias);
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                      << "formal argument will be generated as a new fact!");
+        PHASAR_LOG_LEVEL(DEBUG,
+                         "formal argument will be generated as a new fact!");
       }
     } // ignore everything else
   }
@@ -278,12 +265,12 @@ set<IFDSConstAnalysis::d_t> IFDSConstAnalysis::getContextRelevantPointsToSet(
   return ToGenerate;
 }
 
-bool IFDSConstAnalysis::isInitialized(IFDSConstAnalysis::d_t D) const {
-  return llvm::isa<llvm::GlobalValue>(D) || Initialized.count(D);
+bool IFDSConstAnalysis::isInitialized(IFDSConstAnalysis::d_t Fact) const {
+  return llvm::isa<llvm::GlobalValue>(Fact) || Initialized.count(Fact);
 }
 
-void IFDSConstAnalysis::markAsInitialized(IFDSConstAnalysis::d_t D) {
-  Initialized.insert(D);
+void IFDSConstAnalysis::markAsInitialized(IFDSConstAnalysis::d_t Fact) {
+  Initialized.insert(Fact);
 }
 
 size_t IFDSConstAnalysis::initMemoryLocationCount() {
@@ -293,7 +280,7 @@ size_t IFDSConstAnalysis::initMemoryLocationCount() {
 void IFDSConstAnalysis::emitTextReport(
     const SolverResults<IFDSConstAnalysis::n_t, IFDSConstAnalysis::d_t,
                         BinaryDomain> &SR,
-    ostream &OS) {
+    llvm::raw_ostream &OS) {
   // 1) Remove all mutable memory locations
   for (const auto *F : ICF->getAllFunctions()) {
     for (const auto *Exit : ICF->getExitPointsOf(F)) {

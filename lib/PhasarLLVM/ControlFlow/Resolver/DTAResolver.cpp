@@ -149,34 +149,35 @@ void DTAResolver::otherInst(const llvm::Instruction *Inst) {
 
     if (SrcStructType && DestStructType &&
         heuristicAntiConstructorVtablePos(BitCast)) {
-      typegraph.addLink(DestStructType, SrcStructType);
+      TypeGraph.addLink(DestStructType, SrcStructType);
     }
   }
 }
 
-set<const llvm::Function *>
-DTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite) {
-  set<const llvm::Function *> PossibleCallTargets;
+auto DTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
+    -> FunctionSetTy {
+  FunctionSetTy PossibleCallTargets;
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Call virtual function: " << llvmIRToString(CallSite));
+  PHASAR_LOG_LEVEL(DEBUG,
+                   "Call virtual function: " << llvmIRToString(CallSite));
 
-  auto VtableIndex = getVFTIndex(CallSite);
-  if (VtableIndex < 0) {
+  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  if (!RetrievedVtableIndex.has_value()) {
     // An error occured
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Error with resolveVirtualCall : impossible to retrieve "
+    PHASAR_LOG_LEVEL(DEBUG,
+                     "Error with resolveVirtualCall : impossible to retrieve "
                      "the vtable index\n"
-                  << llvmIRToString(CallSite) << "\n");
+                         << llvmIRToString(CallSite) << "\n");
     return {};
   }
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Virtual function table entry is: " << VtableIndex);
+  auto VtableIndex = RetrievedVtableIndex.value();
+
+  PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
   const auto *ReceiverType = getReceiverType(CallSite);
 
-  auto PossibleTypes = typegraph.getTypes(ReceiverType);
+  auto PossibleTypes = TypeGraph.getTypes(ReceiverType);
 
   // WARNING We deactivated the check on allocated because it is
   // unabled to get the types allocated in the used libraries
@@ -198,10 +199,10 @@ DTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite) {
     PossibleCallTargets = CHAResolver::resolveVirtualCall(CallSite);
   }
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG) << "Possible targets are:");
+  PHASAR_LOG_LEVEL(DEBUG, "Possible targets are:");
 #ifdef DYNAMIC_LOG
   for (const auto *Entry : PossibleCallTargets) {
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG) << Entry);
+    PHASAR_LOG_LEVEL(DEBUG, Entry);
   }
 #endif
 

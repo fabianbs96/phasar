@@ -40,29 +40,28 @@ public:
   using TypeGraph_t = CachedTypeGraph;
 
 protected:
-  TypeGraph_t typegraph;
+  TypeGraph_t TypeGraph;
 
   /**
    * An heuristic that return true if the bitcast instruction is interesting to
    * take into the DTA relational graph
    */
   static bool
-  heuristicAntiConstructorThisType(const llvm::BitCastInst *bitcast);
+  heuristicAntiConstructorThisType(const llvm::BitCastInst *BitCast);
 
   /**
    * Another heuristic that return true if the bitcast instruction is
    * interesting to take into the DTA relational graph (use the presence or not
    * of vtable)
    */
-  bool heuristicAntiConstructorVtablePos(const llvm::BitCastInst *bitcast);
+  bool heuristicAntiConstructorVtablePos(const llvm::BitCastInst *BitCast);
 
 public:
   DTAResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH);
 
   ~DTAResolver() override = default;
 
-  std::set<const llvm::Function *>
-  resolveVirtualCall(const llvm::CallBase *CallSite) override;
+  FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
 
   void otherInst(const llvm::Instruction *Inst) override;
 };

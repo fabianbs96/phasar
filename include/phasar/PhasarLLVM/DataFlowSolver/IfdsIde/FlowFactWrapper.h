@@ -7,10 +7,9 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_FLOWFACTWRAPPER_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_FLOWFACTWRAPPER_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_FLOWFACTWRAPPER_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_FLOWFACTWRAPPER_H
 
-#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -40,10 +39,10 @@ public:
   FlowFactWrapper(const T &F) : Fact(F) {}
   FlowFactWrapper(T &&F) : Fact(std::move(F)) {}
   ~FlowFactWrapper() override = default;
-  const std::optional<T> &get() const { return Fact; }
-  bool isZero() const { return !Fact; }
+  [[nodiscard]] const std::optional<T> &get() const { return Fact; }
+  [[nodiscard]] bool isZero() const { return !Fact; }
 
-  void print(std::ostream &OS) const override final {
+  void print(llvm::raw_ostream &OS) const final {
     if (isZero()) {
       OS << "Λ";
     } else {
@@ -52,7 +51,7 @@ public:
     OS << '\n';
   }
 
-  virtual void print(std::ostream &OS, const T &NonZeroFact) const {
+  virtual void print(llvm::raw_ostream &OS, const T &NonZeroFact) const {
     OS << NonZeroFact;
   }
 };
@@ -106,9 +105,9 @@ public:
   }
 
   template <typename... Args>
-  std::set<const FlowFact *> getOrCreateFlowFacts(Args &&...args) {
+  std::set<const FlowFact *> getOrCreateFlowFacts(Args &&...Arguments) {
     std::set<const FlowFact *> Ret;
-    (Ret.insert(getOrCreateFlowFact(std::forward<Args>(args))), ...);
+    (Ret.insert(getOrCreateFlowFact(std::forward<Args>(Arguments))), ...);
     return Ret;
   }
 };

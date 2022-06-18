@@ -14,13 +14,15 @@
  *      Author: philipp
  */
 
-#include <iostream>
 #include <utility>
 
-#include <phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h>
-#include <phasar/PhasarLLVM/DataFlowSolver/IfdsIde/FlowFunctions.h>
+#include "llvm/Support/raw_ostream.h"
+
+#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/FlowFunctions.h"
 
 #include "IFDSTabulationProblemTestPlugin.h"
+
 using namespace std;
 using namespace psr;
 
@@ -36,13 +38,13 @@ unique_ptr<IFDSTabulationProblemPlugin> makeIFDSTabulationProblemTestPlugin(
 }
 
 __attribute__((constructor)) void init() {
-  cout << "init - IFDSTabulationProblemTestPlugin\n";
+  llvm::outs() << "init - IFDSTabulationProblemTestPlugin\n";
   IFDSTabulationProblemPluginFactory["ifds_testplugin"] =
       &makeIFDSTabulationProblemTestPlugin;
 }
 
 __attribute__((destructor)) void fini() {
-  cout << "fini - IFDSTabulationProblemTestPlugin\n";
+  llvm::outs() << "fini - IFDSTabulationProblemTestPlugin\n";
 }
 
 IFDSTabulationProblemTestPlugin::IFDSTabulationProblemTestPlugin(
@@ -50,7 +52,7 @@ IFDSTabulationProblemTestPlugin::IFDSTabulationProblemTestPlugin(
     const LLVMBasedICFG *ICF, LLVMPointsToInfo *PT,
     std::set<std::string> EntryPoints)
     : IFDSTabulationProblemPlugin(IRDB, TH, ICF, PT, std::move(EntryPoints)) {
-  ZeroValue = ffManager.getOrCreateZero();
+  ZeroValue = FFManager.getOrCreateZero();
 }
 
 const FlowFact *IFDSTabulationProblemTestPlugin::createZeroValue() const {
@@ -59,33 +61,38 @@ const FlowFact *IFDSTabulationProblemTestPlugin::createZeroValue() const {
 
 IFDSTabulationProblemTestPlugin::FlowFunctionPtrType
 IFDSTabulationProblemTestPlugin::getNormalFlowFunction(
-    const llvm::Instruction *Curr, const llvm::Instruction *Succ) {
+    const llvm::Instruction * /*Curr*/, const llvm::Instruction * /*Succ*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSTabulationProblemTestPlugin::FlowFunctionPtrType
 IFDSTabulationProblemTestPlugin::getCallFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Function *DestFun) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*DestFun*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSTabulationProblemTestPlugin::FlowFunctionPtrType
 IFDSTabulationProblemTestPlugin::getRetFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Function *CalleeFun,
-    const llvm::Instruction *ExitSite, const llvm::Instruction *RetSite) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*CalleeFun*/,
+    const llvm::Instruction * /*ExitSite*/,
+    const llvm::Instruction * /*RetSite*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSTabulationProblemTestPlugin::FlowFunctionPtrType
 IFDSTabulationProblemTestPlugin::getCallToRetFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Instruction *RetSite,
-    set<const llvm::Function *> Callees) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Instruction * /*RetSite*/,
+    set<const llvm::Function *> /*Callees*/) {
   return Identity<const FlowFact *>::getInstance();
 }
 
 IFDSTabulationProblemTestPlugin::FlowFunctionPtrType
 IFDSTabulationProblemTestPlugin::getSummaryFlowFunction(
-    const llvm::Instruction *CallSite, const llvm::Function *DestFun) {
+    const llvm::Instruction * /*CallSite*/,
+    const llvm::Function * /*DestFun*/) {
   return nullptr;
 }
 
@@ -93,7 +100,7 @@ InitialSeeds<IFDSTabulationProblemTestPlugin::n_t,
              IFDSTabulationProblemTestPlugin::d_t,
              IFDSTabulationProblemTestPlugin::l_t>
 IFDSTabulationProblemTestPlugin::initialSeeds() {
-  cout << "IFDSTabulationProblemTestPlugin::initialSeeds()\n";
+  llvm::outs() << "IFDSTabulationProblemTestPlugin::initialSeeds()\n";
   InitialSeeds<IFDSTabulationProblemTestPlugin::n_t,
                IFDSTabulationProblemTestPlugin::d_t,
                IFDSTabulationProblemTestPlugin::l_t>

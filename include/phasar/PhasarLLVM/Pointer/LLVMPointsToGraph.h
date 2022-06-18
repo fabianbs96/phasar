@@ -10,7 +10,7 @@
 #ifndef PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOGRAPH_H_
 #define PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOGRAPH_H_
 
-#include <iostream>
+#include <ostream>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -24,6 +24,7 @@
 #include "phasar/Config/Configuration.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
+#include "phasar/PhasarLLVM/Pointer/PointsToSetOwner.h"
 
 namespace llvm {
 class Value;
@@ -60,11 +61,11 @@ public:
      */
     const llvm::Value *V = nullptr;
     VertexProperties() = default;
-    VertexProperties(const llvm::Value *v);
+    VertexProperties(const llvm::Value *V);
     std::string getValueAsString() const;
 
     // Fetching the users for V is expensive, so we cache the result.
-    mutable std::vector<const llvm::User *> users;
+    mutable std::vector<const llvm::User *> Users;
     std::vector<const llvm::User *> getUsers() const;
   };
 
@@ -75,8 +76,8 @@ public:
     /// This may contain a call or invoke instruction.
     const llvm::Value *V = nullptr;
     EdgeProperties() = default;
-    EdgeProperties(const llvm::Value *v);
-    std::string getValueAsString() const;
+    EdgeProperties(const llvm::Value *V);
+    [[nodiscard]] std::string getValueAsString() const;
   };
 
   /// Data structure for holding the points-to graph.
@@ -107,6 +108,11 @@ private:
   std::unordered_set<const llvm::Function *> AnalyzedFunctions;
   LLVMBasedPointsToAnalysis PTA;
 
+  PointsToSetOwner<PointsToSetTy>::memory_resource_type MRes;
+  PointsToSetOwner<PointsToSetTy> Owner{&MRes};
+  std::unordered_map<const llvm::Value *, DynamicPointsToSetPtr<PointsToSetTy>>
+      Cache;
+
   // void mergeGraph(const LLVMPointsToGraph &Other);
 
   void computePointsToGraph(const llvm::Value *V);
@@ -136,11 +142,11 @@ public:
   AliasResult alias(const llvm::Value *V1, const llvm::Value *V2,
                     const llvm::Instruction *I = nullptr) override;
 
-  std::shared_ptr<std::unordered_set<const llvm::Value *>>
+  PointsToSetPtrTy
   getPointsToSet(const llvm::Value *V,
                  const llvm::Instruction *I = nullptr) override;
 
-  std::shared_ptr<std::unordered_set<const llvm::Value *>>
+  AllocationSiteSetPtrTy
   getReachableAllocationSites(const llvm::Value *V, bool IntraProcOnly = false,
                               const llvm::Instruction *I = nullptr) override;
 
@@ -157,11 +163,11 @@ public:
                       const llvm::Instruction *I = nullptr,
                       AliasResult Kind = AliasResult::MustAlias) override;
 
-  void print(std::ostream &OS = std::cout) const override;
+  void print(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   nlohmann::json getAsJson() const override;
 
-  void printAsJson(std::ostream &OS = std::cout) const override;
+  void printAsJson(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   /**
    * @brief Returns true if graph contains 0 nodes.
@@ -217,8 +223,8 @@ public:
   public:
     PointerVertexOrEdgePrinter(const graph_t &PAG) : PAG(PAG) {}
     template <class VertexOrEdge>
-    void operator()(std::ostream &out, const VertexOrEdge &v) const {
-      out << "[label=\"" << PAG[v].getValueAsString() << "\"]";
+    void operator()(std::ostream &Out, const VertexOrEdge &V) const {
+      Out << "[label=\"" << PAG[V].getValueAsString() << "\"]";
     }
 
   private:
@@ -227,7 +233,7 @@ public:
 
   static inline PointerVertexOrEdgePrinter
   makePointerVertexOrEdgePrinter(const graph_t &PAG) {
-    return PointerVertexOrEdgePrinter(PAG);
+    return {PAG};
   }
 
   /**
@@ -235,7 +241,7 @@ public:
    * stream.
    * @param outputstream.
    */
-  void printAsDot(std::ostream &OS = std::cout) const;
+  void printAsDot(llvm::raw_ostream &OS = llvm::outs()) const;
 
   size_t getNumVertices() const;
 

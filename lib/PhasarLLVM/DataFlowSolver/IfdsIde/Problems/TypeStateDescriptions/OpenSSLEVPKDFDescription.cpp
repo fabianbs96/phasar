@@ -7,15 +7,11 @@
  *     Philipp Schubert, Fabian Schiebel and others
  *****************************************************************************/
 
-#include <iostream>
 #include <map>
 
 #include "llvm/Support/ErrorHandling.h"
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/TypeStateDescriptions/OpenSSLEVPKDFDescription.h"
-
-using namespace std;
-using namespace psr;
 
 namespace psr {
 
@@ -73,16 +69,15 @@ OpenSSLEVPKDFDescription::getNextState(std::string Tok,
     // std::cout << "Delta[" << Tok << ", " << stateToString(S)
     //           << "] = " << stateToString(ret) << std::endl;
     return Ret;
-  } else {
-    return OpenSSLEVPKDFState::BOT;
   }
+  return OpenSSLEVPKDFState::BOT;
 }
 
 std::string OpenSSLEVPKDFDescription::getTypeNameOfInterest() const {
   return "struct.evp_kdf_st";
 }
 
-set<int>
+std::set<int>
 OpenSSLEVPKDFDescription::getConsumerParamIdx(const std::string &F) const {
   if (isConsumingFunction(F)) {
     return OpenSSLEVPKDFFuncs.at(F);
@@ -90,7 +85,7 @@ OpenSSLEVPKDFDescription::getConsumerParamIdx(const std::string &F) const {
   return {};
 }
 
-set<int>
+std::set<int>
 OpenSSLEVPKDFDescription::getFactoryParamIdx(const std::string &F) const {
   if (isFactoryFunction(F)) {
     // Trivial here, since we only generate via return value
@@ -139,14 +134,14 @@ TypeStateDescription::State OpenSSLEVPKDFDescription::error() const {
 }
 
 OpenSSLEVPKDFDescription::OpenSSLEVTKDFToken
-OpenSSLEVPKDFDescription::funcNameToToken(const std::string &F) {
-  if (F == "EVP_KDF_fetch") {
+OpenSSLEVPKDFDescription::funcNameToToken(const std::string &FuncName) {
+  if (FuncName == "EVP_KDF_fetch") {
     return OpenSSLEVTKDFToken::EVP_KDF_FETCH;
-  } else if (F == "EVP_KDF_free") {
-    return OpenSSLEVTKDFToken::EVP_KDF_FREE;
-  } else {
-    return OpenSSLEVTKDFToken::STAR;
   }
+  if (FuncName == "EVP_KDF_free") {
+    return OpenSSLEVTKDFToken::EVP_KDF_FREE;
+  }
+  return OpenSSLEVTKDFToken::STAR;
 }
 
 } // namespace psr

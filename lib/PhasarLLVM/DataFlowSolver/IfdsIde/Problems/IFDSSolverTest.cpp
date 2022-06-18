@@ -33,44 +33,43 @@ IFDSSolverTest::IFDSSolverTest(const ProjectIRDB *IRDB,
                                const LLVMBasedICFG *ICF, LLVMPointsToInfo *PT,
                                std::set<std::string> EntryPoints)
     : IFDSTabulationProblem(IRDB, TH, ICF, PT, std::move(EntryPoints)) {
-  IFDSSolverTest::ZeroValue = createZeroValue();
+  IFDSSolverTest::ZeroValue = IFDSSolverTest::createZeroValue();
 }
 
 IFDSSolverTest::FlowFunctionPtrType
-IFDSSolverTest::getNormalFlowFunction(IFDSSolverTest::n_t Curr,
-                                      IFDSSolverTest::n_t Succ) {
+IFDSSolverTest::getNormalFlowFunction(IFDSSolverTest::n_t /*Curr*/,
+                                      IFDSSolverTest::n_t /*Succ*/) {
   return Identity<IFDSSolverTest::d_t>::getInstance();
 }
 
 IFDSSolverTest::FlowFunctionPtrType
-IFDSSolverTest::getCallFlowFunction(IFDSSolverTest::n_t CallSite,
-                                    IFDSSolverTest::f_t DestFun) {
+IFDSSolverTest::getCallFlowFunction(IFDSSolverTest::n_t /*CallSite*/,
+                                    IFDSSolverTest::f_t /*DestFun*/) {
   return Identity<IFDSSolverTest::d_t>::getInstance();
 }
 
 IFDSSolverTest::FlowFunctionPtrType IFDSSolverTest::getRetFlowFunction(
-    IFDSSolverTest::n_t CallSite, IFDSSolverTest::f_t CalleeFun,
-    IFDSSolverTest::n_t ExitSite, IFDSSolverTest::n_t RetSite) {
+    IFDSSolverTest::n_t /*CallSite*/, IFDSSolverTest::f_t /*CalleeFun*/,
+    IFDSSolverTest::n_t /*ExitStmt*/, IFDSSolverTest::n_t /*RetSite*/) {
   return Identity<IFDSSolverTest::d_t>::getInstance();
 }
 
 IFDSSolverTest::FlowFunctionPtrType
-IFDSSolverTest::getCallToRetFlowFunction(IFDSSolverTest::n_t CallSite,
-                                         IFDSSolverTest::n_t RetSite,
-                                         set<IFDSSolverTest::f_t> Callees) {
+IFDSSolverTest::getCallToRetFlowFunction(IFDSSolverTest::n_t /*CallSite*/,
+                                         IFDSSolverTest::n_t /*RetSite*/,
+                                         set<IFDSSolverTest::f_t> /*Callees*/) {
   return Identity<IFDSSolverTest::d_t>::getInstance();
 }
 
 IFDSSolverTest::FlowFunctionPtrType
-IFDSSolverTest::getSummaryFlowFunction(IFDSSolverTest::n_t CallSite,
-                                       IFDSSolverTest::f_t DestFun) {
+IFDSSolverTest::getSummaryFlowFunction(IFDSSolverTest::n_t /*CallSite*/,
+                                       IFDSSolverTest::f_t /*DestFun*/) {
   return nullptr;
 }
 
 InitialSeeds<IFDSSolverTest::n_t, IFDSSolverTest::d_t, IFDSSolverTest::l_t>
 IFDSSolverTest::initialSeeds() {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "IFDSSolverTest::initialSeeds()");
+  PHASAR_LOG_LEVEL(DEBUG, "IFDSSolverTest::initialSeeds()");
   InitialSeeds<IFDSSolverTest::n_t, IFDSSolverTest::d_t, IFDSSolverTest::l_t>
       Seeds;
   for (const auto &EntryPoint : EntryPoints) {
@@ -85,21 +84,23 @@ IFDSSolverTest::d_t IFDSSolverTest::createZeroValue() const {
   return LLVMZeroValue::getInstance();
 }
 
-bool IFDSSolverTest::isZeroValue(IFDSSolverTest::d_t D) const {
-  return LLVMZeroValue::getInstance()->isLLVMZeroValue(D);
+bool IFDSSolverTest::isZeroValue(IFDSSolverTest::d_t Fact) const {
+  return LLVMZeroValue::getInstance()->isLLVMZeroValue(Fact);
 }
 
-void IFDSSolverTest::printNode(ostream &OS, IFDSSolverTest::n_t N) const {
-  OS << llvmIRToString(N);
+void IFDSSolverTest::printNode(llvm::raw_ostream &OS,
+                               IFDSSolverTest::n_t Stmt) const {
+  OS << llvmIRToString(Stmt);
 }
 
-void IFDSSolverTest::printDataFlowFact(ostream &OS,
-                                       IFDSSolverTest::d_t D) const {
-  OS << llvmIRToString(D);
+void IFDSSolverTest::printDataFlowFact(llvm::raw_ostream &OS,
+                                       IFDSSolverTest::d_t Fact) const {
+  OS << llvmIRToString(Fact);
 }
 
-void IFDSSolverTest::printFunction(ostream &OS, IFDSSolverTest::f_t M) const {
-  OS << M->getName().str();
+void IFDSSolverTest::printFunction(llvm::raw_ostream &OS,
+                                   IFDSSolverTest::f_t Func) const {
+  OS << Func->getName();
 }
 
 } // namespace psr

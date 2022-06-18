@@ -1,6 +1,6 @@
 set(PHASAR_pointer_COMPONENT_FOUND 1)
 
-find_package(Boost COMPONENTS log filesystem graph REQUIRED)
+find_package(Boost COMPONENTS graph REQUIRED)
 
 list(APPEND
   PHASAR_LLVM_DEPS
@@ -11,6 +11,7 @@ list(APPEND
 
 list(APPEND
   PHASAR_POINTER_DEPS
+  db
   utils
 )
 

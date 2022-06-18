@@ -7,26 +7,24 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include <ostream>
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/DataFlowSolver/WPDS/WPDSSolverConfig.h"
-
-using namespace std;
-using namespace psr;
 
 namespace psr {
 
 WPDSSolverConfig::WPDSSolverConfig(bool RecordWitnesses,
                                    WPDSSearchDirection SearchDirection,
-                                   WPDSType Wpdsty)
-    : recordWitnesses(RecordWitnesses), searchDirection(SearchDirection),
-      wpdsty(Wpdsty) {}
+                                   enum WPDSType Wpdsty)
+    : RecordWitnesses(RecordWitnesses), Direction(SearchDirection),
+      WPDSType(Wpdsty) {}
 
-ostream &operator<<(ostream &OS, const WPDSSolverConfig &SC) {
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              const WPDSSolverConfig &SC) {
   return OS << "WPDSSolverConfig:\n"
-            << "\trecordWitnesses: " << SC.recordWitnesses << "\n"
-            << "\tsearchDirection: " << SC.searchDirection << "\n"
-            << "\twpdsty: " << SC.wpdsty << "\n";
+            << "\trecordWitnesses: " << SC.RecordWitnesses << "\n"
+            << "\tsearchDirection: " << SC.Direction << "\n"
+            << "\twpdsty: " << SC.WPDSType << "\n";
 }
 
 } // namespace psr

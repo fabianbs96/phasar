@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,7 @@
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarPass/Options.h"
 #include "phasar/Utils/LLVMIRToSrc.h"
 #include "phasar/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -32,36 +34,41 @@ using MapTy = llvm::DenseMap<const llvm::Function *,
 
 class LLVMBasedICFGExportTest : public ::testing::Test {
 protected:
-  const std::string &pathToLLFiles = unittest::PathToLLTestFiles;
-  const std::string &pathToJSONFiles = unittest::PathToJSONTestFiles;
+  const std::string &PathToLLFiles = unittest::PathToLLTestFiles;
+  const std::string &PathToJSONFiles = unittest::PathToJSONTestFiles;
 
-  void SetUp() override {
-    boost::log::core::get()->set_logging_enabled(false);
-    ValueAnnotationPass::resetValueID();
-  }
+  void SetUp() override { ValueAnnotationPass::resetValueID(); }
 
-  nlohmann::json exportICFG(const std::string &testFile,
-                            bool asSrcCode = false) {
-    ProjectIRDB IRDB({pathToLLFiles + testFile}, IRDBOptions::WPA);
+  nlohmann::json exportICFG(const std::string &TestFile,
+                            bool AsSrcCode = false) {
+    ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMTypeHierarchy TH(IRDB);
     LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
 
-    return asSrcCode ? ICFG.exportICFGAsSourceCodeJson()
-                     : ICFG.exportICFGAsJson();
+    auto Ret =
+        AsSrcCode ? ICFG.exportICFGAsSourceCodeJson() : ICFG.exportICFGAsJson();
+
+    // llvm::errs() << "Result: " << Ret.dump(4) << '\n';
+
+    return Ret;
   }
 
-  nlohmann::json exportCFGFor(const std::string &testFile,
+  nlohmann::json exportCFGFor(const std::string &TestFile,
                               const std::string &FunctionName,
-                              bool asSrcCode = false) {
-    ProjectIRDB IRDB({pathToLLFiles + testFile}, IRDBOptions::WPA);
+                              bool AsSrcCode = false) {
+    ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMBasedCFG CFG;
 
     const auto *F = IRDB.getFunction(FunctionName);
     assert(F != nullptr && "Invalid function");
     // ASSERT_NE(nullptr, F);
 
-    return asSrcCode ? CFG.exportCFGAsSourceCodeJson(F)
-                     : CFG.exportCFGAsJson(F);
+    auto Ret =
+        AsSrcCode ? CFG.exportCFGAsSourceCodeJson(F) : CFG.exportCFGAsJson(F);
+
+    // llvm::errs() << "Result: " << Ret.dump(4) << '\n';
+
+    return Ret;
   }
 
   MapTy getAllRetSites(const LLVMBasedICFG &ICFG) {
@@ -87,30 +94,34 @@ protected:
                     bool WithDebugOutput = false) {
     auto RetSitesOf = getAllRetSites(GroundTruth);
 
-    auto expectEdge = [&](const std::string &From, const std::string &To) {
-      EXPECT_TRUE(std::any_of(
-          ExportedICFG.begin(), ExportedICFG.end(),
-          [&](auto &&Elem) {
-            return Elem == nlohmann::json{{"from", From}, {"to", To}};
-          }))
-          << "No edge from " << From << " to " << To;
-    };
+    auto expectEdge // NOLINT
+        = [&](const std::string &From, const std::string &To) {
+            EXPECT_TRUE(std::any_of(
+                ExportedICFG.begin(), ExportedICFG.end(),
+                [&](auto &&Elem) {
+                  return Elem == nlohmann::json{{"from", From}, {"to", To}};
+                }))
+                << "No edge from " << From << " to " << To << " in "
+                << ExportedICFG.dump(4);
+          };
 
-    auto print = [WithDebugOutput](auto &&...Args) {
-      if (WithDebugOutput) {
-        ((llvm::errs() << Args), ...);
-        llvm::errs() << "\n";
-      }
-    };
+    auto print // NOLINT
+        = [WithDebugOutput](auto &&...Args) {
+            if (WithDebugOutput) {
+              ((llvm::errs() << Args), ...);
+              llvm::errs() << "\n";
+            }
+          };
 
     for (const auto *F : GroundTruth.getAllFunctions()) {
       for (const auto &Inst : llvm::instructions(F)) {
-        auto InstStr = llvmIRToString(&Inst);
+        auto InstStr = llvmIRToStableString(&Inst);
         if (llvm::isa<llvm::CallBase>(&Inst)) {
           for (const auto *Callee : GroundTruth.getCalleesOfCallAt(&Inst)) {
             if (!Callee->isDeclaration()) {
               print("Callee: ", *Callee);
-              expectEdge(InstStr, llvmIRToString(&Callee->front().front()));
+              expectEdge(InstStr,
+                         llvmIRToStableString(&Callee->front().front()));
 
               print("> end");
             }
@@ -120,11 +131,11 @@ protected:
           const auto &RetSites = RetSitesOf[Inst.getFunction()];
 
           for (const auto *Ret : RetSites) {
-            expectEdge(InstStr, llvmIRToString(Ret));
+            expectEdge(InstStr, llvmIRToStableString(Ret));
           }
         } else {
           for (const auto *Succ : GroundTruth.getSuccsOf(&Inst)) {
-            expectEdge(InstStr, llvmIRToString(Succ));
+            expectEdge(InstStr, llvmIRToStableString(Succ));
           }
         }
       }
@@ -153,22 +164,24 @@ protected:
     }
   }
 
-  nlohmann::json readJson(const std::string &jsonfileName) {
-    std::ifstream fIn(pathToJSONFiles + jsonfileName);
-    assert(fIn.good() && "Invalid JSON file");
+  nlohmann::json readJson(const std::string &JsonFilename) {
+    std::ifstream IfIn(PathToJSONFiles + JsonFilename);
+    assert(IfIn.good() && "Invalid JSON file");
 
     nlohmann::json J;
-    fIn >> J;
+    IfIn >> J;
 
-    assert(fIn.good() && "Error reading JSON file");
+    assert(IfIn.good() && "Error reading JSON file");
     return J;
   }
 
-  void verifyExportICFG(const std::string &testFile,
+  void verifyExportICFG(const std::string &TestFile,
                         bool WithDebugOutput = false) {
-    ProjectIRDB IRDB({pathToLLFiles + testFile}, IRDBOptions::WPA);
+    ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMTypeHierarchy TH(IRDB);
     LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
+
+    std::cerr << "ModuleRef: " << IRDB.getWPAModule() << "\n";
 
     verifyIRJson(ICFG.exportICFGAsJson(), ICFG, WithDebugOutput);
   }
@@ -263,33 +276,33 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGIRV9) {
 }
 
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
-  auto results =
+  auto Results =
       exportICFG("linear_constant/call_01_cpp_dbg.ll", /*asSrcCode*/ true);
-  verifySourceCodeJSON(results,
+  verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_01_cpp_icfg.json"));
 }
 
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
-  auto results =
+  auto Results =
       exportICFG("linear_constant/call_07_cpp_dbg.ll", /*asSrcCode*/ true);
-  // std::cerr << results.dump(4) << std::endl;
-  verifySourceCodeJSON(results,
+  // std::cerr << Results.dump(4) << std::endl;
+  verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
 
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
-  auto results =
+  auto Results =
       exportICFG("exceptions/exceptions_01_cpp_dbg.ll", /*asSrcCode*/ true);
-  // std::cerr << results.dump(4) << std::endl;
-  verifySourceCodeJSON(results,
+  // std::cerr << Results.dump(4) << std::endl;
+  verifySourceCodeJSON(Results,
                        readJson("exceptions/exceptions_01_cpp_icfg.json"));
 }
 
 TEST_F(LLVMBasedICFGExportTest, ExportCFG01) {
-  auto results = exportCFGFor("linear_constant/branch_07_cpp_dbg.ll", "main",
+  auto Results = exportCFGFor("linear_constant/branch_07_cpp_dbg.ll", "main",
                               /*asSrcCode*/ true);
-  // std::cerr << results.dump(4) << std::endl;
-  verifySourceCodeJSON(results,
+  // std::cerr << Results.dump(4) << std::endl;
+  verifySourceCodeJSON(Results,
                        readJson("linear_constant/branch_07_cpp_main_cfg.json"));
 }
 

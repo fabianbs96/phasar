@@ -7,14 +7,12 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <limits>
 #include <string>
 
 #include "boost/algorithm/string/trim.hpp"
-#include "boost/filesystem.hpp"
-#include "boost/filesystem/path.hpp"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -35,8 +33,8 @@ using namespace psr;
 namespace psr {
 
 llvm::DbgVariableIntrinsic *getDbgVarIntrinsic(const llvm::Value *V) {
-  if (auto *VAM =
-          llvm::ValueAsMetadata::getIfExists(const_cast<llvm::Value *>(V))) {
+  if (auto *VAM = llvm::ValueAsMetadata::getIfExists(
+          const_cast<llvm::Value *>(V))) { // NOLINT FIXME when LLVM supports it
     if (auto *MDV = llvm::MetadataAsValue::getIfExists(V->getContext(), VAM)) {
       for (auto *U : MDV->users()) {
         if (auto *DBGIntr = llvm::dyn_cast<llvm::DbgVariableIntrinsic>(U)) {
@@ -134,7 +132,8 @@ llvm::DIFile *getDIFile(const llvm::Value *V) {
 std::string getVarNameFromIR(const llvm::Value *V) {
   if (auto *LocVar = getDILocalVariable(V)) {
     return LocVar->getName().str();
-  } else if (auto *GlobVar = getDIGlobalVariable(V)) {
+  }
+  if (auto *GlobVar = getDIGlobalVariable(V)) {
     return GlobVar->getName().str();
   }
   return "";
@@ -144,9 +143,11 @@ std::string getFunctionNameFromIR(const llvm::Value *V) {
   // We can return unmangled function names w/o checking debug info
   if (const auto *F = llvm::dyn_cast<llvm::Function>(V)) {
     return F->getName().str();
-  } else if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
+  }
+  if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
     return Arg->getParent()->getName().str();
-  } else if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
+  }
+  if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
     return I->getFunction()->getName().str();
   }
   return "";
@@ -154,8 +155,8 @@ std::string getFunctionNameFromIR(const llvm::Value *V) {
 
 std::string getFilePathFromIR(const llvm::Value *V) {
   if (auto *DIF = getDIFile(V)) {
-    boost::filesystem::path File(DIF->getFilename().str());
-    boost::filesystem::path Dir(DIF->getDirectory().str());
+    std::filesystem::path File(DIF->getFilename().str());
+    std::filesystem::path Dir(DIF->getDirectory().str());
     if (!File.empty()) {
       // try to concatenate file path and dir to get absolut path
       if (!File.has_root_directory() && !Dir.empty()) {
@@ -169,9 +170,11 @@ std::string getFilePathFromIR(const llvm::Value *V) {
      * will return 'llvm-link' for linked modules. */
     if (const auto *F = llvm::dyn_cast<llvm::Function>(V)) {
       return F->getParent()->getSourceFileName();
-    } else if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
+    }
+    if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
       return Arg->getParent()->getParent()->getSourceFileName();
-    } else if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
+    }
+    if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
       return I->getFunction()->getParent()->getSourceFileName();
     }
   }
@@ -182,9 +185,11 @@ unsigned int getLineFromIR(const llvm::Value *V) {
   // Argument and Instruction
   if (auto *DILoc = getDILocation(V)) {
     return DILoc->getLine();
-  } else if (auto *DISubpr = getDISubprogram(V)) { // Function
+  }
+  if (auto *DISubpr = getDISubprogram(V)) { // Function
     return DISubpr->getLine();
-  } else if (auto *DIGV = getDIGlobalVariable(V)) { // Globals
+  }
+  if (auto *DIGV = getDIGlobalVariable(V)) { // Globals
     return DIGV->getLine();
   }
   return 0;
@@ -194,12 +199,14 @@ std::string getDirectoryFromIR(const llvm::Value *V) {
   // Argument and Instruction
   if (auto *DILoc = getDILocation(V)) {
     return DILoc->getDirectory().str();
-  } else if (auto *DISubpr = getDISubprogram(V)) { // Function
+  }
+  if (auto *DISubpr = getDISubprogram(V)) { // Function
     return DISubpr->getDirectory().str();
-  } else if (auto *DIGV = getDIGlobalVariable(V)) { // Globals
+  }
+  if (auto *DIGV = getDIGlobalVariable(V)) { // Globals
     return DIGV->getDirectory().str();
   }
-  return nullptr;
+  return "";
 }
 
 unsigned int getColumnFromIR(const llvm::Value *V) {
@@ -213,9 +220,8 @@ unsigned int getColumnFromIR(const llvm::Value *V) {
 std::string getSrcCodeFromIR(const llvm::Value *V) {
   unsigned int LineNr = getLineFromIR(V);
   if (LineNr > 0) {
-    boost::filesystem::path Path(getFilePathFromIR(V));
-    if (boost::filesystem::exists(Path) &&
-        !boost::filesystem::is_directory(Path)) {
+    std::filesystem::path Path(getFilePathFromIR(V));
+    if (std::filesystem::exists(Path) && !std::filesystem::is_directory(Path)) {
       std::ifstream Ifs(Path.string(), std::ios::binary);
       if (Ifs.is_open()) {
         Ifs.seekg(std::ios::beg);
@@ -235,9 +241,11 @@ std::string getSrcCodeFromIR(const llvm::Value *V) {
 std::string getModuleIDFromIR(const llvm::Value *V) {
   if (const auto *GO = llvm::dyn_cast<llvm::GlobalObject>(V)) {
     return GO->getParent()->getModuleIdentifier();
-  } else if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
+  }
+  if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
     return Arg->getParent()->getParent()->getModuleIdentifier();
-  } else if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
+  }
+  if (const auto *I = llvm::dyn_cast<llvm::Instruction>(V)) {
     return I->getFunction()->getParent()->getModuleIdentifier();
   }
   return "";
@@ -262,8 +270,8 @@ bool SourceCodeInfo::equivalentWith(const SourceCodeInfo &Other) const {
     return false;
   }
 
-  auto Pos =
-      SourceCodeFilename.find_last_of(boost::filesystem::path::separator);
+  auto Pos = SourceCodeFilename.find_last_of(
+      std::filesystem::path::preferred_separator);
   if (Pos == std::string::npos) {
     Pos = 0;
   }

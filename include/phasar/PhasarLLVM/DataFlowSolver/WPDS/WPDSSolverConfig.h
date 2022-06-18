@@ -7,28 +7,31 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_WPDS_SOLVERCONFIGURATION_H_
-#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_WPDS_SOLVERCONFIGURATION_H_
-
-#include <iosfwd>
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_WPDS_WPDSSOLVERCONFIG_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_WPDS_WPDSSOLVERCONFIG_H
 
 #include "phasar/PhasarLLVM/DataFlowSolver/WPDS/WPDSOptions.h"
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace psr {
 
 struct WPDSSolverConfig {
   WPDSSolverConfig() = default;
-  WPDSSolverConfig(bool recordWitnesses, WPDSSearchDirection searchDirection,
-                   WPDSType wpdsty);
+  WPDSSolverConfig(bool RecordWitnesses, WPDSSearchDirection Direction,
+                   WPDSType WPDSTy);
   ~WPDSSolverConfig() = default;
   WPDSSolverConfig(const WPDSSolverConfig &) = default;
   WPDSSolverConfig &operator=(const WPDSSolverConfig &) = default;
   WPDSSolverConfig(WPDSSolverConfig &&) = default;
   WPDSSolverConfig &operator=(WPDSSolverConfig &&) = default;
-  bool recordWitnesses = false;
-  WPDSSearchDirection searchDirection = WPDSSearchDirection::FORWARD;
-  WPDSType wpdsty = WPDSType::FWPDS;
-  friend std::ostream &operator<<(std::ostream &os, const WPDSSolverConfig &sc);
+  bool RecordWitnesses = false;
+  WPDSSearchDirection Direction = WPDSSearchDirection::FORWARD;
+  WPDSType WPDSType = WPDSType::FWPDS;
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const WPDSSolverConfig &SC);
 };
 
 } // namespace psr

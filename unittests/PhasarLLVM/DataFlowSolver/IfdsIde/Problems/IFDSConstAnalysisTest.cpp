@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 
 #include "TestConfig.h"
+#include "phasar/Utils/LLVMShorthands.h"
 
 using namespace std;
 using namespace psr;
@@ -41,12 +42,7 @@ protected:
         IRDB.get(), TH.get(), ICFG.get(), PT.get(), EntryPoints);
   }
 
-  void SetUp() override {
-    initializeLogger(false);
-    ValueAnnotationPass::resetValueID();
-  }
-
-  void TearDown() override {}
+  void SetUp() override { ValueAnnotationPass::resetValueID(); }
 
   void compareResults(const std::set<unsigned long> &GroundTruth,
                       IFDSSolver_P<IFDSConstAnalysis> &Solver) {
@@ -58,12 +54,14 @@ protected:
         if (isAllocaInstOrHeapAllocaFunction(Fact) ||
             (llvm::isa<llvm::GlobalValue>(Fact) &&
              !Constproblem->isZeroValue(Fact))) {
+
           AllMutableAllocas.insert(Fact);
         }
       }
     }
     std::set<unsigned long> MutableIDs;
     for (const auto *Memloc : AllMutableAllocas) {
+      std::cerr << "> Is Mutable: " << llvmIRToShortString(Memloc) << "\n";
       MutableIDs.insert(std::stoul(getMetaDataID(Memloc)));
     }
     EXPECT_EQ(GroundTruth, MutableIDs);
@@ -185,7 +183,9 @@ TEST_F(IFDSConstAnalysisTest, HandleGlobalTest_03) {
   initialize({PathToLlFiles + "global/global_03_cpp_m2r_dbg.ll"});
   IFDSSolver_P<IFDSConstAnalysis> Llvmconstsolver(*Constproblem);
   Llvmconstsolver.solve();
-  compareResults({0, 1, 2}, Llvmconstsolver);
+
+  /// The @llvm.global_ctors global variable is never immutable
+  compareResults({0, /*1,*/ 2}, Llvmconstsolver);
 }
 
 TEST_F(IFDSConstAnalysisTest, DISABLED_HandleGlobalTest_04) {
@@ -321,6 +321,7 @@ TEST_F(IFDSConstAnalysisTest, HandleArrayTest_06) {
   initialize({PathToLlFiles + "array/array_06_cpp_m2r_dbg.ll"});
   IFDSSolver_P<IFDSConstAnalysis> Llvmconstsolver(*Constproblem);
   Llvmconstsolver.solve();
+  PT->print(llvm::errs());
   compareResults({1}, Llvmconstsolver);
 }
 
@@ -362,16 +363,15 @@ TEST_F(IFDSConstAnalysisTest, HandleSTLArrayTest_02) {
   compareResults({0, 1}, Llvmconstsolver);
 }
 
-TEST_F(IFDSConstAnalysisTest, HandleSTLArrayTest_03) {
-// If we use libcxx this won't work since internal implementation is different
-#ifdef _LIBCPP_VERSION
-  GTEST_SKIP();
-#endif
+PHASAR_SKIP_TEST(TEST_F(IFDSConstAnalysisTest, HandleSTLArrayTest_03) {
+  // If we use libcxx this won't work since internal implementation is different
+  LIBCPP_GTEST_SKIP;
+
   initialize({PathToLlFiles + "array/stl_array/stl_array_03_cpp_m2r_dbg.ll"});
   IFDSSolver_P<IFDSConstAnalysis> Llvmconstsolver(*Constproblem);
   Llvmconstsolver.solve();
   compareResults({0, 1, 2}, Llvmconstsolver);
-}
+})
 
 TEST_F(IFDSConstAnalysisTest, DISABLED_HandleSTLArrayTest_04) {
   // Guaranteed to fail - enable, once we have more precise points-to

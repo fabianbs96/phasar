@@ -31,38 +31,39 @@ using namespace psr;
 CHAResolver::CHAResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH)
     : Resolver(IRDB, TH) {}
 
-set<const llvm::Function *>
-CHAResolver::resolveVirtualCall(const llvm::CallBase *CallSite) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG) << "Call virtual function: ");
+auto CHAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
+    -> FunctionSetTy {
+  PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: ");
   // Leading to SEGFAULT in Unittests. Error only when run in Debug mode
   // << llvmIRToString(CallSite));
 
-  auto VFTIdx = getVFTIndex(CallSite);
-  if (VFTIdx < 0) {
+  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  if (!RetrievedVtableIndex.has_value()) {
     // An error occured
-    LOG_IF_ENABLE(
-        BOOST_LOG_SEV(lg::get(), DEBUG)
-        << "Error with resolveVirtualCall : impossible to retrieve "
-           "the vtable index\n"
-        // Leading to SEGFAULT in Unittests. Error only when run in Debug mode
-        // << llvmIRToString(CallSite)
-        << "\n");
+    PHASAR_LOG_LEVEL(DEBUG,
+                     "Error with resolveVirtualCall : impossible to retrieve "
+                     "the vtable index\n"
+                         // Leading to SEGFAULT in Unittests. Error only when
+                         // run in Debug mode
+                         // << llvmIRToString(CallSite)
+                         << "\n");
     return {};
   }
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Virtual function table entry is: " << VFTIdx);
+  auto VtableIndex = RetrievedVtableIndex.value();
+
+  PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
   const auto *ReceiverTy = getReceiverType(CallSite);
 
   // also insert all possible subtypes vtable entries
   auto FallbackTys = Resolver::TH->getSubTypes(ReceiverTy);
 
-  set<const llvm::Function *> PossibleCallees;
+  FunctionSetTy PossibleCallees;
 
   for (const auto &FallbackTy : FallbackTys) {
     const auto *Target =
-        getNonPureVirtualVFTEntry(FallbackTy, VFTIdx, CallSite);
+        getNonPureVirtualVFTEntry(FallbackTy, VtableIndex, CallSite);
     if (Target) {
       PossibleCallees.insert(Target);
     }

@@ -14,7 +14,6 @@
  *      Author: pdschbrt
  */
 
-#include <iostream>
 #include <string>
 
 #include "llvm/Analysis/LoopInfo.h"
@@ -42,9 +41,9 @@ size_t ValueAnnotationPass::UniqueValueId = 0;
 ValueAnnotationPass::ValueAnnotationPass() = default;
 
 llvm::PreservedAnalyses
-ValueAnnotationPass::run(llvm::Module &M, llvm::ModuleAnalysisManager &AM) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), INFO)
-                << "Running ValueAnnotationPass");
+ValueAnnotationPass::run(llvm::Module &M,
+                         llvm::ModuleAnalysisManager & /*AM*/) {
+  PHASAR_LOG_LEVEL(INFO, "Running ValueAnnotationPass");
   auto &Context = M.getContext();
   for (auto &Global : M.globals()) {
     llvm::MDNode *Node = llvm::MDNode::get(
@@ -73,7 +72,7 @@ ValueAnnotationPass::run(llvm::Module &M, llvm::ModuleAnalysisManager &AM) {
 }
 
 void ValueAnnotationPass::resetValueID() {
-  cout << "Reset ID" << endl;
+  llvm::outs() << "Reset ID" << '\n';
   UniqueValueId = 0;
 }
 

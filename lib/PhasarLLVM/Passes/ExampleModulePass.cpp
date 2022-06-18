@@ -7,8 +7,6 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include <iostream>
-
 #include "llvm/IR/Module.h"
 
 #include "phasar/PhasarLLVM/Passes/ExampleModulePass.h"
@@ -23,8 +21,9 @@ llvm::AnalysisKey ExampleModulePass::Key;
 ExampleModulePass::ExampleModulePass() = default;
 
 llvm::PreservedAnalyses
-ExampleModulePass::run(llvm::Module &M, llvm::ModuleAnalysisManager &MAM) {
-  cout << "ExampleModulePass::run()\n";
+ExampleModulePass::run(llvm::Module & /*M*/,
+                       llvm::ModuleAnalysisManager & /*MAM*/) {
+  llvm::outs() << "ExampleModulePass::run()\n";
   return llvm::PreservedAnalyses::all();
 }
 

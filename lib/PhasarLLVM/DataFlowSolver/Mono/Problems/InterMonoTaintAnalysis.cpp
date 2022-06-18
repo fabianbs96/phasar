@@ -7,7 +7,6 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include <iostream>
 #include <unordered_map>
 #include <utility>
 
@@ -20,31 +19,28 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/Mono/Problems/InterMonoTaintAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfigUtilities.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarLLVM/Utils/TaintConfiguration.h"
+#include "phasar/Utils/BitVectorSet.h"
 #include "phasar/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Utilities.h"
-
-using namespace std;
-using namespace psr;
 
 namespace psr {
 
 InterMonoTaintAnalysis::InterMonoTaintAnalysis(
     const ProjectIRDB *IRDB, const LLVMTypeHierarchy *TH,
     const LLVMBasedICFG *ICF, const LLVMPointsToInfo *PT,
-    const TaintConfiguration<InterMonoTaintAnalysis::d_t> &TSF,
-    std::set<std::string> EntryPoints)
+    const TaintConfig &Config, std::set<std::string> EntryPoints)
     : InterMonoProblem<InterMonoTaintAnalysisDomain>(IRDB, TH, ICF, PT,
                                                      std::move(EntryPoints)),
-      TSF(TSF) {}
+      Config(Config) {}
 
 InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::merge(
     const InterMonoTaintAnalysis::mono_container_t &Lhs,
     const InterMonoTaintAnalysis::mono_container_t &Rhs) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::join()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::join()");
   // cout << "InterMonoTaintAnalysis::join()\n";
   return Lhs.setUnion(Rhs);
 }
@@ -52,16 +48,14 @@ InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::merge(
 bool InterMonoTaintAnalysis::equal_to(
     const InterMonoTaintAnalysis::mono_container_t &Lhs,
     const InterMonoTaintAnalysis::mono_container_t &Rhs) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::sqSubSetEqual()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::sqSubSetEqual()");
   return Rhs == Lhs;
 }
 
 InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::normalFlow(
     InterMonoTaintAnalysis::n_t Inst,
     const InterMonoTaintAnalysis::mono_container_t &In) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::normalFlow()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::normalFlow()");
   InterMonoTaintAnalysis::mono_container_t Out(In);
   if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Inst)) {
     if (In.count(Store->getValueOperand())) {
@@ -80,32 +74,23 @@ InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::normalFlow(
       Out.insert(Gep);
     }
   }
+  if (const auto *Cast = llvm::dyn_cast<llvm::CastInst>(Inst)) {
+    if (In.count(Cast->getOperand(0))) {
+      Out.insert(Cast);
+    }
+  }
   return Out;
 }
 
 InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::callFlow(
     InterMonoTaintAnalysis::n_t CallSite, const llvm::Function *Callee,
     const InterMonoTaintAnalysis::mono_container_t &In) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::callFlow()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::callFlow()");
   InterMonoTaintAnalysis::mono_container_t Out;
-  const llvm::CallBase *CS = llvm::cast<llvm::CallBase>(CallSite);
-  vector<InterMonoTaintAnalysis::d_t> Actuals;
-  vector<InterMonoTaintAnalysis::d_t> Formals;
-  // set up the actual parameters
-  for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
-    Actuals.push_back(CS->getArgOperand(Idx));
-  }
-  // set up the formal parameters
-  /* for (unsigned idx = 0; idx < Callee->arg_size(); ++idx) {
-    Formals.push_back(getNthFunctionArgument(Callee, idx));
-  }*/
-  for (const auto &Arg : Callee->args()) {
-    Formals.push_back(&Arg);
-  }
-  for (unsigned Idx = 0; Idx < Actuals.size(); ++Idx) {
-    if (In.count(Actuals[Idx])) {
-      Out.insert(Formals[Idx]);
+  const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
+  for (unsigned Idx = 0; Idx < Callee->arg_size(); ++Idx) {
+    if (In.count(CS->getArgOperand(Idx))) {
+      Out.insert(Callee->getArg(Idx));
     }
   }
   return Out;
@@ -113,10 +98,10 @@ InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::callFlow(
 
 InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::returnFlow(
     InterMonoTaintAnalysis::n_t CallSite, const llvm::Function *Callee,
-    InterMonoTaintAnalysis::n_t ExitStmt, InterMonoTaintAnalysis::n_t RetSite,
+    InterMonoTaintAnalysis::n_t ExitStmt,
+    InterMonoTaintAnalysis::n_t /*RetSite*/,
     const InterMonoTaintAnalysis::mono_container_t &In) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::returnFlow()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::returnFlow()");
   InterMonoTaintAnalysis::mono_container_t Out;
   if (const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(ExitStmt)) {
     if (In.count(Ret->getReturnValue())) {
@@ -125,7 +110,7 @@ InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::returnFlow(
   }
   // propagate pointer arguments to the caller, since this callee may modify
   // them
-  const llvm::CallBase *CS = llvm::cast<llvm::CallBase>(CallSite);
+  const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
   unsigned Index = 0;
   for (const auto &Arg : Callee->args()) {
     if (Arg.getType()->isPointerTy() && In.count(&Arg)) {
@@ -137,84 +122,78 @@ InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::returnFlow(
 }
 
 InterMonoTaintAnalysis::mono_container_t InterMonoTaintAnalysis::callToRetFlow(
-    InterMonoTaintAnalysis::n_t CallSite, InterMonoTaintAnalysis::n_t RetSite,
-    set<const llvm::Function *> Callees,
+    InterMonoTaintAnalysis::n_t CallSite,
+    InterMonoTaintAnalysis::n_t /*RetSite*/,
+    std::set<const llvm::Function *> Callees,
     const InterMonoTaintAnalysis::mono_container_t &In) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::callToRetFlow()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::callToRetFlow()");
   InterMonoTaintAnalysis::mono_container_t Out(In);
-  const llvm::CallBase *CS = llvm::cast<llvm::CallBase>(CallSite);
+  const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
+  mono_container_t Gen;
+  mono_container_t Kill;
+  bool First = true;
   //-----------------------------------------------------------------------------
   // Handle virtual calls in the loop
   //-----------------------------------------------------------------------------
   for (const auto *Callee : Callees) {
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "InterMonoTaintAnalysis::callToRetFlow()::"
-                  << Callee->getName().str());
+    PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::callToRetFlow()::"
+                                << Callee->getName());
 
-    if (TSF.isSink(Callee->getName().str())) {
-      for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
-        if (TSF.getSink(Callee->getName().str()).isLeakedArg(Idx) &&
-            In.count(CS->getArgOperand(Idx))) {
-          cout << "FOUND LEAK AT: " << llvmIRToString(CS) << '\n';
-          cout << "LEAKED VALUE: " << llvmIRToString(CS->getArgOperand(Idx))
-               << '\n'
-               << endl;
-          Leaks[CS].insert(CS->getArgOperand(Idx));
-        }
-      }
+    collectGeneratedFacts(Gen, Config, CS, Callee);
+    collectLeakedFacts(Leaks[CS], Config, CS, Callee,
+                       [&In](const llvm::Value *V) { return In.count(V); });
+    if (First) {
+      First = false;
+      collectSanitizedFacts(Kill, Config, CS, Callee);
+    } else {
+      mono_container_t Tmp;
+      collectSanitizedFacts(Tmp, Config, CS, Callee);
+      intersectWith(Kill, Tmp);
     }
-    if (TSF.isSource(Callee->getName().str())) {
-      for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
-        if (TSF.getSource(Callee->getName().str()).isTaintedArg(Idx)) {
-          Out.insert(CS->getArgOperand(Idx));
-        }
-      }
-      if (TSF.getSource(Callee->getName().str()).TaintsReturn) {
-        Out.insert(CS);
+  }
+  Out.erase(Kill);
+  Out.insert(Gen);
+  if (Gen.empty() && Kill.empty()) {
+    // erase pointer arguments, since they are now propagated in the retFF
+    for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
+      if (CS->getArgOperand(Idx)->getType()->isPointerTy()) {
+        Out.erase(CS->getArgOperand(Idx));
       }
     }
   }
 
-  // erase pointer arguments, since they are now propagated in the retFF
-  for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
-    if (CS->getArgOperand(Idx)->getType()->isPointerTy()) {
-      Out.erase(CS->getArgOperand(Idx));
-    }
-  }
   return Out;
 }
 
-unordered_map<InterMonoTaintAnalysis::n_t,
-              InterMonoTaintAnalysis::mono_container_t>
+std::unordered_map<InterMonoTaintAnalysis::n_t,
+                   InterMonoTaintAnalysis::mono_container_t>
 InterMonoTaintAnalysis::initialSeeds() {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "InterMonoTaintAnalysis::initialSeeds()");
+  PHASAR_LOG_LEVEL(DEBUG, "InterMonoTaintAnalysis::initialSeeds()");
   const llvm::Function *Main = ICF->getFunction("main");
-  unordered_map<InterMonoTaintAnalysis::n_t,
-                InterMonoTaintAnalysis::mono_container_t>
+  std::unordered_map<InterMonoTaintAnalysis::n_t,
+                     InterMonoTaintAnalysis::mono_container_t>
       Seeds;
   InterMonoTaintAnalysis::mono_container_t Facts;
   for (unsigned Idx = 0; Idx < Main->arg_size(); ++Idx) {
     Facts.insert(getNthFunctionArgument(Main, Idx));
   }
-  Seeds.insert(make_pair(&Main->front().front(), Facts));
+  Seeds.insert({&Main->front().front(), Facts});
   return Seeds;
 }
 
-void InterMonoTaintAnalysis::printNode(ostream &OS,
+void InterMonoTaintAnalysis::printNode(llvm::raw_ostream &OS,
                                        InterMonoTaintAnalysis::n_t Inst) const {
   OS << llvmIRToString(Inst);
 }
 
 void InterMonoTaintAnalysis::printDataFlowFact(
-    ostream &OS, InterMonoTaintAnalysis::d_t Fact) const {
+    llvm::raw_ostream &OS, InterMonoTaintAnalysis::d_t Fact) const {
   OS << llvmIRToString(Fact) << '\n';
 }
 
-void InterMonoTaintAnalysis::printFunction(ostream &OS,
+void InterMonoTaintAnalysis::printFunction(llvm::raw_ostream &OS,
                                            const llvm::Function *Fun) const {
-  OS << Fun->getName().str();
+  OS << Fun->getName();
 }
 const std::map<InterMonoTaintAnalysis::n_t,
                std::set<InterMonoTaintAnalysis::d_t>> &

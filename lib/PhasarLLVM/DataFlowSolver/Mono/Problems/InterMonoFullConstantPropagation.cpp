@@ -8,7 +8,6 @@
  *****************************************************************************/
 
 #include <algorithm>
-#include <ostream>
 #include <unordered_map>
 #include <utility>
 
@@ -42,8 +41,8 @@ InterMonoFullConstantPropagation::InterMonoFullConstantPropagation(
 
 InterMonoFullConstantPropagation::mono_container_t
 InterMonoFullConstantPropagation::merge(
-    const InterMonoFullConstantPropagation::mono_container_t &Lhs,
-    const InterMonoFullConstantPropagation::mono_container_t &Rhs) {
+    const InterMonoFullConstantPropagation::mono_container_t & /*Lhs*/,
+    const InterMonoFullConstantPropagation::mono_container_t & /*Rhs*/) {
   // TODO implement
   return {};
 }
@@ -85,24 +84,24 @@ InterMonoFullConstantPropagation::callFlow(
     vector<const llvm::Value *> Actuals;
     vector<const llvm::Value *> Formals;
     // Set up the actual parameters
-    for (unsigned idx = 0; idx < CS->getNumArgOperands(); ++idx) {
-      Actuals.push_back(CS->getArgOperand(idx));
+    for (unsigned Idx = 0; Idx < CS->getNumArgOperands(); ++Idx) {
+      Actuals.push_back(CS->getArgOperand(Idx));
     }
     // Set up the formal parameters
-    for (unsigned idx = 0; idx < Callee->arg_size(); ++idx) {
-      Formals.push_back(Callee->getArg(idx));
+    for (unsigned Idx = 0; Idx < Callee->arg_size(); ++Idx) {
+      Formals.push_back(Callee->getArg(Idx));
     }
     // Perform mapping
-    for (unsigned idx = 0; idx < Actuals.size(); ++idx) {
-      auto Search = In.find(Actuals[idx]);
+    for (unsigned Idx = 0; Idx < Actuals.size(); ++Idx) {
+      auto Search = In.find(Actuals[Idx]);
       if (Search != In.end()) {
-        Out.insert({Formals[idx], Search->second});
+        Out.insert({Formals[Idx], Search->second});
       }
       // check for integer literals
       if (const auto *ConstInt =
-              llvm::dyn_cast<llvm::ConstantInt>(Actuals[idx])) {
-        std::cout << "Found literal!\n";
-        Out.insert({Formals[idx], ConstInt->getSExtValue()});
+              llvm::dyn_cast<llvm::ConstantInt>(Actuals[Idx])) {
+        llvm::outs() << "Found literal!\n";
+        Out.insert({Formals[Idx], ConstInt->getSExtValue()});
       }
     }
   }
@@ -117,23 +116,23 @@ InterMonoFullConstantPropagation::callFlow(
 InterMonoFullConstantPropagation::mono_container_t
 InterMonoFullConstantPropagation::returnFlow(
     InterMonoFullConstantPropagation::n_t CallSite,
-    InterMonoFullConstantPropagation::f_t Callee,
-    InterMonoFullConstantPropagation::n_t ExitSite,
-    InterMonoFullConstantPropagation::n_t RetSite,
+    InterMonoFullConstantPropagation::f_t /*Callee*/,
+    InterMonoFullConstantPropagation::n_t ExitStmt,
+    InterMonoFullConstantPropagation::n_t /*RetSite*/,
     const InterMonoFullConstantPropagation::mono_container_t &In) {
   InterMonoFullConstantPropagation::mono_container_t Out;
 
-  if (const auto *Return = llvm::dyn_cast<llvm::ReturnInst>(ExitSite)) {
+  if (const auto *Return = llvm::dyn_cast<llvm::ReturnInst>(ExitStmt)) {
     if (Return->getReturnValue()->getType()->isIntegerTy()) {
       // Return value is integer literal
-      if (auto ConstInt =
+      if (auto *ConstInt =
               llvm::dyn_cast<llvm::ConstantInt>(Return->getReturnValue())) {
         Out.insert({CallSite, ConstInt->getSExtValue()});
       } else {
         // handle return of integer variable
         auto Search = In.find(Return->getReturnValue());
         if (Search != In.end()) {
-          std::cout << "Found const return variable\n";
+          llvm::outs() << "Found const return variable\n";
           Out.insert({CallSite, Search->second});
         }
       }
@@ -146,30 +145,30 @@ InterMonoFullConstantPropagation::returnFlow(
 
 InterMonoFullConstantPropagation::mono_container_t
 InterMonoFullConstantPropagation::callToRetFlow(
-    InterMonoFullConstantPropagation::n_t CallSite,
-    InterMonoFullConstantPropagation::n_t RetSite,
-    std::set<InterMonoFullConstantPropagation::f_t> Callees,
+    InterMonoFullConstantPropagation::n_t /*CallSite*/,
+    InterMonoFullConstantPropagation::n_t /*RetSite*/,
+    std::set<InterMonoFullConstantPropagation::f_t> /*Callees*/,
     const InterMonoFullConstantPropagation::mono_container_t &In) {
   return In;
 }
 
 void InterMonoFullConstantPropagation::printNode(
-    std::ostream &OS, InterMonoFullConstantPropagation::n_t Inst) const {
+    llvm::raw_ostream &OS, InterMonoFullConstantPropagation::n_t Inst) const {
   IntraMonoFullConstantPropagation::printNode(OS, Inst);
 }
 
 void InterMonoFullConstantPropagation::printDataFlowFact(
-    std::ostream &OS, InterMonoFullConstantPropagation::d_t Fact) const {
+    llvm::raw_ostream &OS, InterMonoFullConstantPropagation::d_t Fact) const {
   IntraMonoFullConstantPropagation::printDataFlowFact(OS, Fact);
 }
 
 void InterMonoFullConstantPropagation::printFunction(
-    std::ostream &OS, InterMonoFullConstantPropagation::f_t Fun) const {
+    llvm::raw_ostream &OS, InterMonoFullConstantPropagation::f_t Fun) const {
   IntraMonoFullConstantPropagation::printFunction(OS, Fun);
 }
 
 void InterMonoFullConstantPropagation::printContainer(
-    std::ostream &OS,
+    llvm::raw_ostream &OS,
     InterMonoFullConstantPropagation::mono_container_t Con) const {
   for (const auto &[Var, Val] : Con) {
     OS << "<" << llvmIRToString(Var) << ", " << Val << ">, ";

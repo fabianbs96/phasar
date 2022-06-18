@@ -14,8 +14,8 @@
  *      Author: philipp
  */
 
-#ifndef PHASAR_PHASARLLVM_MONO_PROBLEMS_INTRAMONOFULLCONSTANTPROPAGATION_H_
-#define PHASAR_PHASARLLVM_MONO_PROBLEMS_INTRAMONOFULLCONSTANTPROPAGATION_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_MONO_PROBLEMS_INTRAMONOFULLCONSTANTPROPAGATION_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_MONO_PROBLEMS_INTRAMONOFULLCONSTANTPROPAGATION_H
 
 #include <cstdint>
 #include <map>
@@ -72,7 +72,7 @@ public:
 
 private:
   static LatticeDomain<plain_d_t>
-  executeBinOperation(const unsigned Op, plain_d_t Lop, plain_d_t Rop);
+  executeBinOperation(unsigned Op, plain_d_t Lop, plain_d_t Rop);
 
 public:
   IntraMonoFullConstantPropagation(const ProjectIRDB *IRDB,
@@ -93,11 +93,11 @@ public:
 
   std::unordered_map<n_t, mono_container_t> initialSeeds() override;
 
-  void printNode(std::ostream &OS, n_t Inst) const override;
+  void printNode(llvm::raw_ostream &OS, n_t Inst) const override;
 
-  void printDataFlowFact(std::ostream &OS, d_t Fact) const override;
+  void printDataFlowFact(llvm::raw_ostream &OS, d_t Fact) const override;
 
-  void printFunction(std::ostream &OS, f_t Fun) const override;
+  void printFunction(llvm::raw_ostream &OS, f_t Fun) const override;
 };
 
 } // namespace psr
@@ -110,16 +110,16 @@ struct hash<std::pair<
     psr::LatticeDomain<psr::IntraMonoFullConstantPropagation::plain_d_t>>> {
   size_t operator()(const std::pair<const llvm::Value *,
                                     psr::LatticeDomain<int64_t>> &P) const {
-    std::hash<const llvm::Value *> hash_ptr;
-    size_t hp = hash_ptr(P.first);
-    size_t hu = 0;
+    std::hash<const llvm::Value *> HashPtr;
+    size_t HP = HashPtr(P.first);
+    size_t HU = 0;
     // returns nullptr if P.second is Top or Bottom, a valid pointer otherwise
-    if (auto Ptr =
+    if (const auto *Ptr =
             std::get_if<psr::IntraMonoFullConstantPropagation::plain_d_t>(
                 &P.second)) {
-      hu = *Ptr;
+      HU = *Ptr;
     }
-    return hp ^ (hu << 1);
+    return HP ^ (HU << 1);
   }
 };
 

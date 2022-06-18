@@ -14,15 +14,16 @@
  *      Author: pdschbrt
  */
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_SOLVERCONFIGURATION_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_SOLVERCONFIGURATION_H_
-
-#include <iosfwd>
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_IFDSIDESOLVERCONFIG_H_
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_IFDSIDESOLVERCONFIG_H_
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/Utils/EnumFlags.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/Utilities.h"
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace psr {
 
@@ -35,24 +36,25 @@ enum class SolverConfigOptions : uint32_t {
   EmitESG = 16,
   ComputePersistedSummaries = 32,
 
-  All = ~0u
+  All = ~0U
 };
 
 struct IFDSIDESolverConfig {
-  IFDSIDESolverConfig();
-  IFDSIDESolverConfig(SolverConfigOptions Options);
+  IFDSIDESolverConfig() noexcept = default;
+  IFDSIDESolverConfig(SolverConfigOptions Options) noexcept;
   ~IFDSIDESolverConfig() = default;
-  IFDSIDESolverConfig(const IFDSIDESolverConfig &) = default;
-  IFDSIDESolverConfig &operator=(const IFDSIDESolverConfig &) = default;
-  IFDSIDESolverConfig(IFDSIDESolverConfig &&) = default;
-  IFDSIDESolverConfig &operator=(IFDSIDESolverConfig &&) = default;
+  IFDSIDESolverConfig(const IFDSIDESolverConfig &) noexcept = default;
+  IFDSIDESolverConfig &
+  operator=(const IFDSIDESolverConfig &) noexcept = default;
+  IFDSIDESolverConfig(IFDSIDESolverConfig &&) noexcept = default;
+  IFDSIDESolverConfig &operator=(IFDSIDESolverConfig &&) noexcept = default;
 
-  bool followReturnsPastSeeds() const;
-  bool autoAddZero() const;
-  bool computeValues() const;
-  bool recordEdges() const;
-  bool emitESG() const;
-  bool computePersistedSummaries() const;
+  [[nodiscard]] bool followReturnsPastSeeds() const;
+  [[nodiscard]] bool autoAddZero() const;
+  [[nodiscard]] bool computeValues() const;
+  [[nodiscard]] bool recordEdges() const;
+  [[nodiscard]] bool emitESG() const;
+  [[nodiscard]] bool computePersistedSummaries() const;
 
   void setFollowReturnsPastSeeds(bool Set = true);
   void setAutoAddZero(bool Set = true);
@@ -61,8 +63,10 @@ struct IFDSIDESolverConfig {
   void setEmitESG(bool Set = true);
   void setComputePersistedSummaries(bool Set = true);
 
-  friend std::ostream &operator<<(std::ostream &OS,
-                                  const IFDSIDESolverConfig &SC);
+  void setConfig(SolverConfigOptions Opt);
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const IFDSIDESolverConfig &SC);
 
 private:
   SolverConfigOptions Options = SolverConfigOptions::AutoAddZero |

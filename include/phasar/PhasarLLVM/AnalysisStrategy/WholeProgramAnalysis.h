@@ -19,6 +19,8 @@
 
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/AnalysisStrategy/AnalysisSetup.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/IFDSIDESolverConfig.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Solver/IDESolver.h"
 
 namespace psr {
 
@@ -44,13 +46,14 @@ private:
   std::unique_ptr<PointerAnalysisTy> PointerInfo;
   std::unique_ptr<CallGraphAnalysisTy> CallGraph;
   std::set<std::string> EntryPoints;
-  std::unique_ptr<ConfigurationTy> Config;
+  ConfigurationTy *Config = nullptr;
+  bool OwnsConfig = false;
   std::string ConfigPath;
   ProblemDescription ProblemDesc;
   Solver DataFlowSolver;
 
 public:
-  WholeProgramAnalysis(ProjectIRDB &IRDB,
+  WholeProgramAnalysis(IFDSIDESolverConfig SolverConfig, ProjectIRDB &IRDB,
                        std::set<std::string> EntryPoints = {},
                        PointerAnalysisTy *PointerInfo = nullptr,
                        CallGraphAnalysisTy *CallGraph = nullptr,
@@ -69,12 +72,17 @@ public:
                       : std::unique_ptr<CallGraphAnalysisTy>(CallGraph)),
         EntryPoints(EntryPoints),
         ProblemDesc(&IRDB, TypeHierarchy, CallGraph, PointerInfo, EntryPoints),
-        DataFlowSolver(ProblemDesc) {}
+        DataFlowSolver(ProblemDesc) {
+    if constexpr (has_setIFDSIDESolverConfig_v<ProblemDescription>) {
+      ProblemDesc.setIFDSIDESolverConfig(SolverConfig);
+    }
+  }
 
   template <typename T = ProblemDescription,
             typename = typename std::enable_if_t<!std::is_same_v<
                 typename T::ConfigurationTy, HasNoConfigurationType>>>
-  WholeProgramAnalysis(ProjectIRDB &IRDB, ConfigurationTy *Config,
+  WholeProgramAnalysis(IFDSIDESolverConfig SolverConfig, ProjectIRDB &IRDB,
+                       ConfigurationTy *Config,
                        std::set<std::string> EntryPoints = {},
                        PointerAnalysisTy *PointerInfo = nullptr,
                        CallGraphAnalysisTy *CallGraph = nullptr,
@@ -91,16 +99,20 @@ public:
                             IRDB, CallGraphAnalysisType::OTF, EntryPoints,
                             this->TypeHierarchy.get(), this->PointerInfo.get())
                       : std::unique_ptr<CallGraphAnalysisTy>(CallGraph)),
-        EntryPoints(EntryPoints),
-        Config(std::unique_ptr<ConfigurationTy>(Config)), ConfigPath(""),
+        EntryPoints(EntryPoints), Config(Config),
         ProblemDesc(&IRDB, TypeHierarchy, CallGraph, PointerInfo, *Config,
                     EntryPoints),
-        DataFlowSolver(ProblemDesc) {}
+        DataFlowSolver(ProblemDesc) {
+    if constexpr (has_setIFDSIDESolverConfig_v<ProblemDescription>) {
+      ProblemDesc.setIFDSIDESolverConfig(SolverConfig);
+    }
+  }
 
   template <typename T = ProblemDescription,
             typename = typename std::enable_if_t<!std::is_same_v<
                 typename T::ConfigurationTy, HasNoConfigurationType>>>
-  WholeProgramAnalysis(ProjectIRDB &IRDB, std::string ConfigPath,
+  WholeProgramAnalysis(IFDSIDESolverConfig SolverConfig, ProjectIRDB &IRDB,
+                       std::string ConfigPath,
                        std::set<std::string> EntryPoints = {},
                        PointerAnalysisTy *PointerInfo = nullptr,
                        CallGraphAnalysisTy *CallGraph = nullptr,
@@ -117,29 +129,45 @@ public:
                             IRDB, CallGraphAnalysisType::OTF, EntryPoints,
                             this->TypeHierarchy.get(), this->PointerInfo.get())
                       : std::unique_ptr<CallGraphAnalysisTy>(CallGraph)),
-        EntryPoints(EntryPoints),
-        Config(std::make_unique<ConfigurationTy>(ConfigPath)),
-        ConfigPath(ConfigPath), ProblemDesc(&IRDB, TypeHierarchy, CallGraph,
-                                            PointerInfo, *Config, EntryPoints),
-        DataFlowSolver(ProblemDesc) {}
+        EntryPoints(EntryPoints), Config(new ConfigurationTy(ConfigPath)),
+        OwnsConfig(true), ConfigPath(ConfigPath),
+        ProblemDesc(&IRDB, TypeHierarchy, CallGraph, PointerInfo, *Config,
+                    EntryPoints),
+        DataFlowSolver(ProblemDesc) {
+    if constexpr (has_setIFDSIDESolverConfig_v<ProblemDescription>) {
+      ProblemDesc.setIFDSIDESolverConfig(SolverConfig);
+    }
+  }
+
+  WholeProgramAnalysis(const WholeProgramAnalysis &) = delete;
+  WholeProgramAnalysis(WholeProgramAnalysis &&) = delete;
+  WholeProgramAnalysis &operator=(WholeProgramAnalysis &) = delete;
+  WholeProgramAnalysis &operator=(WholeProgramAnalysis &&) = delete;
+
+  ~WholeProgramAnalysis() {
+    if (OwnsConfig) {
+      delete Config;
+      Config = nullptr;
+    }
+  }
 
   void solve() { DataFlowSolver.solve(); }
 
   void operator()() { solve(); }
 
-  void dumpResults(std::ostream &OS = std::cout) {
+  void dumpResults(llvm::raw_ostream &OS = llvm::outs()) {
     DataFlowSolver.dumpResults(OS);
   }
 
-  void emitTextReport(std::ostream &OS = std::cout) {
+  void emitTextReport(llvm::raw_ostream &OS = llvm::outs()) {
     DataFlowSolver.emitTextReport(OS);
   }
 
-  void emitGraphicalReport(std::ostream &OS = std::cout) {
+  void emitGraphicalReport(llvm::raw_ostream &OS = llvm::outs()) {
     DataFlowSolver.emitGraphicalReport(OS);
   }
 
-  void emitESG(std::ostream &OS = std::cout) {
+  void emitESG(llvm::raw_ostream &OS = llvm::outs()) {
     // if (std::is_base_of_v<typename Solver::ProblemTy, ProblemDescription>) {
     //   DataFlowSolver.emitESGAsDot(OS);
     // }
@@ -158,8 +186,6 @@ public:
   CallGraphAnalysisTy *releaseCallGraph() { return CallGraph.release(); }
 
   TypeHierarchyTy *releaseTypeHierarchy() { return TypeHierarchy.release(); }
-
-  ConfigurationTy *releaseConfiguration() { return Config.release(); }
 };
 
 } // namespace psr

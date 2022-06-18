@@ -2,6 +2,7 @@ file(GLOB_RECURSE POINTER_SRC *.h *.cpp)
 
 set(PHASAR_LINK_LIBS
   phasar_utils
+  phasar_db
 )
 
 set(LLVM_LINK_COMPONENTS
@@ -25,9 +26,9 @@ else()
   )
 endif()
 
-find_package(Boost COMPONENTS log filesystem graph REQUIRED)
+find_package(Boost COMPONENTS graph REQUIRED)
 target_link_libraries(phasar_pointer
-  LINK_PUBLIC  
+  LINK_PUBLIC
   ${Boost_LIBRARIES}
 )
 

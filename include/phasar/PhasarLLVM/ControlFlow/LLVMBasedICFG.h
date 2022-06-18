@@ -18,7 +18,6 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 
 #include <iosfwd>
-#include <iostream>
 #include <memory>
 #include <set>
 #include <stack>
@@ -30,8 +29,10 @@
 #include "boost/container/flat_set.hpp"
 #include "boost/graph/adjacency_list.hpp"
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
 
@@ -71,35 +72,23 @@ private:
   LLVMTypeHierarchy *TH;
   LLVMPointsToInfo *PT;
   std::unique_ptr<Resolver> Res;
-  std::unordered_set<const llvm::Function *> VisitedFunctions;
-  llvm::SmallPtrSet<llvm::Function *, 2> UserEntryPoints;
+  llvm::DenseSet<const llvm::Function *> VisitedFunctions;
+  std::unordered_set<llvm::Function *> UserEntryPoints;
 
   GlobalCtorTy GlobalCtors;
   GlobalDtorTy GlobalDtors;
-
-  // llvm::SmallDenseMap<F, typename GlobalCtorTy::const_iterator, 2>
-  // GlobalCtorFn; llvm::SmallDenseMap<F, typename GlobalDtorTy::const_iterator,
-  // 2> GlobalDtorFn;
 
   llvm::Function *GlobalCleanupFn = nullptr;
 
   llvm::SmallDenseMap<const llvm::Module *, llvm::Function *>
       GlobalRegisteredDtorsCaller;
-  /// Keeps track of the call-sites already resolved
-  // std::vector<const llvm::Instruction *> CallStack;
-
-  // Keeps track of the type graph already constructed
-  // TypeGraph_t typegraph;
-
-  // Any types that could be initialized outside of the module
-  // std::set<const llvm::StructType*> unsound_types;
 
   // The worklist for direct callee resolution.
   std::vector<const llvm::Function *> FunctionWL;
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.
-  std::unordered_map<const llvm::Instruction *, unsigned> IndirectCalls;
+  llvm::DenseMap<const llvm::Instruction *, unsigned> IndirectCalls;
   // The VertexProperties for our call-graph.
   struct VertexProperties {
     const llvm::Function *F = nullptr;
@@ -140,10 +129,8 @@ private:
 
   bool constructDynamicCall(const llvm::Instruction *I, Resolver &Resolver);
 
-  std::unique_ptr<Resolver> makeResolver(ProjectIRDB &IRDB,
-                                         CallGraphAnalysisType CGT,
-                                         LLVMTypeHierarchy &TH,
-                                         LLVMPointsToInfo &PT);
+  std::unique_ptr<Resolver>
+  makeResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH, LLVMPointsToInfo &PT);
 
   template <typename MapTy>
   static void insertGlobalCtorsDtorsImpl(MapTy &Into, const llvm::Module *M,
@@ -192,19 +179,13 @@ public:
   LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                 const std::set<std::string> &EntryPoints = {},
                 LLVMTypeHierarchy *TH = nullptr, LLVMPointsToInfo *PT = nullptr,
-                Soundness S = Soundness::Soundy, bool IncludeGlobals = false);
+                Soundness S = Soundness::Soundy, bool IncludeGlobals = true);
 
-  LLVMBasedICFG(const LLVMBasedICFG &);
+  LLVMBasedICFG(const LLVMBasedICFG &ICF);
+
+  LLVMBasedICFG &operator=(const LLVMBasedICFG &) = delete;
 
   ~LLVMBasedICFG() override;
-
-  // Re-override getSuccsOf and getPredsOf from LLVMBasedCFG to incorporate
-  // information about global ctors and globale dtors
-  [[nodiscard]] std::vector<const llvm::Instruction *>
-  getPredsOf(const llvm::Instruction *Inst) const override;
-
-  [[nodiscard]] std::vector<const llvm::Instruction *>
-  getSuccsOf(const llvm::Instruction *Inst) const override;
 
   [[nodiscard]] const llvm::Function *getFirstGlobalCtorOrNull() const;
 
@@ -278,6 +259,10 @@ public:
   [[nodiscard]] std::set<const llvm::Function *>
   getCalleesOfCallAt(const llvm::Instruction *N) const override;
 
+  void forEachCalleeOfCallAt(
+      const llvm::Instruction *I,
+      llvm::function_ref<void(const llvm::Function *)> Callback) const;
+
   /**
    * \return all caller statements/nodes of a given method.
    */
@@ -301,18 +286,18 @@ public:
   [[nodiscard]] CallGraphAnalysisType getCallGraphAnalysisType() const;
 
   using LLVMBasedCFG::print; // tell the compiler we wish to have both prints
-  void print(std::ostream &OS = std::cout) const override;
+  void print(llvm::raw_ostream &OS = llvm::outs()) const override;
 
-  void printAsDot(std::ostream &OS = std::cout,
-                  bool printEdgeLabels = true) const;
+  void printAsDot(llvm::raw_ostream &OS = llvm::outs(),
+                  bool PrintEdgeLabels = true) const;
 
-  void printInternalPTGAsDot(std::ostream &OS = std::cout) const;
+  void printInternalPTGAsDot(llvm::raw_ostream &OS = llvm::outs()) const;
 
   using LLVMBasedCFG::getAsJson; // tell the compiler we wish to have both
                                  // prints
   [[nodiscard]] nlohmann::json getAsJson() const override;
 
-  void printAsJson(std::ostream &OS = std::cout) const;
+  void printAsJson(llvm::raw_ostream &OS = llvm::outs()) const;
 
   /// Create an IR based JSON export of the whole ICFG.
   ///
@@ -333,26 +318,26 @@ public:
   [[nodiscard]] const llvm::Function *
   getRegisteredDtorsCallerOrNull(const llvm::Module *Mod);
 
-  template <typename Fn> void forEachGlobalCtor(Fn &&fn) const {
+  template <typename Fn> void forEachGlobalCtor(Fn &&F) const {
     for (auto [Prio, Fun] : GlobalCtors) {
-      fn(static_cast<const llvm::Function *>(Fun));
+      std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
-  template <typename Fn> void forEachGlobalDtor(Fn &&fn) const {
+  template <typename Fn> void forEachGlobalDtor(Fn &&F) const {
     for (auto [Prio, Fun] : GlobalDtors) {
-      fn(static_cast<const llvm::Function *>(Fun));
+      std::invoke(F, static_cast<const llvm::Function *>(Fun));
     }
   }
 
 protected:
-  void collectGlobalCtors() override;
+  void collectGlobalCtors() final;
 
-  void collectGlobalDtors() override;
+  void collectGlobalDtors() final;
 
-  void collectGlobalInitializers() override;
+  void collectGlobalInitializers() final;
 
-  void collectRegisteredDtors() override;
+  void collectRegisteredDtors() final;
 };
 
 } // namespace psr

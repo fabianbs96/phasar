@@ -14,8 +14,8 @@
  *      Author: richard leer
  */
 
-#ifndef PHASAR_PHASARLLVM_MONO_PROBLEMS_INTERMONOTAINTANALYSIS_H_
-#define PHASAR_PHASARLLVM_MONO_PROBLEMS_INTERMONOTAINTANALYSIS_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_MONO_PROBLEMS_INTERMONOTAINTANALYSIS_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_MONO_PROBLEMS_INTERMONOTAINTANALYSIS_H
 
 #include <map>
 #include <set>
@@ -24,7 +24,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/Mono/InterMonoProblem.h"
 #include "phasar/PhasarLLVM/Domain/AnalysisDomain.h"
-#include "phasar/PhasarLLVM/Utils/TaintConfiguration.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
 #include "phasar/Utils/BitVectorSet.h"
 
 namespace llvm {
@@ -53,11 +53,11 @@ public:
   using v_t = InterMonoTaintAnalysisDomain::v_t;
   using i_t = InterMonoTaintAnalysisDomain::i_t;
   using mono_container_t = InterMonoTaintAnalysisDomain::mono_container_t;
-  using ConfigurationTy = TaintConfiguration<d_t>;
+  using ConfigurationTy = TaintConfig;
 
   InterMonoTaintAnalysis(const ProjectIRDB *IRDB, const LLVMTypeHierarchy *TH,
                          const LLVMBasedICFG *ICF, const LLVMPointsToInfo *PT,
-                         const TaintConfiguration<d_t> &TSF,
+                         const TaintConfig &Config,
                          std::set<std::string> EntryPoints = {});
 
   ~InterMonoTaintAnalysis() override = default;
@@ -82,16 +82,16 @@ public:
 
   std::unordered_map<n_t, mono_container_t> initialSeeds() override;
 
-  void printNode(std::ostream &OS, n_t Inst) const override;
+  void printNode(llvm::raw_ostream &OS, n_t Inst) const override;
 
-  void printDataFlowFact(std::ostream &OS, d_t Fact) const override;
+  void printDataFlowFact(llvm::raw_ostream &OS, d_t Fact) const override;
 
-  void printFunction(std::ostream &OS, f_t Fun) const override;
+  void printFunction(llvm::raw_ostream &OS, f_t Fun) const override;
 
-  const std::map<n_t, std::set<d_t>> &getAllLeaks() const;
+  [[nodiscard]] const std::map<n_t, std::set<d_t>> &getAllLeaks() const;
 
 private:
-  const TaintConfiguration<d_t> &TSF;
+  [[maybe_unused]] const TaintConfig &Config;
   std::map<n_t, std::set<d_t>> Leaks;
 };
 

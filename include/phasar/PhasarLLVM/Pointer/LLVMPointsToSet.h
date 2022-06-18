@@ -7,22 +7,22 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H_
-#define PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H_
+#ifndef PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H
+#define PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H
 
-#include <iostream>
-#include <memory>
-#include <numeric>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
+#include "phasar/DB/ProjectIRDB.h"
+#include "phasar/PhasarLLVM/Pointer/DynamicPointsToSetPtr.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
+#include "phasar/PhasarLLVM/Pointer/PointsToSetOwner.h"
+#include "phasar/Utils/StableVector.h"
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 
 #include "nlohmann/json.hpp"
 
-#include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
-
-#include "llvm/Support/FormatVariadic.h"
+#include <memory_resource>
 
 namespace llvm {
 class Value;
@@ -38,12 +38,15 @@ namespace psr {
 
 class LLVMPointsToSet : public LLVMPointsToInfo {
 private:
-  using PointsToSetMap = std::unordered_map<
-      const llvm::Value *,
-      std::shared_ptr<std::unordered_set<const llvm::Value *>>>;
+  using PointsToSetMap =
+      llvm::DenseMap<const llvm::Value *, DynamicPointsToSetPtr<PointsToSetTy>>;
 
   LLVMBasedPointsToAnalysis PTA;
-  std::unordered_set<const llvm::Function *> AnalyzedFunctions;
+  llvm::DenseSet<const llvm::Function *> AnalyzedFunctions;
+
+  PointsToSetOwner<PointsToSetTy>::memory_resource_type MRes;
+  PointsToSetOwner<PointsToSetTy> Owner{&MRes};
+
   PointsToSetMap PointsToSets;
 
   void computeValuesPointsToSet(const llvm::Value *V);
@@ -54,6 +57,9 @@ private:
 
   void mergePointsToSets(const llvm::Value *V1, const llvm::Value *V2);
 
+  void mergePointsToSets(DynamicPointsToSetPtr<PointsToSetTy> PTS1,
+                         DynamicPointsToSetPtr<PointsToSetTy> PTS2);
+
   bool interIsReachableAllocationSiteTy(const llvm::Value *V,
                                         const llvm::Value *P);
 
@@ -62,18 +68,25 @@ private:
                                         const llvm::Function *VFun,
                                         const llvm::GlobalObject *VG);
 
+  /// Utility function used by computeFunctionsPointsToSet(...)
+  void addPointer(llvm::AAResults &AA, const llvm::DataLayout &DL,
+                  const llvm::Value *V, std::vector<const llvm::Value *> &Reps);
+
+  [[nodiscard]] static DynamicPointsToSetPtr<PointsToSetTy>
+  getEmptyPointsToSet();
+
 public:
   /**
-   * Creates points-to set(s) based on the computed alias results.
-   *
-   * @brief Creates points-to set(s) for a given function.
-   * @param AA Contains the computed Alias Results.
-   * @param F Points-to set is created for this particular function.
-   * @param onlyConsiderMustAlias True, if only Must Aliases should be
-   * considered. False, if May and Must Aliases should be considered.
+   * Creates points-to set(s) for all functions in the IRDB. If
+   * UseLazyEvaluation is true, computes points-to-sets for functions that do
+   * not use global variables on the fly
    */
-  LLVMPointsToSet(ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
-                  PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+  explicit LLVMPointsToSet(
+      ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
+      PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+
+  explicit LLVMPointsToSet(ProjectIRDB &IRDB,
+                           const nlohmann::json &SerializedPTS);
 
   ~LLVMPointsToSet() override = default;
 
@@ -90,11 +103,11 @@ public:
   alias(const llvm::Value *V1, const llvm::Value *V2,
         const llvm::Instruction *I = nullptr) override;
 
-  [[nodiscard]] std::shared_ptr<std::unordered_set<const llvm::Value *>>
+  [[nodiscard]] PointsToSetPtrTy
   getPointsToSet(const llvm::Value *V,
                  const llvm::Instruction *I = nullptr) override;
 
-  [[nodiscard]] std::shared_ptr<std::unordered_set<const llvm::Value *>>
+  [[nodiscard]] AllocationSiteSetPtrTy
   getReachableAllocationSites(const llvm::Value *V, bool IntraProcOnly = false,
                               const llvm::Instruction *I = nullptr) override;
 
@@ -113,11 +126,11 @@ public:
 
   [[nodiscard]] inline bool empty() const { return AnalyzedFunctions.empty(); }
 
-  void print(std::ostream &OS = std::cout) const override;
+  void print(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   [[nodiscard]] nlohmann::json getAsJson() const override;
 
-  void printAsJson(std::ostream &OS = std::cout) const override;
+  void printAsJson(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   /**
    * Shows a parts of an alias set. Good for debugging when one wants to peak

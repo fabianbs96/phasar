@@ -1,9 +1,11 @@
 set(UtilsSources
   BitVectorSetTest.cpp
   EquivalenceClassMapTest.cpp
+  IOTest.cpp
   LLVMIRToSrcTest.cpp
   LLVMShorthandsTest.cpp
   PAMMTest.cpp
+  StableVectorTest.cpp
 )
 
 foreach(TEST_SRC ${UtilsSources})

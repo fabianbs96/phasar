@@ -7,13 +7,14 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_IFDSIDE_EDGEFACTWRAPPER_H_
-#define PHASAR_PHASARLLVM_IFDSIDE_EDGEFACTWRAPPER_H_
+#ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_EDGEFACTWRAPPER_H
+#define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_EDGEFACTWRAPPER_H
 
 #include <map>
 #include <memory>
-#include <ostream>
 #include <type_traits>
+
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/EdgeFact.h"
 
@@ -33,9 +34,9 @@ public:
   using l_t = T;
   EdgeFactWrapper(const T &F) : Fact(F) {}
   EdgeFactWrapper(T &&F) : Fact(std::move(F)) {}
-  virtual ~EdgeFactWrapper() = default;
-  const T &get() const { return Fact; }
-  void print(std::ostream &OS) const override { OS << Fact << '\n'; }
+  ~EdgeFactWrapper() override = default;
+  [[nodiscard]] const T &get() const { return Fact; }
+  void print(llvm::raw_ostream &OS) const override { OS << Fact << '\n'; }
 };
 
 /// A simple memory manager for EdgeFactWrappers. You may use them in your

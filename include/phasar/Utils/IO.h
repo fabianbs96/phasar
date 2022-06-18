@@ -14,16 +14,28 @@
  *      Author: philipp
  */
 
-#ifndef PHASAR_UTILS_IO_H_
-#define PHASAR_UTILS_IO_H_
+#ifndef PHASAR_UTILS_IO_H
+#define PHASAR_UTILS_IO_H
 
+#include <filesystem>
+#include <memory>
 #include <string>
+
+#include "nlohmann/json.hpp"
+
+#include "llvm/Support/MemoryBuffer.h"
 
 namespace psr {
 
-std::string readFile(const std::string &path);
+std::string readTextFile(const std::filesystem::path &Path);
 
-void writeFile(const std::string &path, const std::string &content);
+std::unique_ptr<llvm::MemoryBuffer> readFile(const std::filesystem::path &Path);
+std::unique_ptr<llvm::MemoryBuffer> readFile(const llvm::Twine &Path);
+
+nlohmann::json readJsonFile(const llvm::Twine &Path);
+nlohmann::json readJsonFile(const std::filesystem::path &Path);
+
+void writeTextFile(const std::filesystem::path &Path, llvm::StringRef Content);
 
 } // namespace psr
 

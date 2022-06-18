@@ -46,28 +46,29 @@ RTAResolver::RTAResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH)
 //   }
 // }
 
-set<const llvm::Function *>
-RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite) {
+auto RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
+    -> FunctionSetTy {
   // throw runtime_error("RTA is currently unabled to deal with already built "
   //                     "library, it has been disable until this is fixed");
 
-  set<const llvm::Function *> PossibleCallTargets;
+  FunctionSetTy PossibleCallTargets;
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Call virtual function: " << llvmIRToString(CallSite));
+  PHASAR_LOG_LEVEL(DEBUG,
+                   "Call virtual function: " << llvmIRToString(CallSite));
 
-  auto VtableIndex = getVFTIndex(CallSite);
-  if (VtableIndex < 0) {
+  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  if (!RetrievedVtableIndex.has_value()) {
     // An error occured
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Error with resolveVirtualCall : impossible to retrieve "
+    PHASAR_LOG_LEVEL(DEBUG,
+                     "Error with resolveVirtualCall : impossible to retrieve "
                      "the vtable index\n"
-                  << llvmIRToString(CallSite) << "\n");
+                         << llvmIRToString(CallSite) << "\n");
     return {};
   }
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Virtual function table entry is: " << VtableIndex);
+  auto VtableIndex = RetrievedVtableIndex.value();
+
+  PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
   const auto *ReceiverType = getReceiverType(CallSite);
 

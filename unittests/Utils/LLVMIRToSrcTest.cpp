@@ -1,4 +1,3 @@
-#include <iostream>
 #include <memory>
 
 #include "gtest/gtest.h"
@@ -23,9 +22,8 @@ using namespace psr;
 
 class LLVMIRToSrcTest : public ::testing::Test {
 protected:
-  const std::string PathToLlFiles =
-      PhasarConfig::getPhasarConfig().PhasarDirectory() +
-      "build/test/llvm_test_code/llvmIRtoSrc/";
+  const std::string PathToLlFiles = PhasarConfig::PhasarDirectory() +
+                                    "build/test/llvm_test_code/llvmIRtoSrc/";
 
   unique_ptr<ProjectIRDB> IRDB;
   unique_ptr<LLVMTypeHierarchy> TH;
@@ -39,15 +37,12 @@ protected:
     IRDB = make_unique<ProjectIRDB>(IRFiles, IRDBOptions::WPA);
     TH = make_unique<LLVMTypeHierarchy>(*IRDB);
     PT = make_unique<LLVMPointsToSet>(*IRDB);
-    set<string> entry_points = {"main"};
+    set<string> EntryPoints = {"main"};
     ICFG = make_unique<LLVMBasedICFG>(*IRDB, CallGraphAnalysisType::OTF,
-                                      entry_points, TH.get(), PT.get());
+                                      EntryPoints, TH.get(), PT.get());
   }
 
-  void SetUp() override {
-    boost::log::core::get()->set_logging_enabled(false);
-    ValueAnnotationPass::resetValueID();
-  }
+  void SetUp() override { ValueAnnotationPass::resetValueID(); }
 
   void TearDown() override {}
 }; // Test Fixture
@@ -62,7 +57,7 @@ protected:
 //            !llvm::isa<llvm::DbgValueInst>(&I) &&
 //            !llvm::isa<llvm::DbgDeclareInst>(&I)) ||
 //           llvm::isa<llvm::LoadInst>(&I)) {
-//         std::cout << '\n'
+//         llvm::outs() << '\n'
 //                   << llvmIRToString(&I) << "\n  --> "
 //                   << llvmInstructionToSrc(&I) << std::endl;
 //       }
@@ -75,7 +70,7 @@ protected:
 //   for (auto F : IRDB->getAllFunctions()) {
 //     // F->print(llvm::outs());
 //     // llvm::outs() << '\n';
-//     std::cout << '\n' << llvmFunctionToSrc(F) << std::endl;
+//     llvm::outs() << '\n' << llvmFunctionToSrc(F) << std::endl;
 //   }
 // }
 
@@ -83,14 +78,14 @@ protected:
 //   Initialize({pathToLLFiles + "global_01_cpp_dbg.ll"});
 //   for (auto &GV :
 //        IRDB->getModule(pathToLLFiles + "global_01_cpp_dbg.ll")->globals()) {
-//     std::cout << '\n' << llvmGlobalValueToSrc(&GV) << std::endl;
+//     llvm::outs() << '\n' << llvmGlobalValueToSrc(&GV) << std::endl;
 //   }
 // }
 
 // TEST_F(LLVMIRToSrcTest, HandleAlloca) {
 //   Initialize({pathToLLFiles + "function_call_cpp_dbg.ll"});
 //   for (auto A : IRDB->getAllocaInstructions()) {
-//     std::cout << '\n'
+//     llvm::outs() << '\n'
 //               << llvmIRToString(A) << "\n  --> " << llvmValueToSrc(A)
 //               << std::endl;
 //   }

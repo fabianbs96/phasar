@@ -7,7 +7,6 @@
  *     Philipp Schubert, Fabian Schiebel and others
  *****************************************************************************/
 
-#include <iostream>
 #include <set>
 #include <string>
 
@@ -18,17 +17,15 @@
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/TypeStateDescriptions/OpenSSLEVPKDFCTXDescription.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/TypeStateDescriptions/OpenSSLEVPKDFDescription.h"
 
-using namespace std;
-using namespace psr;
-
 namespace psr {
 
 // Return value is modeled as -1
-const map<string, set<int>> OpenSSLEVPKDFCTXDescription::OpenSSLEVPKDFFuncs = {
-    {"EVP_KDF_CTX_new", {-1}},
-    {"EVP_KDF_CTX_set_params", {0}},
-    {"EVP_KDF_derive", {0}},
-    {"EVP_KDF_CTX_free", {0}}
+const std::map<std::string, std::set<int>>
+    OpenSSLEVPKDFCTXDescription::OpenSSLEVPKDFFuncs = {
+        {"EVP_KDF_CTX_new", {-1}},
+        {"EVP_KDF_CTX_set_params", {0}},
+        {"EVP_KDF_derive", {0}},
+        {"EVP_KDF_CTX_free", {0}}
 
 };
 
@@ -98,9 +95,8 @@ OpenSSLEVPKDFCTXDescription::getNextState(std::string Tok,
     // std::cout << "delta[" << Tok << ", " << stateToString(S)
     //           << "] = " << stateToString(ret) << std::endl;
     return Ret;
-  } else {
-    return OpenSSLEVPKDFState::BOT;
   }
+  return OpenSSLEVPKDFState::BOT;
 }
 TypeStateDescription::State OpenSSLEVPKDFCTXDescription::getNextState(
     const std::string &Tok, TypeStateDescription::State S,
@@ -119,7 +115,7 @@ TypeStateDescription::State OpenSSLEVPKDFCTXDescription::getNextState(
       // cout.flush();
       // cout << llvmIRToShortString(CS.getInstruction()) << endl;
       auto KdfState =
-          kdfAnalysisResults.resultAt(CallSite, CallSite->getArgOperand(0));
+          KDFAnalysisResults.resultAt(CallSite, CallSite->getArgOperand(0));
       if (KdfState !=
           OpenSSLEVPKDFDescription::OpenSSLEVPKDFState::KDF_FETCHED) {
         return error();
@@ -128,16 +124,15 @@ TypeStateDescription::State OpenSSLEVPKDFCTXDescription::getNextState(
     // std::cout << "delta[" << Tok << ", " << stateToString(S)
     //           << "] = " << stateToString(ret) << std::endl;
     return Ret;
-  } else {
-    return OpenSSLEVPKDFState::BOT;
   }
+  return OpenSSLEVPKDFState::BOT;
 }
 
 std::string OpenSSLEVPKDFCTXDescription::getTypeNameOfInterest() const {
   return "struct.evp_kdf_ctx_st";
 }
 
-set<int>
+std::set<int>
 OpenSSLEVPKDFCTXDescription::getConsumerParamIdx(const std::string &F) const {
   if (isConsumingFunction(F)) {
     return OpenSSLEVPKDFFuncs.at(F);
@@ -145,7 +140,7 @@ OpenSSLEVPKDFCTXDescription::getConsumerParamIdx(const std::string &F) const {
   return {};
 }
 
-set<int>
+std::set<int>
 OpenSSLEVPKDFCTXDescription::getFactoryParamIdx(const std::string &F) const {
   if (isFactoryFunction(F)) {
     // Trivial here, since we only generate via return value
@@ -209,16 +204,17 @@ OpenSSLEVPKDFCTXDescription::OpenSSLEVTKDFToken
 OpenSSLEVPKDFCTXDescription::funcNameToToken(const std::string &F) {
   if (F == "EVP_KDF_CTX_new") {
     return OpenSSLEVTKDFToken::EVP_KDF_CTX_NEW;
-  } else if (F == "EVP_KDF_CTX_set_params") {
-    return OpenSSLEVTKDFToken::EVP_KDF_CTX_SET_PARAMS;
-  } else if (F == "EVP_KDF_derive") {
-    return OpenSSLEVTKDFToken::DERIVE;
-
-  } else if (F == "EVP_KDF_CTX_free") {
-    return OpenSSLEVTKDFToken::EVP_KDF_CTX_FREE;
-  } else {
-    return OpenSSLEVTKDFToken::STAR;
   }
+  if (F == "EVP_KDF_CTX_set_params") {
+    return OpenSSLEVTKDFToken::EVP_KDF_CTX_SET_PARAMS;
+  }
+  if (F == "EVP_KDF_derive") {
+    return OpenSSLEVTKDFToken::DERIVE;
+  }
+  if (F == "EVP_KDF_CTX_free") {
+    return OpenSSLEVTKDFToken::EVP_KDF_CTX_FREE;
+  }
+  return OpenSSLEVTKDFToken::STAR;
 }
 
 // bool OpenSSLEVPKDFCTXDescription::validateKDFConstraints(

@@ -18,11 +18,14 @@
 #define PHASAR_UTILS_PAMM_H_
 
 #include <chrono>        // high_resolution_clock::time_point, milliseconds
-#include <iosfwd>        // ostream
 #include <set>           // set
 #include <string>        // string
 #include <unordered_map> // unordered_map
 #include <vector>        // vector
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace psr {
 
@@ -65,10 +68,10 @@ private:
 
 public:
   // PAMM is used as singleton.
-  PAMM(const PAMM &pm) = delete;
-  PAMM(PAMM &&pm) = delete;
-  PAMM &operator=(const PAMM &pm) = delete;
-  PAMM &operator=(PAMM &&pm) = delete;
+  PAMM(const PAMM &PM) = delete;
+  PAMM(PAMM &&PM) = delete;
+  PAMM &operator=(const PAMM &PM) = delete;
+  PAMM &operator=(PAMM &&PM) = delete;
 
   /// \brief Returns a reference to the PAMM object (singleton) - associated
   /// macro: PAMM_GET_INSTANCE.
@@ -172,15 +175,15 @@ public:
                       const std::string &DataPointId,
                       unsigned long DataPointValue = 1);
 
-  void printTimers(std::ostream &os);
+  void printTimers(llvm::raw_ostream &OS);
 
-  void printCounters(std::ostream &os);
+  void printCounters(llvm::raw_ostream &OS);
 
-  void printHistograms(std::ostream &os);
+  void printHistograms(llvm::raw_ostream &OS);
 
   /// \brief Prints the measured data to the commandline - associated macro:
   /// PRINT_MEASURED_DATA
-  void printMeasuredData(std::ostream &os);
+  void printMeasuredData(llvm::raw_ostream &OS);
 
   /// \brief Exports the measured data to JSON - associated macro:
   /// EXPORT_MEASURED_DATA(PATH).

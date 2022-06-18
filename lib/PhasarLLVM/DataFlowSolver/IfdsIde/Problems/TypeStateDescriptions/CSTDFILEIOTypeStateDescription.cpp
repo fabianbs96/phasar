@@ -10,10 +10,6 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/TypeStateDescriptions/CSTDFILEIOTypeStateDescription.h"
-#include <iostream>
-
-using namespace std;
-using namespace psr;
 
 namespace psr {
 
@@ -82,16 +78,15 @@ TypeStateDescription::State CSTDFILEIOTypeStateDescription::getNextState(
     //            << ") = " << stateToString(Ret) << std::endl;
     // }
     return Ret;
-  } else {
-    return CSTDFILEIOState::BOT;
   }
+  return CSTDFILEIOState::BOT;
 }
 
 std::string CSTDFILEIOTypeStateDescription::getTypeNameOfInterest() const {
   return "struct._IO_FILE";
 }
 
-set<int> CSTDFILEIOTypeStateDescription::getConsumerParamIdx(
+std::set<int> CSTDFILEIOTypeStateDescription::getConsumerParamIdx(
     const std::string &F) const {
   if (isConsumingFunction(F)) {
     return StdFileIOFuncs.at(F);
@@ -99,7 +94,7 @@ set<int> CSTDFILEIOTypeStateDescription::getConsumerParamIdx(
   return {};
 }
 
-set<int>
+std::set<int>
 CSTDFILEIOTypeStateDescription::getFactoryParamIdx(const std::string &F) const {
   if (isFactoryFunction(F)) {
     // Trivial here, since we only generate via return value
@@ -159,11 +154,11 @@ CSTDFILEIOTypeStateDescription::CSTDFILEIOToken
 CSTDFILEIOTypeStateDescription::funcNameToToken(const std::string &F) {
   if (F == "fopen" || F == "fdopen") {
     return CSTDFILEIOToken::FOPEN;
-  } else if (F == "fclose") {
-    return CSTDFILEIOToken::FCLOSE;
-  } else {
-    return CSTDFILEIOToken::STAR;
   }
+  if (F == "fclose") {
+    return CSTDFILEIOToken::FCLOSE;
+  }
+  return CSTDFILEIOToken::STAR;
 }
 
 } // namespace psr
