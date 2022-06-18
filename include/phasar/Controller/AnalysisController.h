@@ -10,12 +10,9 @@
 #ifndef PHASAR_CONTROLLER_ANALYSISCONTROLLER_H
 #define PHASAR_CONTROLLER_ANALYSISCONTROLLER_H
 
-#include <iostream>
 #include <set>
 #include <string>
 #include <vector>
-
-#include "boost/filesystem.hpp"
 
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/AnalysisStrategy/Strategies.h"
@@ -62,7 +59,7 @@ private:
       AnalysisControllerEmitterOptions::None;
   std::string ProjectID;
   std::string OutDirectory;
-  boost::filesystem::path ResultDirectory;
+  std::filesystem::path ResultDirectory;
   IFDSIDESolverConfig SolverConfig;
   [[maybe_unused]] Soundness SoundnessLevel;
   [[maybe_unused]] bool AutoGlobalSupport;
@@ -84,34 +81,41 @@ private:
 
   void emitRequestedHelperAnalysisResults();
 
+  std::unique_ptr<llvm::raw_fd_ostream>
+  openFileStream(llvm::StringRef Filename);
+
   template <typename T> void emitRequestedDataFlowResults(T &WPA) {
     if (EmitterOptions & AnalysisControllerEmitterOptions::EmitTextReport) {
       if (!ResultDirectory.empty()) {
-        std::ofstream OFS(ResultDirectory.string() + "/psr-report.txt");
-        WPA.emitTextReport(OFS);
+        if (auto OFS = openFileStream("/psr-report.txt")) {
+          WPA.emitTextReport(*OFS);
+        }
       } else {
-        WPA.emitTextReport(std::cout);
+        WPA.emitTextReport(llvm::outs());
       }
     }
     if (EmitterOptions &
         AnalysisControllerEmitterOptions::EmitGraphicalReport) {
       if (!ResultDirectory.empty()) {
-        std::ofstream OFS(ResultDirectory.string() + "/psr-report.html");
-        WPA.emitGraphicalReport(OFS);
+        if (auto OFS = openFileStream("/psr-report.html")) {
+          WPA.emitGraphicalReport(*OFS);
+        }
       } else {
-        WPA.emitGraphicalReport(std::cout);
+        WPA.emitGraphicalReport(llvm::outs());
       }
     }
     if (EmitterOptions & AnalysisControllerEmitterOptions::EmitRawResults) {
       if (!ResultDirectory.empty()) {
-        std::ofstream OFS(ResultDirectory.string() + "/psr-raw-results.txt");
-        WPA.dumpResults(OFS);
+        if (auto OFS = openFileStream("/psr-raw-results.txt")) {
+          WPA.dumpResults(*OFS);
+        }
       } else {
-        WPA.dumpResults(std::cout);
+        WPA.dumpResults(llvm::outs());
       }
     }
     if (EmitterOptions & AnalysisControllerEmitterOptions::EmitESGAsDot) {
-      std::cout << "Front-end support for 'EmitESGAsDot' to be implemented\n";
+      llvm::outs()
+          << "Front-end support for 'EmitESGAsDot' to be implemented\n";
     }
   }
 
@@ -126,7 +130,8 @@ public:
                      AnalysisControllerEmitterOptions EmitterOptions,
                      IFDSIDESolverConfig SolverConfig,
                      const std::string &ProjectID = "default-phasar-project",
-                     const std::string &OutDirectory = "");
+                     const std::string &OutDirectory = "",
+                     const nlohmann::json &PrecomputedPointsToInfo = {});
 
   ~AnalysisController() = default;
 

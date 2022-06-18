@@ -55,8 +55,7 @@ void OTFResolver::handlePossibleTargets(const llvm::CallBase *CallSite,
   // information to simulate inter-procedural points-to information
   if (!PT.isInterProcedural()) {
     for (const auto *CalleeTarget : CalleeTargets) {
-      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                    << "Target name: " << CalleeTarget->getName().str());
+      PHASAR_LOG_LEVEL(DEBUG, "Target name: " << CalleeTarget->getName());
       // do the merge of the points-to information for all possible targets, but
       // only if they are available
       if (CalleeTarget->isDeclaration()) {
@@ -87,42 +86,52 @@ auto OTFResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
     -> FunctionSetTy {
   FunctionSetTy PossibleCallTargets;
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Call virtual function: " << llvmIRToString(CallSite));
+  PHASAR_LOG_LEVEL(DEBUG,
+                   "Call virtual function: " << llvmIRToString(CallSite));
 
-  auto VtableIndex = getVFTIndex(CallSite);
-  if (VtableIndex < 0) {
+  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  if (!RetrievedVtableIndex.has_value()) {
     // An error occured
-    LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                  << "Error with resolveVirtualCall : impossible to retrieve "
+    PHASAR_LOG_LEVEL(DEBUG,
+                     "Error with resolveVirtualCall : impossible to retrieve "
                      "the vtable index\n"
-                  << llvmIRToString(CallSite) << "\n");
+                         << llvmIRToString(CallSite) << "\n");
     return {};
   }
 
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Virtual function table entry is: " << VtableIndex);
+  auto VtableIndex = RetrievedVtableIndex.value();
+
+  PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
   const llvm::Value *Receiver = CallSite->getArgOperand(0);
 
-  // Use points-to information to resolve the indirect call
-  auto AllocSites = PT.getReachableAllocationSites(Receiver);
-  auto PossibleAllocatedTypes = getReachableTypes(*AllocSites);
+  if (CallSite->getCalledOperand() &&
+      CallSite->getCalledOperand()->getType()->isPointerTy()) {
+    if (const auto *FTy = llvm::dyn_cast<llvm::FunctionType>(
+            CallSite->getCalledOperand()->getType()->getPointerElementType())) {
 
-  // Now we must check if we have found some allocated struct types
-  set<const llvm::StructType *> PossibleTypes;
-  for (const auto *Type : PossibleAllocatedTypes) {
-    if (const auto *StructType =
-            llvm::dyn_cast<llvm::StructType>(stripPointer(Type))) {
-      PossibleTypes.insert(StructType);
-    }
-  }
-
-  for (const auto *PossibleTypeStruct : PossibleTypes) {
-    const auto *Target =
-        getNonPureVirtualVFTEntry(PossibleTypeStruct, VtableIndex, CallSite);
-    if (Target) {
-      PossibleCallTargets.insert(Target);
+      auto PTS = PT.getPointsToSet(CallSite->getCalledOperand(), CallSite);
+      for (const auto *P : *PTS) {
+        if (auto *PGV = llvm::dyn_cast<llvm::GlobalVariable>(P)) {
+          if (PGV->hasName() &&
+              PGV->getName().startswith(LLVMTypeHierarchy::VTablePrefix) &&
+              PGV->hasInitializer()) {
+            if (auto *PCS = llvm::dyn_cast<llvm::ConstantStruct>(
+                    PGV->getInitializer())) {
+              auto VFs = LLVMVFTable::getVFVectorFromIRVTable(*PCS);
+              if (VtableIndex >= VFs.size()) {
+                continue;
+              }
+              auto *Callee = VFs[VtableIndex];
+              if (Callee == nullptr || !Callee->hasName() ||
+                  Callee->getName() == LLVMTypeHierarchy::PureVirtualCallName) {
+                continue;
+              }
+              PossibleCallTargets.insert(Callee);
+            }
+          }
+        }
+      }
     }
   }
 

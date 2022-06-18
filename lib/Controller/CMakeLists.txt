@@ -30,11 +30,8 @@ else()
   )
 endif()
 
-find_package(Boost COMPONENTS log REQUIRED)
 target_link_libraries(phasar_controller
   LINK_PUBLIC
-
-  ${Boost_LIBRARIES}
   ${PHASAR_STD_FILESYSTEM}
 )
 

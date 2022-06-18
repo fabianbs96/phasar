@@ -7,21 +7,22 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H_
-#define PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H_
+#ifndef PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H
+#define PHASAR_PHASARLLVM_POINTER_LLVMPOINTSTOSET_H
 
-#include <iostream>
-#include <memory_resource>
-
-#include "nlohmann/json.hpp"
-
-#include "llvm/ADT/DenseSet.h"
-
+#include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/DynamicPointsToSetPtr.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/Pointer/PointsToSetOwner.h"
 #include "phasar/Utils/StableVector.h"
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+
+#include "nlohmann/json.hpp"
+
+#include <memory_resource>
 
 namespace llvm {
 class Value;
@@ -43,9 +44,9 @@ private:
   LLVMBasedPointsToAnalysis PTA;
   llvm::DenseSet<const llvm::Function *> AnalyzedFunctions;
 
-  std::pmr::unsynchronized_pool_resource MRes;
-
+  PointsToSetOwner<PointsToSetTy>::memory_resource_type MRes;
   PointsToSetOwner<PointsToSetTy> Owner{&MRes};
+
   PointsToSetMap PointsToSets;
 
   void computeValuesPointsToSet(const llvm::Value *V);
@@ -76,16 +77,16 @@ private:
 
 public:
   /**
-   * Creates points-to set(s) based on the computed alias results.
-   *
-   * @brief Creates points-to set(s) for a given function.
-   * @param AA Contains the computed Alias Results.
-   * @param F Points-to set is created for this particular function.
-   * @param onlyConsiderMustAlias True, if only Must Aliases should be
-   * considered. False, if May and Must Aliases should be considered.
+   * Creates points-to set(s) for all functions in the IRDB. If
+   * UseLazyEvaluation is true, computes points-to-sets for functions that do
+   * not use global variables on the fly
    */
-  LLVMPointsToSet(ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
-                  PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+  explicit LLVMPointsToSet(
+      ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
+      PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+
+  explicit LLVMPointsToSet(ProjectIRDB &IRDB,
+                           const nlohmann::json &SerializedPTS);
 
   ~LLVMPointsToSet() override = default;
 
@@ -125,11 +126,11 @@ public:
 
   [[nodiscard]] inline bool empty() const { return AnalyzedFunctions.empty(); }
 
-  void print(std::ostream &OS = std::cout) const override;
+  void print(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   [[nodiscard]] nlohmann::json getAsJson() const override;
 
-  void printAsJson(std::ostream &OS = std::cout) const override;
+  void printAsJson(llvm::raw_ostream &OS = llvm::outs()) const override;
 
   /**
    * Shows a parts of an alias set. Good for debugging when one wants to peak

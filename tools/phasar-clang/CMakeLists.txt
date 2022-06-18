@@ -9,9 +9,12 @@ else()
   )
 endif()
 
-find_package(Boost COMPONENTS log filesystem program_options graph ${BOOST_THREAD} REQUIRED)
-list(TRANSFORM LLVM_LINK_COMPONENTS PREPEND LLVM)
-target_link_libraries(phasar-clang PUBLIC ${LLVM_LINK_COMPONENTS})
+find_package(Boost COMPONENTS program_options graph ${BOOST_THREAD} REQUIRED)
+if(USE_LLVM_FAT_LIB)
+  llvm_config(phasar-clang USE_SHARED ${LLVM_LINK_COMPONENTS})
+else()
+  llvm_config(phasar-clang ${LLVM_LINK_COMPONENTS})
+endif()
 target_link_libraries(phasar-clang
   LINK_PUBLIC
   phasar_config

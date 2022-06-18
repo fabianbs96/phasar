@@ -17,13 +17,14 @@
 #ifndef PHASAR_CONFIG_CONFIGURATION_H_
 #define PHASAR_CONFIG_CONFIGURATION_H_
 
+#include <filesystem>
 #include <string>
 
-#include "boost/filesystem.hpp"
 #include "boost/program_options.hpp"
 
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/Config/Version.h"
 
@@ -43,11 +44,11 @@ public:
   static std::string MetaDataKind() { return "psr.id"; }
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  static std::string ConfigurationDirectory() { return ConfigDir; }
+  static const std::string &ConfigurationDirectory();
 
   /// Specifies the directory in which Phasar is located.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  static std::string PhasarDirectory() { return PhasarDir; }
+  static const std::string &PhasarDirectory();
 
   /// Name of the file storing all standard header search paths used for
   /// compilation.
@@ -122,34 +123,16 @@ private:
 
   std::set<std::string> SpecialFuncNames;
 
-  /// Specifies the directory in which important configuration files are
-  /// located.
-  inline static const std::string ConfigDir = []() {
-    auto *EnvHome = std::getenv("HOME");
-    std::string ConfigFolder = "config/";
-    if (EnvHome) { // Check if HOME was defined in the environment
-      std::string PhasarConfDir = std::string(EnvHome) + "/.config/phasar/";
-      if (boost::filesystem::exists(PhasarConfDir) &&
-          boost::filesystem::is_directory(PhasarConfDir)) {
-        ConfigFolder = PhasarConfDir;
-      }
-    }
-    return ConfigFolder;
-  }();
-
-  /// Specifies the directory in which Phasar is located.
-  static const std::string PhasarDir;
-
   /// Name of the file storing all glibc function names.
-  static inline const std::string GLIBCFunctionListFileName =
+  static constexpr auto GLIBCFunctionListFileName =
       "glibc_function_list_v1-04.05.17.conf";
 
   /// Name of the file storing all LLVM intrinsic function names.
-  static inline const std::string LLVMIntrinsicFunctionListFileName =
+  static constexpr auto LLVMIntrinsicFunctionListFileName =
       "llvm_intrinsics_function_list_v1-04.05.17.conf";
 
   /// Log file directory
-  static inline const std::string LogFileDirectory = "log/";
+  static constexpr auto LogFileDirectory = "log/";
 };
 
 } // namespace psr

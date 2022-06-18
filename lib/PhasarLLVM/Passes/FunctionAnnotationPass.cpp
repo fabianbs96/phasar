@@ -28,8 +28,7 @@ FunctionAnnotationPass::FunctionAnnotationPass() = default;
 llvm::PreservedAnalyses
 FunctionAnnotationPass::run(llvm::Module &M,
                             [[maybe_unused]] llvm::ModuleAnalysisManager &MAM) {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), INFO)
-                << "Running FunctionAnnotationPass");
+  PHASAR_LOG_LEVEL(INFO, "Running FunctionAnnotationPass");
   auto &Context = M.getContext();
   for (auto &F : M) {
     if (!F.isDeclaration() && !F.isIntrinsic()) {
@@ -39,9 +38,10 @@ FunctionAnnotationPass::run(llvm::Module &M,
                              llvm::ValueAsMetadata::get(llvm::ConstantInt::get(
                                  llvm::IntegerType::get(M.getContext(), 32),
                                  llvm::APInt(32, UniqueFunctionId)))));
-      LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                    << "Function, " << F.getName().str()
-                    << ", has the id: " << UniqueFunctionId);
+      PHASAR_LOG_LEVEL(DEBUG, "Function, "
+                                  << F.getName().str()
+                                  << ", has the id: " << UniqueFunctionId);
+
       UniqueFunctionId++;
     }
   }
@@ -49,7 +49,7 @@ FunctionAnnotationPass::run(llvm::Module &M,
 }
 
 void FunctionAnnotationPass::resetFunctionID() {
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), INFO) << "Reset FunctionId");
+  PHASAR_LOG_LEVEL(INFO, "Reset FunctionId");
   UniqueFunctionId = 0;
 }
 } // namespace psr

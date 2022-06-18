@@ -7,11 +7,11 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include <iostream>
 #include <utility>
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "phasar/DB/ProjectIRDB.h"
 
@@ -23,11 +23,13 @@ using namespace psr;
 namespace psr {
 
 __attribute__((constructor)) void init() {
-  cout << "init - ICFGTestPlugin\n";
+  llvm::outs() << "init - ICFGTestPlugin\n";
   ICFGPluginFactory["icfg_testplugin"] = &makeICFGTestPlugin;
 }
 
-__attribute__((destructor)) void fini() { cout << "fini - ICFGTestPlugin\n"; }
+__attribute__((destructor)) void fini() {
+  llvm::outs() << "fini - ICFGTestPlugin\n";
+}
 
 unique_ptr<ICFGPlugin> makeICFGTestPlugin(ProjectIRDB &IRDB,
                                           const vector<string> &EntryPoints) {
@@ -136,7 +138,7 @@ ICFGTestPlugin::getDemangledFunctionName(ICFGTestPlugin::f_t /*Fun*/) const {
 }
 
 void ICFGTestPlugin::print(ICFGTestPlugin::f_t /*F*/,
-                           std::ostream & /*OS*/) const {}
+                           llvm::raw_ostream & /*OS*/) const {}
 
 nlohmann::json ICFGTestPlugin::getAsJson(ICFGTestPlugin::f_t /*F*/) const {
   return "";
@@ -190,7 +192,7 @@ ICFGTestPlugin::getReturnSitesOfCallAt(ICFGTestPlugin::n_t /*Inst*/) const {
   return {};
 }
 
-void ICFGTestPlugin::print(std::ostream & /*OS*/) const {}
+void ICFGTestPlugin::print(llvm::raw_ostream & /*OS*/) const {}
 
 nlohmann::json ICFGTestPlugin::getAsJson() const { return ""_json; }
 

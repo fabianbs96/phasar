@@ -24,6 +24,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "nlohmann/json.hpp"
+
 #include "phasar/Utils/IO.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -47,6 +49,16 @@ std::unique_ptr<llvm::MemoryBuffer> readFile(const llvm::Twine &Path) {
   }
 
   return std::move(Ret.get());
+}
+
+nlohmann::json readJsonFile(const llvm::Twine &Path) {
+  auto Buf = readFile(Path);
+  assert(Buf && "File reading failure should already be caught");
+  return nlohmann::json::parse(Buf->getBufferStart(), Buf->getBufferEnd());
+}
+
+nlohmann::json readJsonFile(const std::filesystem::path &Path) {
+  return readJsonFile(llvm::StringRef(Path.string()));
 }
 
 void writeTextFile(const std::filesystem::path &Path, llvm::StringRef Content) {

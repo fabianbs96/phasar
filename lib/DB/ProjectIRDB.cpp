@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -31,9 +32,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils.h"
 
-#include "boost/filesystem.hpp"
-#include "boost/log/sources/severity_feature.hpp"
-
 #include "phasar/Config/Configuration.h"
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/LLVMZeroValue.h"
@@ -47,7 +45,6 @@
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Utilities.h"
 
-using namespace psr;
 using namespace std;
 
 namespace psr {
@@ -98,7 +95,7 @@ ProjectIRDB::ProjectIRDB(const std::vector<std::string> &IRFiles,
 
     if ((File.find(".ll") != std::string::npos ||
          File.find(".bc") != std::string::npos) &&
-        boost::filesystem::exists(File)) {
+        std::filesystem::exists(File)) {
       llvm::SMDiagnostic Diag;
       std::unique_ptr<llvm::Module> M = llvm::parseIRFile(File, Diag, *Context);
       bool BrokenDebugInfo = false;
@@ -166,8 +163,7 @@ void ProjectIRDB::preprocessModule(llvm::Module *M) {
   PAMM_GET_INSTANCE;
   // add moduleID to timer name if performing MWA!
   START_TIMER("LLVM Passes", PAMM_SEVERITY_LEVEL::Full);
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), INFO)
-                << "Preprocess module: " << M->getModuleIdentifier());
+  PHASAR_LOG_LEVEL(INFO, "Preprocess module: " << M->getModuleIdentifier());
   MPM.run(*M, MAM);
   // retrieve data from the GeneralStatisticsAnalysis registered earlier
   auto GSPResult = MAM.getResult<GeneralStatisticsAnalysis>(*M);
@@ -229,9 +225,9 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
       }
       if (BrokenDebugInfo) {
         // at least log this incident
-        LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), WARNING)
-                      << "Reloading the module '" << Module->getName().str()
-                      << "' lead to broken debug info!");
+        PHASAR_LOG_LEVEL(WARNING, "Reloading the module '"
+                                      << Module->getName()
+                                      << "' lead to broken debug info!")
       }
       // now we can safely perform the linking
       if (Link.linkInModule(std::move(TmpMod), LinkerFlags)) {
@@ -257,6 +253,7 @@ void ProjectIRDB::linkForWPA(llvm::Linker::Flags LinkerFlags) {
     // to link at all. But we have to update the WPAMOD pointer!
     WPAModule = Modules.begin()->second.get();
   }
+  ModulesToSlotTracker::updateMSTForModule(WPAModule);
 }
 
 void ProjectIRDB::preprocessAllModules() {
@@ -307,7 +304,8 @@ std::size_t ProjectIRDB::getNumGlobals() const {
   return Ret;
 }
 
-const llvm::Instruction *ProjectIRDB::getInstruction(std::size_t Id) {
+const llvm::Instruction *
+ProjectIRDB::getInstruction(std::size_t Id) const noexcept {
   if (Id < FirstInstId || Id - FirstInstId >= AllInstructions.size()) {
     return nullptr;
   }
@@ -445,11 +443,11 @@ std::string ProjectIRDB::valueToPersistedString(const llvm::Value *V) {
            std::to_string(A->getArgNo());
   }
   if (const auto *G = llvm::dyn_cast<llvm::GlobalValue>(V)) {
-    std::cout << "special case: WE ARE AN GLOBAL VARIABLE\n";
-    std::cout << "all user:\n";
+    llvm::outs() << "special case: WE ARE AN GLOBAL VARIABLE\n";
+    llvm::outs() << "all user:\n";
     for (const auto *User : V->users()) {
       if (const auto *I = llvm::dyn_cast<llvm::Instruction>(User)) {
-        std::cout << I->getFunction()->getName().str() << "\n";
+        llvm::outs() << I->getFunction()->getName().str() << "\n";
       }
     }
     return G->getName().str();
@@ -457,7 +455,7 @@ std::string ProjectIRDB::valueToPersistedString(const llvm::Value *V) {
   if (llvm::isa<llvm::Value>(V)) {
     // In this case we should have an operand of an instruction which can be
     // identified by the instruction id and the operand index.
-    std::cout << "special case: WE ARE AN OPERAND\n";
+    llvm::outs() << "special case: WE ARE AN OPERAND\n";
     // We should only have one user in this special case
     for (const auto *User : V->users()) {
       if (const auto *I = llvm::dyn_cast<llvm::Instruction>(User)) {
@@ -493,9 +491,9 @@ ProjectIRDB::persistedStringToValue(const std::string &S) const {
     unsigned I = S.find('.');
     unsigned J = S.find(".o.");
     unsigned InstID = stoi(S.substr(I + 1, J));
-    // std::cout << "FOUND instID: " << instID << "\n";
+    // llvm::outs() << "FOUND instID: " << instID << "\n";
     unsigned OpIdx = stoi(S.substr(J + 3, S.size()));
-    // std::cout << "FOUND opIdx: " << to_string(opIdx) << "\n";
+    // llvm::outs() << "FOUND opIdx: " << to_string(opIdx) << "\n";
     const llvm::Function *F = getFunctionDefinition(S.substr(0, S.find('.')));
     for (const auto &BB : *F) {
       for (const auto &Inst : BB) {

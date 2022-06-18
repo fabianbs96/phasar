@@ -76,46 +76,6 @@ LLVMBasedCFG::getPredsOf(const llvm::Instruction *I) const {
   return Preds;
 }
 
-std::vector<const llvm::Instruction *>
-LLVMBasedCFG::getSuccsOf(const llvm::Instruction *I) const {
-
-  // case we wish to consider LLVM's debug instructions
-  if (!IgnoreDbgInstructions) {
-    if (const auto *NextInst = I->getNextNode()) {
-      return {NextInst};
-    }
-  } else if (const auto *NextNonDbgInst = I->getNextNonDebugInstruction(
-                 false /*Only debug instructions*/)) {
-    return {NextNonDbgInst};
-  }
-
-  if (const auto *Branch = llvm::dyn_cast<llvm::BranchInst>(I);
-      Branch && isStaticVariableLazyInitializationBranch(Branch)) {
-    // Skip the "already initialized" case, such that the analysis is always
-    // aware of the initialized value.
-    const auto *NextInst = &Branch->getSuccessor(0)->front();
-    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(NextInst)) {
-      NextInst = NextInst->getNextNonDebugInstruction(false);
-    }
-    return {NextInst};
-  }
-
-  std::vector<const llvm::Instruction *> Successors;
-  Successors.reserve(I->getNumSuccessors() + Successors.size());
-  std::transform(
-      llvm::succ_begin(I), llvm::succ_end(I), std::back_inserter(Successors),
-      [IgnoreDbgInstructions{IgnoreDbgInstructions}](
-          const llvm::BasicBlock *BB) {
-        const llvm::Instruction *Succ = &BB->front();
-        if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(Succ)) {
-          Succ = Succ->getNextNonDebugInstruction(
-              false /*Only debug instructions*/);
-        }
-        return Succ;
-      });
-  return Successors;
-}
-
 void LLVMBasedCFG::getSuccsOf(
     const llvm::Instruction *Inst,
     llvm::SmallVectorImpl<const llvm::Instruction *> &Succs) const {
@@ -149,6 +109,43 @@ void LLVMBasedCFG::getSuccsOf(
   std::transform(llvm::succ_begin(Inst), llvm::succ_end(Inst),
                  std::back_inserter(Succs),
                  [](const llvm::BasicBlock *BB) { return &BB->front(); });
+}
+
+std::vector<const llvm::Instruction *>
+LLVMBasedCFG::getSuccsOf(const llvm::Instruction *I) const {
+  // case we wish to consider LLVM's debug instructions
+  if (!IgnoreDbgInstructions) {
+    if (const auto *NextInst = I->getNextNode()) {
+      return {NextInst};
+    }
+  } else if (const auto *NextNonDbgInst = I->getNextNonDebugInstruction(
+                 false /*Only debug instructions*/)) {
+    return {NextNonDbgInst};
+  }
+  if (const auto *Branch = llvm::dyn_cast<llvm::BranchInst>(I);
+      Branch && isStaticVariableLazyInitializationBranch(Branch)) {
+    // Skip the "already initialized" case, such that the analysis is always
+    // aware of the initialized value.
+    const auto *NextInst = &Branch->getSuccessor(0)->front();
+    if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(NextInst)) {
+      NextInst = NextInst->getNextNonDebugInstruction(false);
+    }
+    return {NextInst};
+  }
+  std::vector<const llvm::Instruction *> Successors;
+  Successors.reserve(I->getNumSuccessors() + Successors.size());
+  std::transform(
+      llvm::succ_begin(I), llvm::succ_end(I), std::back_inserter(Successors),
+      [IgnoreDbgInstructions{IgnoreDbgInstructions}](
+          const llvm::BasicBlock *BB) {
+        const llvm::Instruction *Succ = &BB->front();
+        if (IgnoreDbgInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(Succ)) {
+          Succ = Succ->getNextNonDebugInstruction(
+              false /*Only debug instructions*/);
+        }
+        return Succ;
+      });
+  return Successors;
 }
 
 void LLVMBasedCFG::getAllControlFlowEdges(
@@ -185,9 +182,9 @@ LLVMBasedCFG::getStartPointsOf(const llvm::Function *Fun) const {
     }
     return {EntryInst};
   }
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Could not get starting points of '" << Fun->getName().str()
-                << "' because it is a declaration");
+  PHASAR_LOG_LEVEL(DEBUG, "Could not get starting points of '"
+                              << Fun->getName()
+                              << "' because it is a declaration");
   return {};
 }
 
@@ -208,9 +205,8 @@ LLVMBasedCFG::getExitPointsOf(const llvm::Function *Fun) const {
 
     return ExitPoints;
   }
-  LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
-                << "Could not get exit points of '" << Fun->getName().str()
-                << "' which is declaration!");
+  PHASAR_LOG_LEVEL(DEBUG, "Could not get exit points of '"
+                              << Fun->getName() << "' which is declaration!");
   return {};
 }
 
@@ -363,7 +359,7 @@ LLVMBasedCFG::getDemangledFunctionName(const llvm::Function *Fun) const {
   return llvm::demangle(getFunctionName(Fun));
 }
 
-void LLVMBasedCFG::print(const llvm::Function *F, std::ostream &OS) const {
+void LLVMBasedCFG::print(const llvm::Function *F, llvm::raw_ostream &OS) const {
   OS << llvmIRToString(F);
 }
 
@@ -390,14 +386,45 @@ LLVMBasedCFG::exportCFGAsJson(const llvm::Function *F) const {
 LLVMBasedCFG::exportCFGAsSourceCodeJson(const llvm::Function *F) const {
   nlohmann::json J;
 
-  for (auto [From, To] : getAllControlFlowEdges(F)) {
-    if (llvm::isa<llvm::UnreachableInst>(From)) {
+  for (const auto &BB : *F) {
+    assert(!BB.empty() && "Invalid IR: Empty BasicBlock");
+    auto It = BB.begin();
+    auto End = BB.end();
+    auto From = getFirstNonEmpty(It, End);
+
+    if (It == End) {
       continue;
     }
-    J.push_back({{"from", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(From),
-                                               llvmIRToStableString(From)}},
-                 {"to", SourceCodeInfoWithIR{getSrcCodeInfoFromIR(To),
-                                             llvmIRToStableString(To)}}});
+    ++It;
+    // Edges inside the BasicBlock
+    for (; It != End; ++It) {
+      auto To = getFirstNonEmpty(It, End);
+      if (To.empty()) {
+        break;
+      }
+
+      J.push_back({{"from", From}, {"to", To}});
+
+      From = std::move(To);
+    }
+
+    const auto *Term = BB.getTerminator();
+    assert(Term && "Invalid IR: BasicBlock without terminating instruction!");
+
+    const auto NumSuccessors = Term->getNumSuccessors();
+
+    if (NumSuccessors != 0) {
+      // Branch Edges
+
+      for (const auto *Succ : llvm::successors(&BB)) {
+        assert(Succ && !Succ->empty());
+
+        auto To = getFirstNonEmpty(Succ);
+        if (From != To) {
+          J.push_back({{"from", From}, {"to", std::move(To)}});
+        }
+      }
+    }
   }
 
   return J;

@@ -34,14 +34,14 @@ public:
                          std::set<std::string> EntryPoints)
       : IntraMonoProblem(IRDB, TH, CF, PT, std::move(EntryPoints)) {}
 
-  void printNode(std::ostream &OS, n_t Stmt) const override {
+  void printNode(llvm::raw_ostream &OS, n_t Stmt) const override {
     OS << llvmIRToString((llvm::Value *)Stmt);
   }
-  void printDataFlowFact(std::ostream &OS, d_t Fact) const override {
+  void printDataFlowFact(llvm::raw_ostream &OS, d_t Fact) const override {
     OS << llvmIRToString(Fact);
   }
-  void printFunction(std::ostream &OS, f_t Func) const override {
-    OS << Func->getName().str();
+  void printFunction(llvm::raw_ostream &OS, f_t Func) const override {
+    OS << Func->getName();
   }
 };
 

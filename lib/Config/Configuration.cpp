@@ -18,10 +18,10 @@
 
 #include "boost/algorithm/string/classification.hpp"
 #include "boost/algorithm/string/split.hpp"
-#include "boost/filesystem.hpp"
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/Config/Version.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace psr;
 
@@ -35,11 +35,38 @@ PhasarConfig::PhasarConfig() {
   SpecialFuncNames.insert({"_Znwm", "_Znam", "_ZdlPv", "_ZdaPv"});
 }
 
+const std::string &PhasarConfig::ConfigurationDirectory() {
+  static const std::string ConfigDir = [] {
+    auto *EnvHome = std::getenv("HOME");
+    std::string ConfigFolder = "config/";
+    if (EnvHome) { // Check if HOME was defined in the environment
+      std::string PhasarConfDir = std::string(EnvHome) + "/.config/phasar/";
+      if (std::filesystem::exists(PhasarConfDir) &&
+          std::filesystem::is_directory(PhasarConfDir)) {
+        ConfigFolder = PhasarConfDir;
+      }
+    }
+    return ConfigFolder;
+  }();
+
+  return ConfigDir;
+}
+
+/// Specifies the directory in which Phasar is located.
+// NOLINTNEXTLINE(readability-identifier-naming)
+const std::string &PhasarConfig::PhasarDirectory() {
+  static const std::string PhasarDir = [] {
+    std::string CurrPath = std::filesystem::current_path().string();
+    size_t I = CurrPath.rfind("build", CurrPath.length());
+    return CurrPath.substr(0, I);
+  }();
+  return PhasarDir;
+}
+
 std::string PhasarConfig::readConfigFile(const std::string &Path) {
   // We use a local file reading function to make phasar_config independent of
   // other phasar libraries.
-  if (boost::filesystem::exists(Path) &&
-      !boost::filesystem::is_directory(Path)) {
+  if (std::filesystem::exists(Path) && !std::filesystem::is_directory(Path)) {
     std::ifstream Ifs(Path, std::ios::binary);
     if (Ifs.is_open()) {
       Ifs.seekg(0, std::ifstream::end);
@@ -58,7 +85,7 @@ void PhasarConfig::loadGlibcSpecialFunctionNames() {
   const std::string GLIBCFunctionListFilePath =
       ConfigurationDirectory() + GLIBCFunctionListFileName;
 
-  if (boost::filesystem::exists(GLIBCFunctionListFilePath)) {
+  if (std::filesystem::exists(GLIBCFunctionListFilePath)) {
     // Load glibc function names specified in the config file
     std::vector<std::string> GlibcFunctions;
     std::string Glibc = readConfigFile(GLIBCFunctionListFilePath);
@@ -76,7 +103,7 @@ void PhasarConfig::loadGlibcSpecialFunctionNames() {
 void PhasarConfig::loadLLVMSpecialFunctionNames() {
   const std::string LLVMFunctionListFilePath =
       ConfigurationDirectory() + LLVMIntrinsicFunctionListFileName;
-  if (boost::filesystem::exists(LLVMFunctionListFilePath)) {
+  if (std::filesystem::exists(LLVMFunctionListFilePath)) {
     // Load LLVM function names specified in the config file
     std::string LLVMIntrinsics = readConfigFile(LLVMFunctionListFilePath);
 
@@ -92,12 +119,6 @@ void PhasarConfig::loadLLVMSpecialFunctionNames() {
     SpecialFuncNames.insert({"llvm.va_start"});
   }
 }
-
-const std::string PhasarConfig::PhasarDir = std::string([]() {
-  std::string CurrPath = boost::filesystem::current_path().string();
-  size_t I = CurrPath.rfind("build", CurrPath.length());
-  return CurrPath.substr(0, I);
-}());
 
 PhasarConfig &PhasarConfig::getPhasarConfig() {
   static PhasarConfig PC;

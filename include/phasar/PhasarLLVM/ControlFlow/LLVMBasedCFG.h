@@ -136,7 +136,8 @@ public:
   [[nodiscard]] std::string
   getDemangledFunctionName(const llvm::Function *Fun) const override;
 
-  void print(const llvm::Function *Fun, std::ostream &OS) const override;
+  void print(const llvm::Function *Fun,
+             llvm::raw_ostream &OS = llvm::outs()) const override;
 
   [[nodiscard]] nlohmann::json
   getAsJson(const llvm::Function *Fun) const override;

@@ -10,7 +10,6 @@
 #ifndef PHASAR_UTILS_UTILITIES_H_
 #define PHASAR_UTILS_UTILITIES_H_
 
-#include <iosfwd>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -152,7 +151,8 @@ void intersectWith(BitVectorSet<T> &Dest, const BitVectorSet<T> &Src) {
   Dest.setIntersectWith(Src);
 }
 
-std::ostream &operator<<(std::ostream &OS, const std::vector<bool> &Bits);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              const std::vector<bool> &Bits);
 
 struct StringIDLess {
   bool operator()(const std::string &LHS, const std::string &RHS) const;
@@ -161,12 +161,13 @@ struct StringIDLess {
 /// See "https://en.cppreference.com/w/cpp/experimental/scope_exit/scope_exit"
 template <typename Fn> class scope_exit { // NOLINT
 public:
-  template <typename FFn, typename = decltype(std::declval<FFn>()())>
+  template <typename FFn,
+            typename = std::enable_if_t<std::is_invocable_v<std::decay_t<FFn>>>>
   scope_exit(FFn &&F) noexcept(std::is_nothrow_constructible_v<Fn, FFn> ||
                                std::is_nothrow_constructible_v<Fn, FFn &>)
       : F(std::forward<FFn>(F)) {}
 
-  ~scope_exit() { F(); }
+  ~scope_exit() { std::invoke(F); }
 
   scope_exit(const scope_exit &) = delete;
   scope_exit(scope_exit &&) = delete;
@@ -178,7 +179,7 @@ private:
   Fn F;
 };
 
-template <typename Fn> scope_exit(Fn) -> scope_exit<Fn>;
+template <typename Fn> scope_exit(Fn) -> scope_exit<std::decay_t<Fn>>;
 
 // Copied from "https://en.cppreference.com/w/cpp/utility/variant/visit"
 template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };

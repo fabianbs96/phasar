@@ -10,14 +10,11 @@
 #ifndef PHASAR_PHASARLLVM_UTILS_LATTICEDOMAIN_H
 #define PHASAR_PHASARLLVM_UTILS_LATTICEDOMAIN_H
 
-#include <iostream>
-#include <type_traits>
-#include <variant>
-
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "phasar/Utils/TypeTraits.h"
+#include <type_traits>
+#include <variant>
 
 namespace psr {
 
@@ -25,10 +22,6 @@ namespace psr {
 /// Top is the greatest element that is less than or equal to all elements of
 /// the lattice.
 struct Top {};
-
-inline std::ostream &operator<<(std::ostream &OS, Top /*unused*/) {
-  return OS << "Top";
-}
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Top /*unused*/) {
   return OS << "Top";
@@ -38,10 +31,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Top /*unused*/) {
 /// Bottom is the least element that is greater than or equal to all elements
 /// of the lattice.
 struct Bottom {};
-
-inline std::ostream &operator<<(std::ostream &OS, Bottom /*unused*/) {
-  return OS << "Bottom";
-}
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Bottom /*unused*/) {
   return OS << "Bottom";
@@ -65,22 +54,6 @@ struct LatticeDomain : public std::variant<Top, L, Bottom> {
     return std::get_if<L>(this);
   }
 };
-
-template <typename L,
-          typename = std::void_t<decltype(std::declval<std::ostream &>()
-                                          << std::declval<L>())>>
-inline std::ostream &operator<<(std::ostream &OS, const LatticeDomain<L> &LD) {
-  if (LD.isBottom()) {
-    return OS << "Bottom";
-  }
-  if (LD.isTop()) {
-    return OS << "Top";
-  }
-
-  const auto *Val = LD.getValueOrNull();
-  assert(Val && "Only alternative remaining is L");
-  return OS << *Val;
-}
 
 template <typename L,
           typename = std::void_t<decltype(std::declval<llvm::raw_ostream &>()

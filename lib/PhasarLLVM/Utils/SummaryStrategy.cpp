@@ -8,30 +8,16 @@
  *****************************************************************************/
 
 #include "phasar/PhasarLLVM/Utils/SummaryStrategy.h"
-#include <ostream>
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
-using namespace std;
-using namespace psr;
-
-namespace psr {
-
-const map<SummaryGenerationStrategy, string> SummaryGenerationStrategyToString =
-    {{SummaryGenerationStrategy::always_all, "always_all"},
-     {SummaryGenerationStrategy::always_none, "always_none"},
-     {SummaryGenerationStrategy::all_and_none, "all_and_none"},
-     {SummaryGenerationStrategy::powerset, "powerset"},
-     {SummaryGenerationStrategy::all_observed, "all_observed"}};
-
-const map<string, SummaryGenerationStrategy> StringToSummaryGenerationStrategy =
-    {{"always_all", SummaryGenerationStrategy::always_all},
-     {"always_none", SummaryGenerationStrategy::always_none},
-     {"all_and_none", SummaryGenerationStrategy::all_and_none},
-     {"powerset", SummaryGenerationStrategy::powerset},
-     {"all_observed", SummaryGenerationStrategy::all_observed}
-
-};
-
-ostream &operator<<(ostream &OS, const SummaryGenerationStrategy &S) {
-  return OS << SummaryGenerationStrategyToString.at(S);
+llvm::raw_ostream &psr::operator<<(llvm::raw_ostream &OS,
+                                   SummaryGenerationStrategy S) {
+  switch (S) {
+#define SUMMARY_STRATEGY(NAME)                                                 \
+  case SummaryGenerationStrategy::NAME:                                        \
+    return OS << #NAME;
+#include "phasar/PhasarLLVM/Utils/SummaryStrategy.def"
+  }
+  llvm_unreachable("Invalid SummaryGenerationStrategy");
 }
-} // namespace psr

@@ -271,17 +271,13 @@ public:
 
   [[nodiscard]] std::size_t getNumGlobals() const;
 
-  [[nodiscard]] const llvm::Instruction *getInstruction(std::size_t Id);
+  [[nodiscard]] const llvm::Instruction *
+  getInstruction(std::size_t Id) const noexcept;
 
   [[nodiscard]] static std::size_t getInstructionID(const llvm::Instruction *I);
 
   void print() const;
 
-  inline void emitPreprocessedIR(std::ostream &OS,
-                                 bool ShortenIR = false) const {
-    llvm::raw_os_ostream ROS(OS);
-    emitPreprocessedIR(ROS, ShortenIR);
-  }
   void emitPreprocessedIR(llvm::raw_ostream &OS = llvm::outs(),
                           bool ShortenIR = false) const;
   /**

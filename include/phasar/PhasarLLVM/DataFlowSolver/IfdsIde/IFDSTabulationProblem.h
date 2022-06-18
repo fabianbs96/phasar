@@ -17,7 +17,6 @@
 #ifndef PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_IFDSTABULATIONPROBLEM_H
 #define PHASAR_PHASARLLVM_DATAFLOWSOLVER_IFDSIDE_IFDSTABULATIONPROBLEM_H
 
-#include <iostream>
 #include <map>
 #include <set>
 #include <string>
@@ -128,7 +127,7 @@ public:
   /// output stream.
   virtual void
   emitTextReport([[maybe_unused]] const SolverResults<n_t, d_t, l_t> &Results,
-                 std::ostream &OS = std::cout) {
+                 llvm::raw_ostream &OS = llvm::outs()) {
     OS << "No text report available!\n";
   }
 
@@ -136,14 +135,14 @@ public:
   /// the results that is written to the specified output stream.
   virtual void emitGraphicalReport(
       [[maybe_unused]] const SolverResults<n_t, d_t, l_t> &Results,
-      std::ostream &OS = std::cout) {
+      llvm::raw_ostream &OS = llvm::outs()) {
     OS << "No graphical report available!\n";
   }
 
   /// Sets the level of soundness to be used by the analysis. Returns false if
   /// the level of soundness is ignored. Otherwise, true.
   virtual bool setSoundness(Soundness /*S*/) { return false; }
-};
+}; // namespace psr
 } // namespace psr
 
 #endif

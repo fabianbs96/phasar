@@ -1,5 +1,5 @@
 int increment(int a) { // clang-format off
-  return ++a;
+   return ++a;
 } // clang-format on
 
 int main() {

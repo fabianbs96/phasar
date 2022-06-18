@@ -147,7 +147,8 @@ public:
                          std::set<const llvm::Value *>>
   makeInitialSeeds() const;
 
-  friend std::ostream &operator<<(std::ostream &OS, const TaintConfig &TC);
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const TaintConfig &TC);
 
 private:
   llvm::DenseSet<const llvm::Value *> SourceValues;

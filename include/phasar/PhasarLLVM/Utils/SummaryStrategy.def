@@ -1,0 +1,11 @@
+#ifndef SUMMARY_STRATEGY
+#define SUMMARY_STRATEGY(NAME)
+#endif
+
+SUMMARY_STRATEGY(always_all)
+SUMMARY_STRATEGY(powerset)
+SUMMARY_STRATEGY(all_and_none)
+SUMMARY_STRATEGY(all_observed)
+SUMMARY_STRATEGY(always_none)
+
+#undef SUMMARY_STRATEGY

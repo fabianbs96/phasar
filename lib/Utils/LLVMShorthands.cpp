@@ -15,7 +15,10 @@
  */
 
 #include <cctype>
+#include <charconv>
 #include <cstdlib>
+#include <optional>
+#include <system_error>
 
 #include "boost/algorithm/string/trim.hpp"
 
@@ -38,6 +41,7 @@
 #include "phasar/Config/Configuration.h"
 #include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Utilities.h"
 
 using namespace std;
@@ -258,6 +262,46 @@ std::optional<unsigned> getFunctionId(const llvm::Function *F) {
       llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue());
 }
 
+const llvm::Value *fromMetaDataId(const ProjectIRDB &IRDB, llvm::StringRef Id) {
+  if (Id.empty() || Id[0] == '-') {
+    return nullptr;
+  }
+
+  auto ParseInt = [](llvm::StringRef Str) -> std::optional<unsigned> {
+    unsigned Num;
+    auto [Ptr, EC] = std::from_chars(Str.data(), Str.data() + Str.size(), Num);
+
+    if (EC == std::errc{}) {
+      return Num;
+    }
+
+    PHASAR_LOG_LEVEL(WARNING, "Invalid metadata id '"
+                                  << Str.str() << "': "
+                                  << std::make_error_code(EC).message());
+    return std::nullopt;
+  };
+
+  if (auto Dot = Id.find('.'); Dot != llvm::StringRef::npos) {
+    auto FName = Id.slice(0, Dot);
+
+    auto ArgNr = ParseInt(Id.drop_front(Dot + 1));
+
+    if (!ArgNr) {
+      return nullptr;
+    }
+
+    const auto *F = IRDB.getFunction(FName);
+    if (F) {
+      return getNthFunctionArgument(F, *ArgNr);
+    }
+
+    return nullptr;
+  }
+
+  auto IdNr = ParseInt(Id);
+  return IdNr ? IRDB.getInstruction(*IdNr) : nullptr;
+}
+
 bool LLVMValueIDLess::operator()(const llvm::Value *Lhs,
                                  const llvm::Value *Rhs) const {
   std::string LhsId = getMetaDataID(Lhs);
@@ -461,13 +505,16 @@ llvm::StringRef getVarAnnotationIntrinsicName(const llvm::CallInst *CallInst) {
   const int KPointerGlobalStringIdx = 1;
   auto *CE = llvm::cast<llvm::ConstantExpr>(
       CallInst->getOperand(KPointerGlobalStringIdx));
-
+  assert(CE != nullptr);
   assert(CE->getOpcode() == llvm::Instruction::GetElementPtr);
+  assert(llvm::dyn_cast<llvm::GlobalVariable>(CE->getOperand(0)) != nullptr);
 
-  auto *AnnoteStr = llvm::cast<llvm::GlobalVariable>(CE->getOperand(0));
+  auto *AnnoteStr = llvm::dyn_cast<llvm::GlobalVariable>(CE->getOperand(0));
+  assert(AnnoteStr != nullptr && llvm::dyn_cast<llvm::ConstantDataSequential>(
+                                     AnnoteStr->getInitializer()));
 
   auto *Data =
-      llvm::cast<llvm::ConstantDataSequential>(AnnoteStr->getInitializer());
+      llvm::dyn_cast<llvm::ConstantDataSequential>(AnnoteStr->getInitializer());
 
   // getAsCString to get rid of the null-terminator
   assert(Data->isCString());

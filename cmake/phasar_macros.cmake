@@ -27,15 +27,13 @@ function(add_phasar_unittest test_name)
     # ${PHASAR_PLUGINS_LIB}
     phasar_pointer
     phasar_typehierarchy
-    ${SQLite3_LIBRARIES}
+    phasar_taintconfig
+    nlohmann_json_schema_validator
+    ${SQLITE3_LIBRARY}
     ${Boost_LIBRARIES}
     ${CMAKE_DL_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
-
-    # if you want to use default main method, use gtestd_main
-    gtestd
-    gmockd
-    ${CONAN_LIBS}
+    gtest
   )
 
   add_test(NAME "${test}"
@@ -76,7 +74,7 @@ function(generate_ll_file)
   set(test_code_file_target "${parent_dir}_${test_code_file_name}${ll_file_suffix}")
 
   # define compilation flags
-  set(GEN_CXX_FLAGS -std=c++14 -fno-discard-value-names -emit-llvm -S)
+  set(GEN_CXX_FLAGS -std=c++17 -fno-discard-value-names -emit-llvm -S)
   set(GEN_C_FLAGS -fno-discard-value-names -emit-llvm -S)
   set(GEN_CMD_COMMENT "[LL]")
   if(GEN_LL_MEM2REG)
