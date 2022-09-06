@@ -4,7 +4,8 @@
 bin/*
 
 # build directories for cmake
-build/
+*build/
+*install/
 build_*/
 
 # LLVM project
