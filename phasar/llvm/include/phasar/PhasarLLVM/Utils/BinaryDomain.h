@@ -27,11 +27,7 @@ namespace psr {
 
 enum class BinaryDomain { BOTTOM = 0, TOP = 1 };
 
-extern const std::map<std::string, BinaryDomain> StringToBinaryDomain;
-
-extern const std::map<BinaryDomain, std::string> BinaryDomainToString;
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const BinaryDomain &B);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, BinaryDomain B);
 
 } // namespace psr
 

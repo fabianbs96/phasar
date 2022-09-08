@@ -21,11 +21,7 @@ namespace psr {
 
 enum class Scope { function, module, project };
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Scope &S);
-
-extern const std::map<std::string, Scope> StringToScope;
-
-extern const std::map<Scope, std::string> ScopeToString;
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Scope S);
 
 } // namespace psr
 

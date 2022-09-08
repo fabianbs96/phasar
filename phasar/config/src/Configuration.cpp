@@ -64,37 +64,6 @@ const std::string &PhasarConfig::PhasarDirectory() {
   return PhasarDir;
 }
 
-std::string PhasarConfig::readConfigFile(const std::string &Path) {
-  // We use a local file reading function to make phasar_config independent of
-  // other phasar libraries.
-  if (std::filesystem::exists(Path) && !std::filesystem::is_directory(Path)) {
-    std::ifstream Ifs(Path, std::ios::binary);
-    if (Ifs.is_open()) {
-      Ifs.seekg(0, std::ifstream::end);
-      size_t FileSize = Ifs.tellg();
-      Ifs.seekg(0, std::ifstream::beg);
-      std::string Content(FileSize + 1, '\0');
-      std::stringstream SStream;
-      SStream << Ifs.rdbuf();
-      return SStream.str();
-    }
-    return ConfigFolder;
-  }();
-
-  return ConfigDir;
-}
-
-/// Specifies the directory in which Phasar is located.
-const std::string &PhasarConfig::PhasarDirectory() {
-  static const std::string PhasarDir = [] {
-    std::string CurrPath = std::filesystem::current_path().string();
-    size_t I = CurrPath.rfind("build", CurrPath.length());
-    return CurrPath.substr(0, I);
-  }();
-
-  return PhasarDir;
-}
-
 // copied from utils to prevent circular dependency
 static std::string readTextFile(const llvm::Twine &Path) {
   auto Ret = llvm::MemoryBuffer::getFile(Path);

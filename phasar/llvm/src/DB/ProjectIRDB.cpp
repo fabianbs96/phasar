@@ -304,7 +304,8 @@ std::size_t ProjectIRDB::getNumGlobals() const {
   return Ret;
 }
 
-const llvm::Instruction *ProjectIRDB::getInstruction(std::size_t Id) const noexcept {
+const llvm::Instruction *
+ProjectIRDB::getInstruction(std::size_t Id) const noexcept {
   if (Id < FirstInstId || Id - FirstInstId >= AllInstructions.size()) {
     return nullptr;
   }
@@ -321,16 +322,18 @@ std::size_t ProjectIRDB::getInstructionID(const llvm::Instruction *I) {
 }
 
 void ProjectIRDB::print() const {
-  for (const auto &[File, Module] : Modules) {
-    llvm::outs() << "Module: " << File << '\n';
-    llvm::outs() << *Module;
+  for (const auto &Entry : Modules) {
+    llvm::outs() << "Module: " << Entry.getKey() << '\n';
+    llvm::outs() << *Entry.getValue();
     llvm::outs().flush();
   }
 }
 
 void ProjectIRDB::emitPreprocessedIR(llvm::raw_ostream &OS,
                                      bool ShortenIR) const {
-  for (const auto &[File, Module] : Modules) {
+  for (const auto &Entry : Modules) {
+    auto File = Entry.getKey();
+    auto *Module = Entry.getValue().get();
     OS << "IR module: " << File << '\n';
     // print globals
     for (auto &Glob : Module->globals()) {

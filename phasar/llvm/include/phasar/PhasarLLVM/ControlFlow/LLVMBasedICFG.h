@@ -63,7 +63,7 @@ class LLVMTypeHierarchy;
 
 class LLVMBasedICFG
     : public ICFG<const llvm::Instruction *, const llvm::Function *>,
-      public LLVMBasedCFG {
+      public virtual LLVMBasedCFG {
   friend class LLVMBasedBackwardsICFG;
 
   using GlobalCtorTy = std::multimap<size_t, llvm::Function *>;

@@ -36,7 +36,7 @@
 namespace psr {
 
 class LLVMBasedCFG
-    : public CFG<const llvm::Instruction *, const llvm::Function *> {
+    : public virtual CFG<const llvm::Instruction *, const llvm::Function *> {
 public:
   LLVMBasedCFG(bool IgnoreDbgInstructions = true)
       : IgnoreDbgInstructions(IgnoreDbgInstructions) {}

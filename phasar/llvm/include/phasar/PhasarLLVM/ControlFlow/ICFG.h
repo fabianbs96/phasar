@@ -44,7 +44,7 @@ CallGraphAnalysisType toCallGraphAnalysisType(const std::string &S);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               const CallGraphAnalysisType &CGA);
 
-template <typename N, typename F> class ICFG /*: public virtual CFG<N, F> */ {
+template <typename N, typename F> class ICFG : public virtual CFG<N, F> {
 
 protected:
   std::vector<F> GlobalInitializers;
@@ -85,7 +85,7 @@ public:
   using CFG<N, F>::print; // tell the compiler we wish to have both prints
   virtual void print(llvm::raw_ostream &OS = llvm::outs()) const = 0;
 
-  // using CFG<N, F>::getAsJson; // tell the compiler we wish to have both
+  using CFG<N, F>::getAsJson; // tell the compiler we wish to have both
   // prints
   [[nodiscard]] virtual nlohmann::json getAsJson() const = 0;
 };
