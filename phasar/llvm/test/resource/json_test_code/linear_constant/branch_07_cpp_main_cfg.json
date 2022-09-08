@@ -1,0 +1,282 @@
+[
+    {
+        "from": {
+            "IR": "%j = alloca i32, align 4, !psr.id !14 | ID: 2",
+            "column": 7,
+            "line": 3,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%j = alloca i32, align 4 | ID: 2",
+            "column": 7,
+            "line": 3,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%i = alloca i32, align 4 | ID: 3",
+            "column": 7,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%i = alloca i32, align 4 | ID: 3",
+            "column": 7,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "store i32 10, i32* %j, align 4, !dbg !18, !psr.id !20 | ID: 6",
+            "column": 7,
+            "line": 3,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "store i32 10, i32* %j, align 4, !dbg !18, !psr.id !20 | ID: 6",
+            "column": 7,
+            "line": 3,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": "int j = 10;"
+        },
+        "to": {
+            "IR": "%0 = load i32, i32* %j, align 4, !dbg !24, !psr.id !25 | ID: 8",
+            "column": 11,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": "int i = j + 20;"
+        }
+    },
+    {
+        "from": {
+            "IR": "store i32 10, i32* %j, align 4 | ID: 6",
+            "column": 7,
+            "line": 3,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%0 = load i32, i32* %j, align 4 | ID: 8",
+            "column": 11,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%0 = load i32, i32* %j, align 4 | ID: 8",
+            "column": 11,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%add = add nsw i32 %0, 20 | ID: 9",
+            "column": 13,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%add = add nsw i32 %0, 20 | ID: 9",
+            "column": 13,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "store i32 %add, i32* %i, align 4 | ID: 10",
+            "column": 7,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "store i32 %add, i32* %i, align 4 | ID: 10",
+            "column": 7,
+            "line": 4,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%1 = load i8, i8* @cond, align 1, !dbg !29, !psr.id !31 | ID: 11",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%1 = load i8, i8* @cond, align 1, !dbg !29, !psr.id !31 | ID: 11",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%tobool = trunc i8 %1 to i1, !dbg !29, !psr.id !32 | ID: 12",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%tobool = trunc i8 %1 to i1, !dbg !29, !psr.id !32 | ID: 12",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "br i1 %tobool, label %if.then, label %if.end, !dbg !33, !psr.id !34 | ID: 13",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "br i1 %tobool, label %if.then, label %if.end, !dbg !33, !psr.id !34 | ID: 13",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%2 = load i32, i32* %j, align 4 | ID: 14",
+            "column": 9,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "br i1 %tobool, label %if.then, label %if.end, !dbg !33, !psr.id !34 | ID: 13",
+            "column": 7,
+            "line": 5,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "ret i32 0 | ID: 18",
+            "column": 3,
+            "line": 8,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%2 = load i32, i32* %j, align 4 | ID: 14",
+            "column": 9,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "%add1 = add nsw i32 %2, 20 | ID: 15",
+            "column": 11,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "%add1 = add nsw i32 %2, 20 | ID: 15",
+            "column": 11,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "store i32 %add1, i32* %i, align 4 | ID: 16",
+            "column": 7,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "store i32 %add1, i32* %i, align 4 | ID: 16",
+            "column": 7,
+            "line": 6,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "br label %if.end | ID: 17",
+            "column": 3,
+            "line": 7,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    },
+    {
+        "from": {
+            "IR": "br label %if.end | ID: 17",
+            "column": 3,
+            "line": 7,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        },
+        "to": {
+            "IR": "ret i32 0 | ID: 18",
+            "column": 3,
+            "line": 8,
+            "sourceCodeFileName": "test/llvm_test_code/linear_constant/branch_07.dbg.cpp",
+            "sourceCodeFunctionName": "main",
+            "sourceCodeLine": ""
+        }
+    }
+]
