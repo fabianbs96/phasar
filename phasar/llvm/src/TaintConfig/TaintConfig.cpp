@@ -32,6 +32,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
 
+#include "nlohmann/json_fwd.hpp"
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfig.h"
 #include "phasar/PhasarLLVM/Utils/Annotation.h"
@@ -628,7 +629,7 @@ nlohmann::json parseTaintConfig(const std::filesystem::path &Path) {
   // a custom error handler
   class CustomJsonErrorHandler
       : public nlohmann::json_schema::basic_error_handler {
-    void error(const nlohmann::json_pointer<std::string> &Pointer,
+    void error(const nlohmann::json::json_pointer &Pointer,
                const nlohmann::json &Instance,
                const std::string &Message) override {
       nlohmann::json_schema::basic_error_handler::error(Pointer, Instance,
