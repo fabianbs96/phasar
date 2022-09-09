@@ -391,9 +391,8 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
 TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
   psr::ValueAnnotationPass::resetValueID();
   psr::FunctionAnnotationPass::resetFunctionID();
-  ProjectIRDB IRDB(
-      {"llvm_test_code/call_graphs/runtime_edges_1_cpp.ll"},
-      IRDBOptions::WPA);
+  ProjectIRDB IRDB({"llvm_test_code/call_graphs/runtime_edges_1.ll"},
+                   IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
   LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::NORESOLVE, {"main"}, &TH, &PT,
@@ -428,9 +427,8 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
 TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
   psr::ValueAnnotationPass::resetValueID();
   psr::FunctionAnnotationPass::resetFunctionID();
-  ProjectIRDB IRDB(
-      {"llvm_test_code/call_graphs/runtime_edges_1_cpp.ll"},
-      IRDBOptions::WPA);
+  ProjectIRDB IRDB({"llvm_test_code/call_graphs/runtime_edges_1.ll"},
+                   IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
   LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
