@@ -3,8 +3,6 @@ project(phasar
     VERSION 1.0.0
     HOMEPAGE_URL "https://github.com/secure-software-engineering/phasar")
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 include(cmake/options.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
