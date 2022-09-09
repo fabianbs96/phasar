@@ -66,6 +66,9 @@ enable_testing() #enable ctest
 set(CMAKE_CTEST_ARGUMENTS "--output-junit;${CMAKE_BINARY_DIR}/Testing/Temporary/JUnit.xml;--output-on-failure;") # for ci import
 include(GoogleTest)
 
+# generates compile_commands.json used by IDEs to resolve includes aso
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # TODO offer a diagnostic run with link / compile = 1, job = 1 and check mem usage with "sar -r cmd" (sysstat package) automatically?
 function(just_limit_jobs)
     # Argument parsing
