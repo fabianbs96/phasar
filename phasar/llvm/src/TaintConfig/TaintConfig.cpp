@@ -14,8 +14,9 @@
 #include <map>
 #include <string>
 
-#include "nlohmann/json-schema.hpp"
 #include "nlohmann/json.hpp"
+
+#include "nlohmann/json-schema.hpp"
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -627,7 +628,7 @@ nlohmann::json parseTaintConfig(const std::filesystem::path &Path) {
   // a custom error handler
   class CustomJsonErrorHandler
       : public nlohmann::json_schema::basic_error_handler {
-    void error(const nlohmann::json_pointer<nlohmann::basic_json<>> &Pointer,
+    void error(const nlohmann::json_pointer<std::string> &Pointer,
                const nlohmann::json &Instance,
                const std::string &Message) override {
       nlohmann::json_schema::basic_error_handler::error(Pointer, Instance,

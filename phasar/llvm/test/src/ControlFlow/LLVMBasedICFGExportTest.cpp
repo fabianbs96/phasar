@@ -44,7 +44,8 @@ protected:
                             bool AsSrcCode = false) {
     ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMTypeHierarchy TH(IRDB);
-    LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
+    LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, nullptr,
+                       Soundness::Soundy, /*IncludeGlobals*/ false);
 
     auto Ret =
         AsSrcCode
@@ -296,6 +297,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGIRV9) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
   auto Results =
       exportICFG("linear_constant/call_01.dbg.ll", /*asSrcCode*/ true);
+
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_01_cpp_icfg.json"));
 }
@@ -303,7 +305,6 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
   auto Results =
       exportICFG("linear_constant/call_07.dbg.ll", /*asSrcCode*/ true);
-  // std::cerr << Results.dump(4) << std::endl;
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
@@ -311,7 +312,6 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
   auto Results =
       exportICFG("exceptions/exceptions_01.dbg.ll", /*asSrcCode*/ true);
-  // std::cerr << Results.dump(4) << std::endl;
   verifySourceCodeJSON(Results,
                        readJson("exceptions/exceptions_01_cpp_icfg.json"));
 }
@@ -319,7 +319,10 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
 TEST_F(LLVMBasedICFGExportTest, ExportCFG01) {
   auto Results = exportCFGFor("linear_constant/branch_07.dbg.ll", "main",
                               /*asSrcCode*/ true);
-  // std::cerr << Results.dump(4) << std::endl;
+  std::error_code EC;
+  llvm::raw_fd_ostream ROS("ExportCFG01_results.json", EC);
+  ASSERT_FALSE(EC);
+  ROS << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/branch_07_cpp_main_cfg.json"));
 }

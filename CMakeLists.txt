@@ -1,7 +1,9 @@
 cmake_minimum_required (VERSION 3.21)
-project(phasar 
+project(phasar
     VERSION 1.0.0
     HOMEPAGE_URL "https://github.com/secure-software-engineering/phasar")
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(cmake/options.cmake)
 
