@@ -45,7 +45,7 @@ class PhasarConan(ConanFile):
         "gtest/[>=1.10.0 <2.0.0]",
         "sqlite3/[>=3.36.0 <4.0.0]",
         "json-schema-validator/[>=2.1.0 <3.0.0]",
-        "nlohmann_json/[>=3.10.5 <4.0.0]",
+        "nlohmann_json/[>=3.10.5 <3.11.0]",
         "zlib/[>=1.2.0 <2.0.0]" # fix boost / clash zlib
     ]
         
@@ -68,6 +68,7 @@ class PhasarConan(ConanFile):
         # Other solution would be to modify the llvm recipe package_id:
         # if keep_binaries_regex="^$" append compatible_pkg "ANY" but you can only put there concrete values, no wildcards, so to specific for conan-center
         self.options['llvm'].keep_binaries_regex = "^(clang|clang\+\+|opt)$"
+        self.options['llvm'].enable_debug = True
 
         if self.options.shared:
             self.options['llvm'].shared = True
