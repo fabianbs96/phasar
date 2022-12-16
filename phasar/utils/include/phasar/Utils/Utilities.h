@@ -161,8 +161,7 @@ struct StringIDLess {
 /// See "https://en.cppreference.com/w/cpp/experimental/scope_exit/scope_exit"
 template <typename Fn> class scope_exit { // NOLINT
 public:
-  template <typename FFn,
-            typename = std::enable_if_t<std::is_invocable_v<std::decay_t<FFn>>>>
+  template <typename FFn, typename = decltype(std::declval<FFn>()())>
   scope_exit(FFn &&F) noexcept(std::is_nothrow_constructible_v<Fn, FFn> ||
                                std::is_nothrow_constructible_v<Fn, FFn &>)
       : F(std::forward<FFn>(F)) {}
@@ -182,7 +181,9 @@ private:
 template <typename Fn> scope_exit(Fn) -> scope_exit<std::decay_t<Fn>>;
 
 // Copied from "https://en.cppreference.com/w/cpp/utility/variant/visit"
-template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct Overloaded : Ts... {
+  using Ts::operator()...;
+};
 
 // explicit deduction guide (not needed as of C++20)
 template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;

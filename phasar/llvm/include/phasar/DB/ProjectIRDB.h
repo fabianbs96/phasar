@@ -28,6 +28,8 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/raw_os_ostream.h"
 
+#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 #include "phasar/Utils/EnumFlags.h"
 
 namespace llvm {
@@ -68,6 +70,9 @@ private:
 
   std::vector<const llvm::Instruction *> AllInstructions;
   unsigned FirstInstId = 0;
+
+  size_t NumberCallsites = 0;
+  nlohmann::json StatsJson;
 
   void buildIDModuleMapping(llvm::Module *M);
 
@@ -131,6 +136,8 @@ public:
   ProjectIRDB &operator=(const ProjectIRDB &) = delete;
 
   ~ProjectIRDB();
+
+  void insertFunction(llvm::Function *F);
 
   // add WPA support by providing a fat completely linked module
   void linkForWPA(llvm::Linker::Flags LinkerFlags = DefaultLinkerFlags);
@@ -198,7 +205,7 @@ public:
 
   [[nodiscard]] std::vector<const llvm::Function *> getAllFunctions() const;
 
-  [[nodiscard]] const llvm::Function *getFunctionById(unsigned Id);
+  [[nodiscard]] const llvm::Function *getFunctionById(unsigned Id) const;
 
   [[nodiscard]] inline const llvm::Function *
   getFunctionDefinition(llvm::StringRef FunctionName) const {
@@ -276,6 +283,8 @@ public:
 
   [[nodiscard]] static std::size_t getInstructionID(const llvm::Instruction *I);
 
+  void printAsJson(llvm::raw_ostream &OS = llvm::outs()) const;
+
   void print() const;
 
   void emitPreprocessedIR(llvm::raw_ostream &OS = llvm::outs(),
@@ -317,6 +326,11 @@ public:
   [[nodiscard]] const llvm::Value *
   persistedStringToValue(const std::string &StringRep) const;
 };
+
+/**
+ * Revserses the getMetaDataID function
+ */
+const llvm::Value *fromMetaDataId(const ProjectIRDB &IRDB, llvm::StringRef Id);
 
 } // namespace psr
 

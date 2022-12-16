@@ -9,8 +9,11 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/IR/AssemblyAnnotationWriter.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "nlohmann/json.hpp"
@@ -19,12 +22,12 @@
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarPass/Options.h"
-#include "phasar/Utils/LLVMIRToSrc.h"
-#include "phasar/Utils/LLVMShorthands.h"
+#include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
 
 #include "TestConfig.h"
@@ -44,28 +47,10 @@ protected:
                             bool AsSrcCode = false) {
     ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMTypeHierarchy TH(IRDB);
-    LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, nullptr,
-                       Soundness::Soundy, /*IncludeGlobals*/ false);
+    LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH,
+                       nullptr, Soundness::Soundy, /*IncludeGlobals*/ false);
 
-    auto Ret =
-        AsSrcCode
-            ? nlohmann::json::parse(ICFG.exportICFGAsSourceCodeJsonString())
-            : ICFG.exportICFGAsJson();
-
-    if (AsSrcCode) {
-      std::error_code EC;
-
-      llvm::raw_fd_ostream OS("New1.json", EC);
-      OS << Ret.dump();
-
-      // auto New2 = ICFG.exportICFGAsSourceCodeJsonString2();
-      // [New2 = nlohmann::json::parse(New2), &Ret] { EXPECT_EQ(Ret, New2); }();
-
-      // auto New3 = ICFG.exportICFGAsSourceCodeJson2();
-      // [&New3, &Ret] { EXPECT_EQ(Ret, New3); }();
-    }
-
-    // llvm::errs() << "Result: " << Ret.dump(4) << '\n';
+    auto Ret = ICFG.exportICFGAsJson(AsSrcCode);
 
     // llvm::errs() << "Result: " << Ret.dump(4) << '\n';
 
@@ -93,7 +78,7 @@ protected:
   MapTy getAllRetSites(const LLVMBasedICFG &ICFG) {
     MapTy RetSitesOf;
 
-    for (const auto *F : ICFG.getAllFunctions()) {
+    for (const auto *F : ICFG.getAllVertexFunctions()) {
       for (const auto &Inst : llvm::instructions(F)) {
         if (llvm::isa<llvm::CallBase>(&Inst)) {
           for (const auto *Callee : ICFG.getCalleesOfCallAt(&Inst)) {
@@ -132,17 +117,21 @@ protected:
             }
           };
 
-    for (const auto *F : GroundTruth.getAllFunctions()) {
+    for (const auto *F : GroundTruth.getAllVertexFunctions()) {
       for (const auto &Inst : llvm::instructions(F)) {
         auto InstStr = llvmIRToStableString(&Inst);
         if (llvm::isa<llvm::CallBase>(&Inst)) {
           for (const auto *Callee : GroundTruth.getCalleesOfCallAt(&Inst)) {
             if (!Callee->isDeclaration()) {
-              print("Callee: ", *Callee);
+              if (WithDebugOutput) {
+                print("Callee: ", *Callee);
+              }
+
               expectEdge(InstStr,
                          llvmIRToStableString(&Callee->front().front()));
-
-              print("> end");
+              if (WithDebugOutput) {
+                print("> end");
+              }
             }
           }
         } else if (llvm::isa<llvm::ReturnInst>(&Inst) ||
@@ -198,11 +187,27 @@ protected:
                         bool WithDebugOutput = false) {
     ProjectIRDB IRDB({PathToLLFiles + TestFile}, IRDBOptions::WPA);
     LLVMTypeHierarchy TH(IRDB);
-    LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH);
+    LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH,
+                       nullptr, Soundness::Soundy, /*IncludeGlobals*/ false);
 
-    std::cerr << "ModuleRef: " << IRDB.getWPAModule() << "\n";
+    verifyIRJson(ICFG.exportICFGAsJson(/*WithSourceCodeInfo*/ false), ICFG,
+                 WithDebugOutput);
 
-    verifyIRJson(ICFG.exportICFGAsJson(), ICFG, WithDebugOutput);
+    if (WithDebugOutput) {
+      struct AAWriter : public llvm::AssemblyAnnotationWriter {
+        /// emitInstructionAnnot - This may be implemented to emit a string
+        /// right before an instruction is emitted.
+        void emitInstructionAnnot(const llvm::Instruction *Inst,
+                                  llvm::formatted_raw_ostream &OS) override {
+          OS << "  ; | Id: " << getMetaDataID(Inst) << '\n';
+        }
+      } AW;
+      IRDB.getWPAModule()->print(llvm::errs(), &AW);
+      // llvm::errs() << "ModuleRef: " << *IRDB.getWPAModule() << "\n";
+      llvm::errs()
+          << ICFG.exportICFGAsJson(/*WithSourceCodeInfo*/ false).dump(4)
+          << '\n';
+    }
   }
 };
 
@@ -305,6 +310,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource01) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
   auto Results =
       exportICFG("linear_constant/call_07.dbg.ll", /*asSrcCode*/ true);
+  // llvm::errs() << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/call_07_cpp_icfg.json"));
 }
@@ -312,6 +318,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource02) {
 TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
   auto Results =
       exportICFG("exceptions/exceptions_01.dbg.ll", /*asSrcCode*/ true);
+  // llvm::errs() << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("exceptions/exceptions_01_cpp_icfg.json"));
 }
@@ -319,10 +326,7 @@ TEST_F(LLVMBasedICFGExportTest, ExportICFGSource03) {
 TEST_F(LLVMBasedICFGExportTest, ExportCFG01) {
   auto Results = exportCFGFor("linear_constant/branch_07.dbg.ll", "main",
                               /*asSrcCode*/ true);
-  std::error_code EC;
-  llvm::raw_fd_ostream ROS("ExportCFG01_results.json", EC);
-  ASSERT_FALSE(EC);
-  ROS << Results.dump(4) << '\n';
+  // llvm::errs() << Results.dump(4) << '\n';
   verifySourceCodeJSON(Results,
                        readJson("linear_constant/branch_07_cpp_main_cfg.json"));
 }

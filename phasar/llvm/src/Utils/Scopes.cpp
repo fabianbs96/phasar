@@ -21,5 +21,5 @@ llvm::raw_ostream &psr::operator<<(llvm::raw_ostream &OS, Scope S) {
   case Scope::project:
     return OS << "project";
   }
-  llvm_unreachable("Invalid Scope");
+  llvm_unreachable("All scopes should be handled in the switch above");
 }

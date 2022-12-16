@@ -4,30 +4,37 @@
 #include <string>
 #include <vector>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/Utils/LLVMShorthands.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
 #include "TestConfig.h"
 
 using namespace std;
 using namespace psr;
 
+template <typename T> static auto makeSet(T &&Vec) {
+  using value_type = std::decay_t<decltype(*Vec.begin())>;
+  return std::set<value_type>{Vec.begin(), Vec.end()};
+}
+
 TEST(LLVMBasedICFGTest, StaticCallSite_1) {
   ProjectIRDB IRDB({"llvm_test_code/call_graphs/static_callsite_1.ll"},
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *Foo = IRDB.getFunctionDefinition("foo");
   ASSERT_TRUE(F);
@@ -48,7 +55,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2a) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
                      Soundness::Soundy, false);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *FOO = IRDB.getFunctionDefinition("foo");
@@ -57,13 +64,16 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2a) {
   ASSERT_TRUE(FOO);
   ASSERT_TRUE(BAR);
 
-  vector<const llvm::Function *> FunctionSet{F, FOO, BAR};
-  vector<const llvm::Function *> FunSet = ICFG.getAllFunctions();
-  llvm::sort(FunctionSet);
-  llvm::sort(FunSet);
+  set<const llvm::Function *> FunctionSet;
+  FunctionSet.insert(F);
+  FunctionSet.insert(FOO);
+  FunctionSet.insert(BAR);
+
+  set<const llvm::Function *> FunSet = makeSet(ICFG.getAllFunctions());
   ASSERT_EQ(FunctionSet, FunSet);
 
-  auto CallsFromWithin = ICFG.getCallsFromWithin(F);
+  set<const llvm::Instruction *> CallsFromWithin =
+      makeSet(ICFG.getCallsFromWithin(F));
   ASSERT_EQ(CallsFromWithin.size(), 2U);
 }
 
@@ -72,7 +82,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2b) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *FOO = IRDB.getFunctionDefinition("foo");
   const llvm::Function *BAR = IRDB.getFunctionDefinition("bar");
@@ -86,13 +96,18 @@ TEST(LLVMBasedICFGTest, StaticCallSite_2b) {
   ASSERT_TRUE(CTOR);
   ASSERT_TRUE(DTOR);
 
-  vector<const llvm::Function *> FunctionSet{F, FOO, BAR, CTOR, DTOR};
-  vector<const llvm::Function *> FunSet = ICFG.getAllFunctions();
-  llvm::sort(FunctionSet);
-  llvm::sort(FunSet);
+  set<const llvm::Function *> FunctionSet;
+  FunctionSet.insert(F);
+  FunctionSet.insert(FOO);
+  FunctionSet.insert(BAR);
+  FunctionSet.insert(CTOR);
+  FunctionSet.insert(DTOR);
+
+  auto FunSet = makeSet(ICFG.getAllFunctions());
   ASSERT_EQ(FunctionSet, FunSet);
 
-  auto CallsFromWithin = ICFG.getCallsFromWithin(F);
+  set<const llvm::Instruction *> CallsFromWithin =
+      makeSet(ICFG.getCallsFromWithin(F));
   ASSERT_EQ(CallsFromWithin.size(), 2U);
 }
 
@@ -101,7 +116,7 @@ TEST(LLVMBasedICFGTest, VirtualCallSite_1) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *FooA = IRDB.getFunctionDefinition("_ZN1A3fooEv");
   ASSERT_TRUE(F);
@@ -121,7 +136,7 @@ TEST(LLVMBasedICFGTest, FunctionPointer_1) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *Foo = IRDB.getFunctionDefinition("fptr");
   ASSERT_TRUE(F);
@@ -140,15 +155,15 @@ TEST(LLVMBasedICFGTest, StaticCallSite_3) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *Factorial = IRDB.getFunctionDefinition("factorial");
   ASSERT_TRUE(Factorial);
   for (const auto &BB : *Factorial) {
     for (const auto &I : BB) {
       set<const llvm::Instruction *> CallsFromWithin =
-          ICFG.getCallsFromWithin(ICFG.getFunctionOf(&I));
+          makeSet(ICFG.getCallsFromWithin(ICFG.getFunctionOf(&I)));
       for (const llvm::Instruction *Inst : CallsFromWithin) {
-        std::string MethodName = ICFG.getFunctionName(ICFG.getFunctionOf(Inst));
+        auto MethodName = ICFG.getFunctionName(ICFG.getFunctionOf(Inst));
         ASSERT_EQ(MethodName, "factorial");
       }
     }
@@ -160,7 +175,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_4) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   ASSERT_TRUE(F);
 
@@ -170,12 +185,12 @@ TEST(LLVMBasedICFGTest, StaticCallSite_4) {
 
   for (const auto &BB : *F) {
     for (const auto &I : BB) {
-      CalleesOfCallAt = ICFG.getCalleesOfCallAt(&I);
+      CalleesOfCallAt = makeSet(ICFG.getCalleesOfCallAt(&I));
       for (const llvm::Function *Func : CalleesOfCallAt) {
         for (const auto &BB2 : *Func) {
           for (const auto &I2 : BB2) {
             if (llvm::isa<llvm::CallInst>(&I2)) {
-              CalleesOfCallAtInside = ICFG.getCalleesOfCallAt(&I2);
+              CalleesOfCallAtInside = makeSet(ICFG.getCalleesOfCallAt(&I2));
               CountFunc = CountFunc + CalleesOfCallAtInside.size();
               ASSERT_FALSE(ICFG.isVirtualFunctionCall(&I));
               ASSERT_FALSE(ICFG.isVirtualFunctionCall(&I2));
@@ -193,7 +208,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_5) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *Foo =
       IRDB.getFunctionDefinition("_ZN3Foo10getNumFoosEv");
@@ -204,7 +219,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_5) {
     for (const auto &I : BB) {
       if (ICFG.isCallSite(&I)) {
         set<const llvm::Instruction *> CallsFromWithin =
-            ICFG.getCallsFromWithin(ICFG.getFunctionOf(&I));
+            makeSet(ICFG.getCallsFromWithin(ICFG.getFunctionOf(&I)));
         ASSERT_EQ(CallsFromWithin.size(), 1U);
       }
     }
@@ -216,7 +231,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_6) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *FooF = IRDB.getFunctionDefinition("_ZN3Foo1fEv");
   ASSERT_TRUE(F);
@@ -224,9 +239,10 @@ TEST(LLVMBasedICFGTest, StaticCallSite_6) {
 
   const llvm::Instruction *I = getNthInstruction(F, 1);
   if (ICFG.isCallSite(I) || llvm::isa<llvm::InvokeInst>(I)) {
-    set<const llvm::Instruction *> StartPoints = ICFG.getStartPointsOf(FooF);
-    set<const llvm::Instruction *> CallsFromWithin =
-        ICFG.getCallsFromWithin(ICFG.getFunctionOf(getNthInstruction(F, 2)));
+    set<const llvm::Instruction *> StartPoints =
+        makeSet(ICFG.getStartPointsOf(FooF));
+    set<const llvm::Instruction *> CallsFromWithin = makeSet(
+        ICFG.getCallsFromWithin(ICFG.getFunctionOf(getNthInstruction(F, 2))));
 
     ASSERT_EQ(StartPoints.size(), 1U);
     ASSERT_TRUE(StartPoints.count(I));
@@ -241,7 +257,7 @@ TEST(LLVMBasedICFGTest, StaticCallSite_7) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");
   const llvm::Function *FooF = IRDB.getFunctionDefinition("_ZN3Foo1fEv");
   const llvm::Function *F = IRDB.getFunctionDefinition("_Z1fv");
@@ -252,14 +268,12 @@ TEST(LLVMBasedICFGTest, StaticCallSite_7) {
   const llvm::Instruction *I = getNthInstruction(FooF, 4);
   const llvm::Instruction *LastInst =
       getLastInstructionOf(IRDB.getFunctionDefinition("_ZN3Foo1fEv"));
-  auto AllFuns = ICFG.getAllFunctions();
-  boost::container::flat_set<const llvm::Function *> AllMethods(AllFuns.begin(),
-                                                                AllFuns.end());
+  set<const llvm::Function *> AllMethods = makeSet(ICFG.getAllFunctions());
   ASSERT_EQ(LastInst, I);
   ASSERT_EQ(AllMethods.size(), 5U);
-  ASSERT_TRUE(AllMethods.contains(Main));
-  ASSERT_TRUE(AllMethods.contains(FooF));
-  ASSERT_TRUE(AllMethods.contains(F));
+  ASSERT_TRUE(AllMethods.count(Main));
+  ASSERT_TRUE(AllMethods.count(FooF));
+  ASSERT_TRUE(AllMethods.count(F));
 }
 
 TEST(LLVMBasedICFGTest, StaticCallSite_8) {
@@ -267,19 +281,19 @@ TEST(LLVMBasedICFGTest, StaticCallSite_8) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT);
   const llvm::Function *F = IRDB.getFunctionDefinition("main");
   const llvm::Function *FooF = IRDB.getFunctionDefinition("_ZN4Foo21fEv");
   ASSERT_TRUE(F);
   ASSERT_TRUE(FooF);
 
-  std::vector<const llvm::Instruction *> Insts =
-      ICFG.getAllInstructionsOf(FooF);
-  std::vector<const llvm::Instruction *> Insts1 =
-      ICFG.getAllInstructionsOf(IRDB.getFunctionDefinition("_ZN4Foo21fEv"));
-  ASSERT_EQ(Insts.size(), Insts1.size());
+  // std::vector<const llvm::Instruction *> Insts =
+  //     ICFG.getAllInstructionsOf(FooF);
+  // std::vector<const llvm::Instruction *> Insts1 =
+  //     ICFG.getAllInstructionsOf(IRDB.getFunctionDefinition("_ZN4Foo21fEv"));
+  // ASSERT_EQ(Insts.size(), Insts1.size());
 
-  auto FunSet = ICFG.getAllFunctions();
+  set<const llvm::Function *> FunSet = makeSet(ICFG.getAllFunctions());
   ASSERT_EQ(FunSet.size(), 5U);
 
   const llvm::Instruction *I = getNthInstruction(F, 1);
@@ -291,7 +305,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_1) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
                      Soundness::Soundy, true);
 
   auto *GlobCtorFn = IRDB.getFunction(LLVMBasedICFG::GlobalCRuntimeModelName);
@@ -307,10 +321,10 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_1) {
   ASSERT_TRUE(Main);
   ASSERT_TRUE(BeforeMain);
 
-  auto VertFuns = ICFG.getAllVertexFunctions();
+  auto VertFuns = makeSet(ICFG.getAllVertexFunctions());
 
-  ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
+  ASSERT_TRUE(VertFuns.count(Main));
+  ASSERT_TRUE(VertFuns.count(BeforeMain));
 }
 
 TEST(LLVMBasedICFGTest, GlobalCtorDtor_2) {
@@ -318,7 +332,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_2) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
                      Soundness::Soundy, true);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");
   const llvm::Function *BeforeMain =
@@ -330,11 +344,11 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_2) {
   ASSERT_TRUE(BeforeMain);
   ASSERT_TRUE(AfterMain);
 
-  auto VertFuns = ICFG.getAllVertexFunctions();
+  auto VertFuns = makeSet(ICFG.getAllVertexFunctions());
 
-  ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(AfterMain) != boost::end(VertFuns));
+  ASSERT_TRUE(VertFuns.count(Main));
+  ASSERT_TRUE(VertFuns.count(BeforeMain));
+  ASSERT_TRUE(VertFuns.count(AfterMain));
 }
 
 TEST(LLVMBasedICFGTest, GlobalCtorDtor_3) {
@@ -342,7 +356,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_3) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
                      Soundness::Soundy, true);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");
   const llvm::Function *Ctor = IRDB.getFunctionDefinition("_ZN1SC2Ei");
@@ -352,10 +366,10 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_3) {
   ASSERT_TRUE(Ctor);
   ASSERT_TRUE(Dtor);
 
-  auto VertFuns = ICFG.getAllVertexFunctions();
+  auto VertFuns = makeSet(ICFG.getAllVertexFunctions());
 
-  ASSERT_TRUE(VertFuns.find(Ctor) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(Dtor) != boost::end(VertFuns));
+  ASSERT_TRUE(VertFuns.count(Ctor));
+  ASSERT_TRUE(VertFuns.count(Dtor));
 }
 
 TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
@@ -363,7 +377,7 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::CHA, {"main"}, &TH, &PT,
                      Soundness::Soundy, true);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");
   const llvm::Function *Ctor = IRDB.getFunctionDefinition("_ZN1SC2Ei");
@@ -379,13 +393,13 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
   ASSERT_TRUE(BeforeMain);
   ASSERT_TRUE(AfterMain);
 
-  auto VertFuns = ICFG.getAllVertexFunctions();
+  auto VertFuns = makeSet(ICFG.getAllVertexFunctions());
 
-  ASSERT_TRUE(VertFuns.find(Ctor) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(Dtor) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(Main) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(BeforeMain) != boost::end(VertFuns));
-  ASSERT_TRUE(VertFuns.find(AfterMain) != boost::end(VertFuns));
+  ASSERT_TRUE(VertFuns.count(Ctor));
+  ASSERT_TRUE(VertFuns.count(Dtor));
+  ASSERT_TRUE(VertFuns.count(Main));
+  ASSERT_TRUE(VertFuns.count(BeforeMain));
+  ASSERT_TRUE(VertFuns.count(AfterMain));
 }
 
 TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
@@ -395,8 +409,8 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::NORESOLVE, {"main"}, &TH, &PT,
-                     Soundness::Unsound, true);
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::NORESOLVE, {"main"}, &TH,
+                     &PT, Soundness::Unsound, true);
 
   // llvm::errs() << *IRDB.getWPAModule() << '\n';
 
@@ -409,17 +423,18 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
 
   auto VertFunsBefore = ICFG.getAllVertexFunctions();
 
-  ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
+  ASSERT_TRUE(llvm::find(VertFunsBefore, Bar) == std::end(VertFunsBefore));
   auto TotalEdgesBefore = ICFG.getNumOfEdges();
 
-  std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 1}};
-  auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
+  // std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 1}};
+  auto ICFGChanged = // ICFG.addRuntimeEdges(RuntimeEdges);
+      ICFG.addEdgeToICFG(IRDB.getInstruction(10), IRDB.getFunctionById(1));
 
   ASSERT_TRUE(ICFGChanged);
   auto VertFunsAfter = ICFG.getAllVertexFunctions();
-  ASSERT_TRUE(VertFunsAfter.find(Bar) != boost::end(VertFunsAfter));
+  ASSERT_TRUE(llvm::find(VertFunsAfter, Bar) != std::end(VertFunsAfter));
   ASSERT_TRUE(ICFG.getNumOfEdges() == TotalEdgesBefore + 1);
-  ASSERT_TRUE(ICFG.getCallersOf(Bar).find(IRDB.getInstruction(10)) !=
+  ASSERT_TRUE(llvm::find(ICFG.getCallersOf(Bar), IRDB.getInstruction(10)) !=
               ICFG.getCallersOf(Bar).end());
   ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 1);
 }
@@ -431,7 +446,7 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
                    IRDBOptions::WPA);
   LLVMTypeHierarchy TH(IRDB);
   LLVMPointsToSet PT(IRDB);
-  LLVMBasedICFG ICFG(IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
+  LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Unsound, true);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");
   const llvm::Function *Foo = IRDB.getFunctionDefinition("_Z3foov");
@@ -442,14 +457,15 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
 
   auto VertFunsBefore = ICFG.getAllVertexFunctions();
 
-  ASSERT_TRUE(VertFunsBefore.find(Bar) == boost::end(VertFunsBefore));
+  ASSERT_TRUE(llvm::find(VertFunsBefore, Bar) == std::end(VertFunsBefore));
   auto TotalEdgesBefore = ICFG.getNumOfEdges();
 
-  std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 0}};
-  auto ICFGChanged = ICFG.addRuntimeEdges(RuntimeEdges);
+  // std::vector<std::pair<unsigned, unsigned>> RuntimeEdges = {{10, 0}};
+  auto ICFGChanged = // ICFG.addRuntimeEdges(RuntimeEdges);
+      ICFG.addEdgeToICFG(IRDB.getInstruction(10), IRDB.getFunctionById(0));
 
   ASSERT_FALSE(ICFGChanged);
   auto VertFunsAfter = ICFG.getAllVertexFunctions();
-  ASSERT_TRUE(VertFunsAfter.find(Bar) == boost::end(VertFunsAfter));
+  ASSERT_TRUE(llvm::find(VertFunsAfter, Bar) == std::end(VertFunsAfter));
   ASSERT_TRUE(ICFG.getTotalRuntimeEdgesAdded() == 0);
 }

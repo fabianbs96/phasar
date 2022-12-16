@@ -14,13 +14,11 @@
  *      Author: philipp
  */
 
-#include <cctype>
-#include <charconv>
-#include <cstdlib>
-#include <optional>
-#include <system_error>
-
-#include "boost/algorithm/string/trim.hpp"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Config/Configuration.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h" // Just for the constants
+#include "phasar/Utils/Logger.h"
+#include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -38,11 +36,13 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "phasar/Config/Configuration.h"
-#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
-#include "phasar/Utils/LLVMShorthands.h"
-#include "phasar/Utils/Logger.h"
-#include "phasar/Utils/Utilities.h"
+#include "boost/algorithm/string/trim.hpp"
+
+#include <cctype>
+#include <charconv>
+#include <cstdlib>
+#include <optional>
+#include <system_error>
 
 using namespace std;
 using namespace psr;
@@ -213,6 +213,13 @@ std::string llvmIRToShortString(const llvm::Value *V) {
   return IRBuffer;
 }
 
+void dumpIRValue(const llvm::Value *V) {
+  llvm::outs() << llvmIRToString(V) << '\n';
+}
+void dumpIRValue(const llvm::Instruction *V) {
+  llvm::outs() << llvmIRToString(V) << '\n';
+}
+
 std::vector<const llvm::Value *>
 globalValuesUsedinFunction(const llvm::Function *F) {
   std::vector<const llvm::Value *> GlobalsUsed;
@@ -262,46 +269,6 @@ std::optional<unsigned> getFunctionId(const llvm::Function *F) {
       llvm::cast<llvm::ConstantInt>(MDInt->getValue())->getZExtValue());
 }
 
-const llvm::Value *fromMetaDataId(const ProjectIRDB &IRDB, llvm::StringRef Id) {
-  if (Id.empty() || Id[0] == '-') {
-    return nullptr;
-  }
-
-  auto ParseInt = [](llvm::StringRef Str) -> std::optional<unsigned> {
-    unsigned Num;
-    auto [Ptr, EC] = std::from_chars(Str.data(), Str.data() + Str.size(), Num);
-
-    if (EC == std::errc{}) {
-      return Num;
-    }
-
-    PHASAR_LOG_LEVEL(WARNING, "Invalid metadata id '"
-                                  << Str.str() << "': "
-                                  << std::make_error_code(EC).message());
-    return std::nullopt;
-  };
-
-  if (auto Dot = Id.find('.'); Dot != llvm::StringRef::npos) {
-    auto FName = Id.slice(0, Dot);
-
-    auto ArgNr = ParseInt(Id.drop_front(Dot + 1));
-
-    if (!ArgNr) {
-      return nullptr;
-    }
-
-    const auto *F = IRDB.getFunction(FName);
-    if (F) {
-      return getNthFunctionArgument(F, *ArgNr);
-    }
-
-    return nullptr;
-  }
-
-  auto IdNr = ParseInt(Id);
-  return IdNr ? IRDB.getInstruction(*IdNr) : nullptr;
-}
-
 bool LLVMValueIDLess::operator()(const llvm::Value *Lhs,
                                  const llvm::Value *Rhs) const {
   std::string LhsId = getMetaDataID(Lhs);
@@ -341,15 +308,16 @@ const llvm::Instruction *getNthInstruction(const llvm::Function *F,
   return nullptr;
 }
 
-std::vector<const llvm::Instruction *>
+llvm::SmallVector<const llvm::Instruction *, 2>
 getAllExitPoints(const llvm::Function *F) {
-  std::vector<const llvm::Instruction *> Ret;
+  llvm::SmallVector<const llvm::Instruction *, 2> Ret;
   appendAllExitPoints(F, Ret);
   return Ret;
 }
 
-void appendAllExitPoints(const llvm::Function *F,
-                         std::vector<const llvm::Instruction *> &ExitPoints) {
+void appendAllExitPoints(
+    const llvm::Function *F,
+    llvm::SmallVectorImpl<const llvm::Instruction *> &ExitPoints) {
   if (!F) {
     return;
   }

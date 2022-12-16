@@ -18,12 +18,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "phasar/PhasarLLVM/Utils/BinaryDomain.h"
-using namespace psr;
-using namespace std;
 
-namespace psr {
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, BinaryDomain B) {
+llvm::raw_ostream &psr::operator<<(llvm::raw_ostream &OS, BinaryDomain B) {
   switch (B) {
   case BinaryDomain::BOTTOM:
     return OS << "BOTTOM";
@@ -31,6 +27,5 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, BinaryDomain B) {
     return OS << "TOP";
   }
   llvm_unreachable(
-      "Invalid BinaryDomain element -- must be either BOTTOM or TOP");
+      "Both TOP and BOTTOM should already be handled in the switch above!");
 }
-} // namespace psr
