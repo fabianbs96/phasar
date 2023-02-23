@@ -19,6 +19,7 @@
 
 #include <set>
 #include <unordered_set>
+#include <filesystem>
 
 namespace psr {
 class LLVMProjectIRDB;

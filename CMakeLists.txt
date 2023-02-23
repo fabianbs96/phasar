@@ -192,6 +192,9 @@ if (NOT PHASAR_IN_TREE)
   find_package(LLVM 14 REQUIRED CONFIG)
   include_directories(${LLVM_INCLUDE_DIRS})
   link_directories(${LLVM_LIB_PATH} ${LLVM_LIBRARY_DIRS})
+  message(WARNING "LLVM include directory ${LLVM_INCLUDE_DIRS}" )
+  message(WARNING "LLVM include directory ${LLVM_LIB_PATH}" )
+  message(WARNING "LLVM include directory ${LLVM_LIBRARY_DIRS}" )
 endif()
 
 add_definitions(${LLVM_DEFINITIONS})
@@ -293,6 +296,9 @@ llvm_map_components_to_libnames(llvm_libs
 
 # phasar-based binaries
 add_subdirectory(tools)
+
+# max-based binaries
+add_subdirectory(tools-max)
 
 # Add Phasar unittests and build all IR test code
 if (PHASAR_BUILD_UNITTESTS)
