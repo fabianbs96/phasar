@@ -66,10 +66,16 @@ public:
 
 	[[nodiscard]] bool isZeroValue(IFDSNullpointerDereference::d_t Fact) const override;
 
+	void printNode(llvm::raw_ostream &OS, n_t Stmt) const override;
+
+  	void printDataFlowFact(llvm::raw_ostream &OS, d_t Fact) const override;
+
+  	void printFunction(llvm::raw_ostream &OS, f_t Func) const override;
+
 	[[nodiscard]] const std::map<n_t, std::set<d_t>> &getAllNullptrDerefsFound() const;
 
 	std::vector<NullptrDerefResult> aggregateResults();
 };
-}
+} // namespace psr
 
 #endif

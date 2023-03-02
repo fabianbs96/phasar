@@ -8,6 +8,7 @@
  *****************************************************************************/
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/IFDSNullpointerDereferenceAnalysis.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/FlowFunctions.h"
+#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/LLVMFlowFunctions.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/LLVMZeroValue.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
@@ -35,33 +36,48 @@ IFDSNullpointerDereference::getNormalFlowFunction(
     IFDSNullpointerDereference::n_t Curr,
     IFDSNullpointerDereference::n_t /*Succ*/) {
       if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
-            llvm::outs() << *Curr << " case store \n";
-          } 
-          else if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(Curr)) {
-            llvm::outs() << *Curr <<" case alloca \n";
+        // both store cases
+        // nested if's should be avoided, however, this is a quick and (hopefully) working version
+        if (isZeroValue(Curr)) {
+          llvm::outs() << *Curr << " case store with nullptr \n";
+          struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
+            const llvm::Function *Curr;
+            NDFF(const llvm::Function *CR)
+                : Curr(CR) {}
+            std::set<IFDSNullpointerDereference::d_t>
+            computeTargets(IFDSNullpointerDereference::d_t Source) override {
+              // propagate zero and passed fact
+              return {Source, Curr};
           }
-          else if (const auto *Load = llvm::dyn_cast<llvm::LoadInst>(Curr)) {
-            llvm::outs() << *Curr <<" case load \n";
-      } 
-      struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
-        const llvm::StoreInst *Store;
-        const llvm::Value *Zero;
-        std::map<IFDSNullpointerDereference::n_t, std::set<IFDSNullpointerDereference::d_t>> &NullptrDereferences;
-        NDFF(const llvm::StoreInst *S,
-              std::map<IFDSNullpointerDereference::n_t, std::set<IFDSNullpointerDereference::d_t>> &NPD,
-              const llvm::Value *Zero) 
-              : Store(S), Zero(Zero), NullptrDereferences(NPD) {}
-        std::set<IFDSNullpointerDereference::d_t>
-        computeTargets(IFDSNullpointerDereference::d_t Source) override {
-          if (Source == Store->getPointerOperand()) {
-                return {Source, Store->getPointerOperand()};
-          } else {
-            return {};  // if these conditions aren't met, it isn't a nullpointer dereference
-          }
-        }
-      };
+        };
+        return std::make_shared<NDFF>(Curr);
+        } 
 
-      return std::make_shared<NDFF>(Curr, NullptrReferencesFound, getZeroValue());
+        llvm::outs() << *Curr << " case store not nullptr \n";
+        return strongUpdateStore(Store);
+      } 
+
+      // alloca case
+      if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(Curr)) {
+        llvm::outs() << *Curr <<" case alloca \n";
+        struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
+          const llvm::Function *Curr;
+          NDFF(const llvm::Function *CR)
+              : Curr(CR) {}
+          std::set<IFDSNullpointerDereference::d_t>
+          computeTargets(IFDSNullpointerDereference::d_t Source) override {
+            // propagate zero and passed fact
+            return {Source, Curr};
+          }
+        };
+        return std::make_shared<NDFF>(Curr);
+      }
+
+      // load case
+      if (const auto *Load = llvm::dyn_cast<llvm::LoadInst>(Curr)) {
+        llvm::outs() << *Curr <<" case load \n";
+        return generateFlow(Load, Load->getPointerOperand());
+      } 
 }
 
 IFDSNullpointerDereference::FlowFunctionPtrType
@@ -195,4 +211,4 @@ bool IFDSNullpointerDereference::isZeroValue(
   return LLVMZeroValue::getInstance()->isLLVMZeroValue(Fact);
 }
 
-}
+} // namespace psr
