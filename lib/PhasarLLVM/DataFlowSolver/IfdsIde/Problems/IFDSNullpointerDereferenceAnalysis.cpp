@@ -35,7 +35,7 @@ IFDSNullpointerDereference::FlowFunctionPtrType
 IFDSNullpointerDereference::getNormalFlowFunction(
     IFDSNullpointerDereference::n_t Curr,
     IFDSNullpointerDereference::n_t /*Succ*/) {
-      if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
+      /*if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
         // both store cases
         // nested if's should be avoided, however, this is a quick and (hopefully) working version
         if (isZeroValue(Curr)) {
@@ -56,21 +56,16 @@ IFDSNullpointerDereference::getNormalFlowFunction(
         llvm::outs() << *Curr << " case store not nullptr \n";
         return strongUpdateStore(Store);
       } 
-
+      */
+      
       // alloca case
       if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(Curr)) {
         llvm::outs() << *Curr <<" case alloca \n";
-        struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
-          const llvm::Function *Curr;
-          NDFF(const llvm::Function *CR)
-              : Curr(CR) {}
-          std::set<IFDSNullpointerDereference::d_t>
-          computeTargets(IFDSNullpointerDereference::d_t Source) override {
-            // propagate zero and passed fact
-            return {Source, Curr};
-          }
-        };
-        return std::make_shared<NDFF>(Curr);
+        return lambdaFlow<IFDSNullpointerDereference::d_t>(
+          [Alloca, this](IFDSNullpointerDereference::d_t Source)
+          -> std::set<IFDSNullpointerDereference::d_t> {
+            return { Alloca, getZeroValue() };
+          });
       }
 
       // load case
@@ -78,6 +73,10 @@ IFDSNullpointerDereference::getNormalFlowFunction(
         llvm::outs() << *Curr <<" case load \n";
         return generateFlow(Load, Load->getPointerOperand());
       } 
+
+      // test code so that this file compiles. Needs a return 
+      return Identity<IFDSNullpointerDereference::d_t>::getInstance();
+ ;
 }
 
 IFDSNullpointerDereference::FlowFunctionPtrType
@@ -209,6 +208,21 @@ IFDSNullpointerDereference::initialSeeds() {
 bool IFDSNullpointerDereference::isZeroValue(
     IFDSNullpointerDereference::d_t Fact) const {
   return LLVMZeroValue::getInstance()->isLLVMZeroValue(Fact);
+}
+
+void IFDSNullpointerDereference::printNode(llvm::raw_ostream &OS,
+                                  IFDSNullpointerDereference::n_t Inst) const {
+  OS << llvmIRToString(Inst);
+}
+
+void IFDSNullpointerDereference::printDataFlowFact(
+    llvm::raw_ostream &Os, IFDSNullpointerDereference::d_t FlowFact) const {
+  Os << llvmIRToString(FlowFact);
+}
+
+void IFDSNullpointerDereference::printFunction(llvm::raw_ostream &Os,
+                                      IFDSNullpointerDereference::f_t Fun) const {
+  Os << Fun->getName();
 }
 
 } // namespace psr
