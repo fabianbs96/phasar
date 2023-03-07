@@ -23,6 +23,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 #include <map>
+#include <set>
 
 namespace psr {
 
@@ -35,28 +36,17 @@ IFDSNullpointerDereference::FlowFunctionPtrType
 IFDSNullpointerDereference::getNormalFlowFunction(
     IFDSNullpointerDereference::n_t Curr,
     IFDSNullpointerDereference::n_t /*Succ*/) {
-      /*if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
+      if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
         // both store cases
         // nested if's should be avoided, however, this is a quick and (hopefully) working version
         if (isZeroValue(Curr)) {
           llvm::outs() << *Curr << " case store with nullptr \n";
-          struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
-            const llvm::Function *Curr;
-            NDFF(const llvm::Function *CR)
-                : Curr(CR) {}
-            std::set<IFDSNullpointerDereference::d_t>
-            computeTargets(IFDSNullpointerDereference::d_t Source) override {
-              // propagate zero and passed fact
-              return {Source, Curr};
-          }
-        };
-        return std::make_shared<NDFF>(Curr);
-        } 
+          return generateFlow(getZeroValue(), Store->getPointerOperand());
+        }
 
         llvm::outs() << *Curr << " case store not nullptr \n";
         return strongUpdateStore(Store);
       } 
-      */
       
       // alloca case
       if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(Curr)) {
