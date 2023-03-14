@@ -14,6 +14,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <llvm/IR/InstrTypes.h>
 
 #include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/IFDSTabulationProblem.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"

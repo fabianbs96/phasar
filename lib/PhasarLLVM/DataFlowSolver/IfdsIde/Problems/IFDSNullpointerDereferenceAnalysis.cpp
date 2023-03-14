@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <map>
 #include <set>
+#include <llvm/Support/Casting.h>
 
 namespace psr {
 
@@ -39,9 +40,9 @@ IFDSNullpointerDereference::getNormalFlowFunction(
       if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
         // both store cases
         // nested if's should be avoided, however, this is a quick and (hopefully) working version
-        if (isZeroValue(Curr)) {
+        if (llvm::isa<llvm::ConstantPointerNull>(Store->getValueOperand()))  {
           llvm::outs() << *Curr << " case store with nullptr \n";
-          return generateFlow(getZeroValue(), Store->getPointerOperand());
+          return generateFlow(Store->getPointerOperand(), getZeroValue());
         }
 
         llvm::outs() << *Curr << " case store not nullptr \n";
@@ -51,11 +52,7 @@ IFDSNullpointerDereference::getNormalFlowFunction(
       // alloca case
       if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(Curr)) {
         llvm::outs() << *Curr <<" case alloca \n";
-        return lambdaFlow<IFDSNullpointerDereference::d_t>(
-          [Alloca, this](IFDSNullpointerDereference::d_t Source)
-          -> std::set<IFDSNullpointerDereference::d_t> {
-            return { Alloca, getZeroValue() };
-          });
+        return generateFlow(Alloca, getZeroValue());
       }
 
       // load case
@@ -66,55 +63,19 @@ IFDSNullpointerDereference::getNormalFlowFunction(
 
       // test code so that this file compiles. Needs a return 
       return Identity<IFDSNullpointerDereference::d_t>::getInstance();
- ;
 }
 
 IFDSNullpointerDereference::FlowFunctionPtrType
 IFDSNullpointerDereference::getCallFlowFunction(
     IFDSNullpointerDereference::n_t CallSite,
     IFDSNullpointerDereference::f_t DestFun) {
-        if (llvm::isa<llvm::CallInst>(CallSite) ||
-      llvm::isa<llvm::InvokeInst>(CallSite)) {
-    const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
-    struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
-      const llvm::Function *DestFun;
-      const llvm::CallBase *CallSite;
-      const llvm::Value *Zerovalue;
-      std::vector<const llvm::Value *> Actuals;
-      std::vector<const llvm::Value *> Formals;
-      NDFF(const llvm::Function *DM, const llvm::CallBase *CallSite,
-           const llvm::Value *ZV)
-          : DestFun(DM), CallSite(CallSite), Zerovalue(ZV) {
-        // set up the actual parameters
-        for (unsigned Idx = 0; Idx < CallSite->arg_size(); ++Idx) {
-          Actuals.push_back(CallSite->getArgOperand(Idx));
-        }
-
-        for (const auto &Arg : DestFun->args()) {
-          Formals.push_back(&Arg);
-        }
+        // propagate all
+      if (const auto *CS = llvm::dyn_cast<llvm::CallBase>(CallSite)) 
+      {
+        return Identity<IFDSNullpointerDereference::d_t>::getInstance();
       }
 
-      std::set<IFDSNullpointerDereference::d_t>
-      computeTargets(IFDSNullpointerDereference::d_t Source) override {
-        // perform parameter passing
-        if (Source != Zerovalue) {
-          std::set<const llvm::Value *> Res;
-          for (unsigned Idx = 0; Idx < Formals.size(); ++Idx) {
-            if (Source == Actuals[Idx]) {
-              Res.insert(Formals[Idx]);
-            }
-          }
-          return Res;
-        }
-
-        // propagate zero
-        return {Source};
-      }
-    };
-    return std::make_shared<NDFF>(DestFun, CS, getZeroValue());
-  }
-  return Identity<IFDSNullpointerDereference::d_t>::getInstance();
+      return killAllFlows<d_t>();
 }
 
 IFDSNullpointerDereference::FlowFunctionPtrType
@@ -123,96 +84,72 @@ IFDSNullpointerDereference::getRetFlowFunction(
     IFDSNullpointerDereference::f_t /*CalleeFun*/,
     IFDSNullpointerDereference::n_t ExitStmt,
     IFDSNullpointerDereference::n_t /*RetSite*/) {
-  if (llvm::isa<llvm::CallInst>(CallSite) ||
-      llvm::isa<llvm::InvokeInst>(CallSite)) {
-    const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
-    struct NDFF : FlowFunction<IFDSNullpointerDereference::d_t> {
-      const llvm::CallBase *Call;
-      const llvm::Instruction *Exit;
-      NDFF(const llvm::CallBase *C, const llvm::Instruction *E)
-          : Call(C), Exit(E) {}
-      std::set<IFDSNullpointerDereference::d_t>
-      computeTargets(IFDSNullpointerDereference::d_t Source) override {
-        // check if we return a nullpointer
-        std::set<IFDSNullpointerDereference::d_t> Ret;
-        //----------------------------------------------------------------------
-        // Handle pointer/reference parameters
-        //----------------------------------------------------------------------
-        if (Call->getCalledFunction()) {
-          unsigned I = 0;
-          for (const auto &Arg : Call->getCalledFunction()->args()) {
-            // auto arg = getNthFunctionArgument(call.getCalledFunction(), i);
-            if (&Arg == Source && Arg.getType()->isPointerTy()) {
-              Ret.insert(Call->getArgOperand(I));
-            }
-            I++;
-          }
-        }
+      return mapFactsToCaller(
+        llvm::cast<llvm::CallBase>(CallSite), ExitStmt,
+        [](d_t Formal, d_t Source) {
+          return Formal == Source && Formal->getType()->isPointerTy();
+        },
+        [](d_t RetVal, d_t Source) { return RetVal == Source; });
 
-        // kill all other facts
-        return Ret;
-      }
-    };
-    return std::make_shared<NDFF>(CS, ExitStmt);
-  }
-  // kill everything else
-  return killAllFlows<d_t>();
+      // kill everything else
+      return killAllFlows<d_t>();
 }
 
 IFDSNullpointerDereference::FlowFunctionPtrType
 IFDSNullpointerDereference::getCallToRetFlowFunction(
     IFDSNullpointerDereference::n_t CallSite,
     IFDSNullpointerDereference::n_t /*RetSite*/,
-    llvm::ArrayRef<IFDSNullpointerDereference::f_t> /*Callees*/) {
-  if (const auto *CS = llvm::dyn_cast<llvm::CallBase>(CallSite)) {
-    return lambdaFlow<psr::IFDSNullpointerDereference::d_t>(
-        [CS](psr::IFDSNullpointerDereference::d_t Source)
-            -> std::set<psr::IFDSNullpointerDereference::d_t> {
-          if (Source->getType()->isPointerTy()) {
-            for (const auto &Arg : CS->args()) {
-              if (Arg.get() == Source) {
-                return {};
+    llvm::ArrayRef<IFDSNullpointerDereference::f_t> /*Callees*/) { 
+      if (const auto *CS = llvm::dyn_cast<llvm::CallBase>(CallSite)) {
+        return lambdaFlow<IFDSNullpointerDereference::d_t>(
+            [CS](IFDSNullpointerDereference::d_t Source)
+                 -> std::set<IFDSNullpointerDereference::d_t> {
+              // everything but pointer type variables must be propagated
+              if (!Source->getType()->isPointerTy()) { 
+                return {Source};
               }
-            }
-          }
-          return {Source};
+              return {};
         });
-  }
-  return Identity<psr::IFDSNullpointerDereference::d_t>::getInstance();
+      }
+      // kill everything else
+      return killAllFlows<d_t>();
 }
 
-InitialSeeds<IFDSNullpointerDereference::n_t, IFDSNullpointerDereference::d_t,
-             IFDSNullpointerDereference::l_t>
-IFDSNullpointerDereference::initialSeeds() {
-  PHASAR_LOG_LEVEL(DEBUG, "IFDSNullpointerDereference::initialSeeds()");
-  InitialSeeds<IFDSNullpointerDereference::n_t, IFDSNullpointerDereference::d_t,
-               IFDSNullpointerDereference::l_t>
-      Seeds;
-  for (const auto &EntryPoint : EntryPoints) {
-    Seeds.addSeed(&IRDB->getFunction(EntryPoint)->front().front(),
-                  getZeroValue());
-  }
-  return Seeds;
+InitialSeeds<IFDSNullpointerDereference::n_t, 
+    IFDSNullpointerDereference::d_t,
+    IFDSNullpointerDereference::l_t>
+    IFDSNullpointerDereference::initialSeeds() {
+      PHASAR_LOG_LEVEL(DEBUG, "IFDSNullpointerDereference::initialSeeds()");
+      InitialSeeds<IFDSNullpointerDereference::n_t, 
+      IFDSNullpointerDereference::d_t, 
+      IFDSNullpointerDereference::l_t> Seeds;
+
+      for (const auto &EntryPoint : EntryPoints) {
+        Seeds.addSeed(&IRDB->getFunction(EntryPoint)->front().front(),
+                      getZeroValue());
+      }
+
+      return Seeds;
 }
 
 bool IFDSNullpointerDereference::isZeroValue(
     IFDSNullpointerDereference::d_t Fact) const {
-  return LLVMZeroValue::getInstance()->isLLVMZeroValue(Fact);
+      return LLVMZeroValue::getInstance()->isLLVMZeroValue(Fact);
 }
 
 void IFDSNullpointerDereference::printNode(llvm::raw_ostream &OS,
-                                  IFDSNullpointerDereference::n_t Inst) const {
-  OS << llvmIRToString(Inst);
+    IFDSNullpointerDereference::n_t Inst) const {
+      OS << llvmIRToString(Inst);
 }
 
 void IFDSNullpointerDereference::printDataFlowFact(
     llvm::raw_ostream &Os, IFDSNullpointerDereference::d_t FlowFact) const {
-  Os << llvmIRToString(FlowFact);
+     Os << llvmIRToString(FlowFact);
 }
 
 void IFDSNullpointerDereference::printFunction(llvm::raw_ostream &Os,
-                                      IFDSNullpointerDereference::f_t Fun) const {
-  Os << Fun->getName();
+    IFDSNullpointerDereference::f_t Fun) const {
+      Os << Fun->getName();
 }
 
 } // namespace psr
