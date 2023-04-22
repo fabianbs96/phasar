@@ -13,11 +13,14 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
 #include "phasar/DataFlow/IfdsIde/FlowFunctions.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
+#include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFlowFunctions.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
+#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -612,21 +615,37 @@ void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
   OS << "\n====================== IDE-Linear-Constant-Analysis Report "
         "======================\n";
+  
+  Results<LLVMAnalysisDomainDefault> AnalysisResult; //CHange the type to any in future ...
+  Warnings War{};
+  
   if (!IRDB->debugInfoAvailable()) {
     // Emit only IR code, function name and module info
     OS << "\nWARNING: No Debug Info available - emiting results without "
           "source code mapping!\n";
+
+
     for (const auto *F : ICF->getAllFunctions()) {
       std::string FName = getFunctionNameFromIR(F);
       OS << "\nFunction: " << FName << "\n----------"
          << std::string(FName.size(), '-') << '\n';
       for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
+
+        AnalysisResult.Analysis = LCA;
+
         auto Results = SR.resultsAt(Stmt, true);
         stripBottomResults(Results);
         if (!Results.empty()) {
           OS << "At IR statement: " << NtoString(Stmt) << '\n';
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
+
+                War.Instr = Stmt; // TODO: TYPECASTING NEEDED?
+                War.Fact = Res.first;
+                War.LatticeElement = Res.second;
+
+                AnalysisResult.War.push_back(War);
+
               OS << "   Fact: " << DtoString(Res.first)
                  << "\n  Value: " << LtoString(Res.second) << '\n';
             }
@@ -636,6 +655,12 @@ void IDELinearConstantAnalysis::emitTextReport(
       }
       OS << '\n';
     }
+
+// TODO:
+namespace psr{
+    AnalysisPrinter Printer = new psr::AnalysisPrinter(AnalysisResult);
+};
+
   } else {
     auto LcaResults = getLCAResults(SR);
     for (const auto &Entry : LcaResults) {

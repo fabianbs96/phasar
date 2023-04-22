@@ -10,27 +10,30 @@ enum AnalysisType {LCA, TSA, TA};
 
 //TODO: use generic types n_t, d_t templates instead of llvm
 struct Warnings{
+    using n_t = typename AnalysisDomain::n_t;
     using d_t = typename AnalysisDomain::d_t;
-    using v_t = typename AnalysisDomain::v_t;
-    using l_t = typename AnalysisDomain::l_t;
+    using l_t = typename AnalysisDomain::l_t; // TODO: v_t can be used?
+    n_t *Instr;
+    d_t *Fact;
+    l_t *LatticeElement;
     //llvm::Instruction* Instr;llvm::Value* Value;psr::LLVMProjectIRDB LatticeElement ;
 };
 
-struct Results{
+template <typename AnalysisDomain>
+struct Results{ // TODO: whats the issue here
     AnalysisType Analysis;
     std::vector<Warnings> War;
 };
 
-//template <typename AnalysisDomainTy,
-        //  typename Container = std::set<typename AnalysisDomainTy::d_t>>
-template <typename AnalysisDomain>
 class AnalysisPrinter{
 private:
-  Results Results;
+  Results<AnalysisDomain> Results;
 public:
   virtual ~AnalysisPrinter() = default;
-  AnalysisPrinter(struct Results Res);
-  void getAnalysisResults(struct Results Res);
+  AnalysisPrinter(psr::Results<AnalysisDomain> Res){
+    Res = Results;
+  }
+  void getAnalysisResults(psr::Results<AnalysisDomain> Res);
   virtual void emitAnalysisResults();
 };
 

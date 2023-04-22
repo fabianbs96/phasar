@@ -3,6 +3,7 @@
 #include <vector>
 
 namespace psr{
+
 AnalysisPrinter::AnalysisPrinter(struct Results Res):Results(std::move(Res)){}
 
 void AnalysisPrinter::getAnalysisResults(struct Results Res){
