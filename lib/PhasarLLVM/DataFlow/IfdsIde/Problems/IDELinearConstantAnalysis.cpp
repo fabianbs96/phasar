@@ -616,8 +616,13 @@ void IDELinearConstantAnalysis::emitTextReport(
   OS << "\n====================== IDE-Linear-Constant-Analysis Report "
         "======================\n";
   
+<<<<<<< HEAD
   Results AnalysisResult; 
   Warnings<LLVMAnalysisDomainDefault> War{}; //CHange the type to any in future ...
+=======
+  Results<LLVMAnalysisDomainDefault> AnalysisResult; //CHange the type to any in future ...
+  Warnings War{};
+>>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
   
   if (!IRDB->debugInfoAvailable()) {
     // Emit only IR code, function name and module info
@@ -640,9 +645,15 @@ void IDELinearConstantAnalysis::emitTextReport(
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
 
+<<<<<<< HEAD
                 War.Instr = &Stmt;
                 War.Fact = &Res.first;
                 War.LatticeElement = &Res.second;
+=======
+                War.Instr = Stmt; // TODO: TYPECASTING NEEDED?
+                War.Fact = Res.first;
+                War.LatticeElement = Res.second;
+>>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
 
                 AnalysisResult.War.push_back(War);
 
@@ -657,8 +668,14 @@ void IDELinearConstantAnalysis::emitTextReport(
     }
 
 // TODO:
+<<<<<<< HEAD
 
     AnalysisPrinter Printer(AnalysisResult);
+=======
+namespace psr{
+    AnalysisPrinter Printer = new psr::AnalysisPrinter(AnalysisResult);
+};
+>>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
 
   } else {
     auto LcaResults = getLCAResults(SR);
