@@ -12,12 +12,14 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
 #include "phasar/DataFlow/IfdsIde/FlowFunctions.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/EdgeDomain.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/GenEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/Helpers.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/KillIfSanitizedEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/TransferEdgeFunction.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Pointer/PointsToInfo.h"
 #include "phasar/Utils/DebugOutput.h"
@@ -778,6 +780,11 @@ void IDEExtendedTaintAnalysis::printFunction(llvm::raw_ostream &OS,
 
 void IDEExtendedTaintAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
+
+  Results<IDEExtendedTaintAnalysisDomain> AnalysisResult;
+
+  AnalysisResult.Analysis = TA;
+
   OS << "===== IDEExtendedTaintAnalysis-Results =====\n";
 
   if (!PostProcessed) {
@@ -789,6 +796,14 @@ void IDEExtendedTaintAnalysis::emitTextReport(
     printNode(OS, Inst);
     OS << "\n";
     for (const auto &Leak : LeakSet) {
+
+      Warnings<IDEExtendedTaintAnalysisDomain> War;
+
+      War.Instr = Inst;
+      War.Value = Leak;
+
+      AnalysisResult.War.push_back(War);
+
       OS << "\t" << llvmIRToShortString(Leak) << "\n";
     }
   }

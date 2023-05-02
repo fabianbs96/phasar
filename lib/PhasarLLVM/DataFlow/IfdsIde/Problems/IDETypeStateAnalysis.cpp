@@ -17,6 +17,7 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/TypeStateDescriptions/TypeStateDescription.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -737,12 +738,18 @@ void IDETypeStateAnalysis::emitTextReport(
     llvm::raw_ostream &OS) {
 
   LLVMBasedCFG CFG;
+
+  Results<IDETypeStateAnalysisDomain> AnalysisResult;
+
+  AnalysisResult.Analysis = TSA;
+
   OS << "\n======= TYPE STATE RESULTS =======\n";
   for (const auto &F : IRDB->getAllFunctions()) {
     OS << '\n' << getFunctionNameFromIR(F) << '\n';
     for (const auto &BB : *F) {
       for (const auto &I : BB) {
         auto Results = SR.resultsAt(&I, true);
+
         if (CFG.isExitInst(&I)) {
           OS << "\nAt exit stmt: " << NtoString(&I) << '\n';
           for (auto Res : Results) {
@@ -770,6 +777,15 @@ void IDETypeStateAnalysis::emitTextReport(
                  << "Fact: " << DtoString(Res.first) << '\n'
                  << "State: " << LtoString(Res.second) << '\n';
             }
+
+            Warnings<IDETypeStateAnalysisDomain>
+                War{}; // Change the type to any in future ...
+
+            War.Instr = &I;
+            War.Fact = Res.first;
+            War.LatticeElement = Res.second;
+
+            AnalysisResult.War.push_back(War);
           }
         } else {
           for (auto Res : Results) {
@@ -795,6 +811,15 @@ void IDETypeStateAnalysis::emitTextReport(
                  << "Fact: " << DtoString(Res.first) << '\n'
                  << "State: " << LtoString(Res.second) << '\n';
             }
+
+            Warnings<IDETypeStateAnalysisDomain>
+                War{}; // Change the type to any in future ...
+
+            War.Instr = &I;
+            War.Fact = Res.first;
+            War.LatticeElement = Res.second;
+
+            AnalysisResult.War.push_back(War);
           }
         }
       }

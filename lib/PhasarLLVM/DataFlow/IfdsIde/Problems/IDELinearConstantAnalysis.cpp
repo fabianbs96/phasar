@@ -40,6 +40,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <limits>
 #include <memory>
@@ -615,21 +616,13 @@ void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
   OS << "\n====================== IDE-Linear-Constant-Analysis Report "
         "======================\n";
-  
-<<<<<<< HEAD
-  Results AnalysisResult; 
-  Warnings<LLVMAnalysisDomainDefault> War{}; //CHange the type to any in future ...
-=======
-  Results<LLVMAnalysisDomainDefault> AnalysisResult; //CHange the type to any in future ...
-  Warnings War{};
->>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
-  
+
+  Results<IDELinearConstantAnalysisDomain> AnalysisResult;
+
   if (!IRDB->debugInfoAvailable()) {
     // Emit only IR code, function name and module info
     OS << "\nWARNING: No Debug Info available - emiting results without "
           "source code mapping!\n";
-
-
     for (const auto *F : ICF->getAllFunctions()) {
       std::string FName = getFunctionNameFromIR(F);
       OS << "\nFunction: " << FName << "\n----------"
@@ -641,24 +634,21 @@ void IDELinearConstantAnalysis::emitTextReport(
         auto Results = SR.resultsAt(Stmt, true);
         stripBottomResults(Results);
         if (!Results.empty()) {
-          OS << "At IR statement: " << NtoString(Stmt) << '\n';
+          // OS << "At IR statement: " << NtoString(Stmt) << '\n';
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
 
-<<<<<<< HEAD
-                War.Instr = &Stmt;
-                War.Fact = &Res.first;
-                War.LatticeElement = &Res.second;
-=======
-                War.Instr = Stmt; // TODO: TYPECASTING NEEDED?
-                War.Fact = Res.first;
-                War.LatticeElement = Res.second;
->>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
+              Warnings<IDELinearConstantAnalysisDomain>
+                  War{}; // Change the type to any in future ...
 
-                AnalysisResult.War.push_back(War);
+              War.Instr = Stmt;
+              War.Fact = Res.first;
+              War.LatticeElement = Res.second;
 
-              OS << "   Fact: " << DtoString(Res.first)
-                 << "\n  Value: " << LtoString(Res.second) << '\n';
+              AnalysisResult.War.push_back(War);
+
+              //   OS << "   Fact: " << DtoString(Res.first)
+              //     << "\n  Value: " << LtoString(Res.second) << '\n';
             }
           }
           OS << '\n';
@@ -667,15 +657,10 @@ void IDELinearConstantAnalysis::emitTextReport(
       OS << '\n';
     }
 
-// TODO:
-<<<<<<< HEAD
+    // TODO:
 
     AnalysisPrinter Printer(AnalysisResult);
-=======
-namespace psr{
-    AnalysisPrinter Printer = new psr::AnalysisPrinter(AnalysisResult);
-};
->>>>>>> 923432c496f840a7db6361267b0fe439aeaac99e
+    Printer.emitAnalysisResults(llvm::outs());
 
   } else {
     auto LcaResults = getLCAResults(SR);
