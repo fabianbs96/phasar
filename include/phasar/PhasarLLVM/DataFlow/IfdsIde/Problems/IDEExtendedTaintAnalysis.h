@@ -23,6 +23,7 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/BasicBlockOrdering.h"
 
 #include "llvm/ADT/STLExtras.h"
@@ -285,6 +286,8 @@ private:
 
   AbstractMemoryLocationFactory<d_t> FactFactory;
   const llvm::DataLayout &DL;
+
+  Results<IDEExtendedTaintAnalysisDomain> AnalysisResult;
 
 #ifdef XTAINT_DIAGNOSTICS
   llvm::DenseSet<d_t> allTaintedValues;

@@ -27,6 +27,6 @@ DATA_FLOW_ANALYSIS_TYPES(IntraMonoFullConstantPropagation, "intra-mono-fca", "Si
 DATA_FLOW_ANALYSIS_TYPES(IntraMonoSolverTest, "intra-mono-solvertest", "Empty analysis. Just to see that the intraprocedural monotone solver works")
 DATA_FLOW_ANALYSIS_TYPES(InterMonoSolverTest, "inter-mono-solvertest", "Empty analysis. Just to see that the interprocedural monotone solver works")
 DATA_FLOW_ANALYSIS_TYPES(InterMonoTaintAnalysis, "inter-mono-taint", "Simple taint analysis using the monotone framework with k-limited call-strings. Use ifds-taint or ide-xtaint instead.")
-
+DATA_FLOW_ANALYSIS_TYPES(IDETypeStateAnalysis, "ide-type", "Simple Typestate analysis with IDE")
 
 #undef DATA_FLOW_ANALYSIS_TYPES

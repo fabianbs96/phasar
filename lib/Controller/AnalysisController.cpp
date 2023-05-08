@@ -80,6 +80,7 @@ void AnalysisController::executeWholeProgram() {
   for (auto DataFlowAnalysis : DataFlowAnalyses) {
     switch (DataFlowAnalysis) {
     case DataFlowAnalysisType::None:
+    case DataFlowAnalysisType::IDETypeStateAnalysis:
       continue;
     case DataFlowAnalysisType::IFDSUninitializedVariables:
       executeIFDSUninitVar();

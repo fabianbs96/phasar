@@ -13,6 +13,7 @@
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
 
 #include "llvm/IR/InstrTypes.h"
 
@@ -172,6 +173,8 @@ private:
    * @brief Checks if the type machtes the type of interest.
    */
   bool hasMatchingType(d_t V);
+
+  Results<IDETypeStateAnalysisDomain> AnalysisResult;
 };
 
 } // namespace psr

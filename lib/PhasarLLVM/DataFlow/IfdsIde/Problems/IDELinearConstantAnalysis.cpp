@@ -21,6 +21,7 @@
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -617,8 +618,6 @@ void IDELinearConstantAnalysis::emitTextReport(
   OS << "\n====================== IDE-Linear-Constant-Analysis Report "
         "======================\n";
 
-  Results<IDELinearConstantAnalysisDomain> AnalysisResult;
-
   if (!IRDB->debugInfoAvailable()) {
     // Emit only IR code, function name and module info
     OS << "\nWARNING: No Debug Info available - emiting results without "
@@ -629,12 +628,13 @@ void IDELinearConstantAnalysis::emitTextReport(
          << std::string(FName.size(), '-') << '\n';
       for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
 
-        AnalysisResult.Analysis = LCA;
+        AnalysisResult.Analysis =
+            DataFlowAnalysisType::IDELinearConstantAnalysis;
 
         auto Results = SR.resultsAt(Stmt, true);
         stripBottomResults(Results);
         if (!Results.empty()) {
-          // OS << "At IR statement: " << NtoString(Stmt) << '\n';
+
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
 
@@ -646,9 +646,6 @@ void IDELinearConstantAnalysis::emitTextReport(
               War.LatticeElement = Res.second;
 
               AnalysisResult.War.push_back(War);
-
-              //   OS << "   Fact: " << DtoString(Res.first)
-              //     << "\n  Value: " << LtoString(Res.second) << '\n';
             }
           }
           OS << '\n';

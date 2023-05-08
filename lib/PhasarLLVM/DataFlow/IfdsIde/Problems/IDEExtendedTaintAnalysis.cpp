@@ -20,6 +20,7 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Pointer/PointsToInfo.h"
 #include "phasar/Utils/DebugOutput.h"
@@ -781,9 +782,7 @@ void IDEExtendedTaintAnalysis::printFunction(llvm::raw_ostream &OS,
 void IDEExtendedTaintAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
 
-  Results<IDEExtendedTaintAnalysisDomain> AnalysisResult;
-
-  AnalysisResult.Analysis = TA;
+  AnalysisResult.Analysis = DataFlowAnalysisType::IDEExtendedTaintAnalysis;
 
   OS << "===== IDEExtendedTaintAnalysis-Results =====\n";
 
@@ -800,7 +799,7 @@ void IDEExtendedTaintAnalysis::emitTextReport(
       Warnings<IDEExtendedTaintAnalysisDomain> War;
 
       War.Instr = Inst;
-      War.Value = Leak;
+      War.Fact = makeFlowFact(Leak);
 
       AnalysisResult.War.push_back(War);
 

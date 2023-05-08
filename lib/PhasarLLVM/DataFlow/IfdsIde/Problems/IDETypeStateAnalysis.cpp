@@ -18,6 +18,7 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/TypeStateDescriptions/TypeStateDescription.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -739,9 +740,7 @@ void IDETypeStateAnalysis::emitTextReport(
 
   LLVMBasedCFG CFG;
 
-  Results<IDETypeStateAnalysisDomain> AnalysisResult;
-
-  AnalysisResult.Analysis = TSA;
+  AnalysisResult.Analysis = DataFlowAnalysisType::IDETypeStateAnalysis;
 
   OS << "\n======= TYPE STATE RESULTS =======\n";
   for (const auto &F : IRDB->getAllFunctions()) {

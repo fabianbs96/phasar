@@ -1,8 +1,11 @@
+#ifndef PHASAR_PHASARLLVM_UTILS_ANALYSISPRINTER_H
+#define PHASAR_PHASARLLVM_UTILS_ANALYSISPRINTER_H
+
 #include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/Domain/LatticeDomain.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
-#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/Utils/Printer.h"
 
 #include "llvm/IR/Instruction.h"
@@ -14,24 +17,19 @@
 
 namespace psr {
 
-// TODO: use pre-defined enums
-enum AnalysisType { LCA, TSA, TA };
-
 template <typename AnalysisTemplate> struct Warnings {
+
   using n_t = typename AnalysisTemplate::n_t;
   using d_t = typename AnalysisTemplate::d_t;
   using l_t = typename AnalysisTemplate::l_t;
-  using v_t = typename AnalysisTemplate::v_t;
 
   n_t Instr;
   d_t Fact;
   l_t LatticeElement;
-  v_t Value;
 };
 
-template <typename AnalysisTemplate>
-struct Results { // TODO: whats the issue here
-  AnalysisType Analysis;
+template <typename AnalysisTemplate> struct Results {
+  DataFlowAnalysisType Analysis;
   std::vector<Warnings<AnalysisTemplate>> War;
 };
 
@@ -49,19 +47,18 @@ public:
 
     for (auto Iter = Results.War.begin(); Iter != Results.War.end(); Iter++) {
       if (Iter->Instr != NULL) {
-        OS << "\n Instr is " << llvmIRToString(Iter->Instr) << "\n";
+        OS << "At IR statement: " << llvmIRToString(Iter->Instr) << "\n";
       }
       if (Iter->Fact != NULL) {
-        OS << "Data Flow Fact" << llvmIRToShortString(Iter->Fact) << "\n";
+        OS << "Fact: " << llvmIRToShortString(Iter->Fact);
       }
       if (Iter->LatticeElement != 0) {
-        OS << "Lattice Value " << Iter->LatticeElement << "\n";
-      }
-      if (Iter->Value != NULL) {
-        OS << "Value is " << Iter->Value << "\n";
+        OS << "\n Value: " << Iter->LatticeElement << "\n";
       }
     }
   }
 };
 
 } // namespace psr
+
+#endif
