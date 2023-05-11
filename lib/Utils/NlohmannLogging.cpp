@@ -1,9 +1,11 @@
-
-#include "phasar/Utils/NlohmannLogging.h"
+module;
+#include "nlohmann/json.hpp"
 
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Format.h"         // -- ---------v
+#include "llvm/Support/FormatVariadic.h" // -- for overload resolution
 
-#include "nlohmann/json.hpp"
+export module NlohmannLogging;
 
 namespace psr {
 

@@ -20,7 +20,6 @@
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -41,6 +40,8 @@
 #include <cassert>
 #include <memory>
 #include <ostream>
+
+import NlohmannLogging;
 
 using namespace std;
 

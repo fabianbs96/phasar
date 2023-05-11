@@ -15,7 +15,6 @@
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/BoxedPointer.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/NlohmannLogging.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -47,6 +46,8 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+
+import NlohmannLogging;
 
 namespace psr {
 

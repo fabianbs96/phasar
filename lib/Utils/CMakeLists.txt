@@ -42,3 +42,6 @@ set_target_properties(phasar_utils
   LINKER_LANGUAGE CXX
   PREFIX "lib"
 )
+
+add_module(NlohmannLogging NlohmannLogging.cpp)
+add_dependencies(phasar_utils NlohmannLogging.pcm)

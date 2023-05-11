@@ -2,7 +2,6 @@
 
 #include "phasar/Utils/IO.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/NlohmannLogging.h"
 
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -11,6 +10,8 @@
 #include "nlohmann/json.hpp"
 
 #include <optional>
+
+import NlohmannLogging;
 
 llvm::StringRef psr::to_string(TaintCategory Cat) noexcept {
   switch (Cat) {

@@ -14,7 +14,6 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToUtils.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -31,6 +30,8 @@
 #include "boost/graph/depth_first_search.hpp"
 #include "boost/graph/graph_utility.hpp"
 #include "boost/graph/graphviz.hpp"
+
+import NlohmannLogging;
 
 using namespace std;
 

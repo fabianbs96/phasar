@@ -61,17 +61,17 @@ concept IsEdgeFunction = requires(const T &EF, const EdgeFunction<typename T::l_
   {T::compose(CEF, TEEF)}  -> std::same_as<EdgeFunction<typename T::l_t>>;
   {T::join(CEF, TEEF)}     -> std::same_as<EdgeFunction<typename T::l_t>>;
 };
-  // clang-format on
+// clang-format on
 
 #endif
 
 class EdgeFunctionBase {
 public:
   template <typename ConcreteEF>
-  static constexpr bool
-      IsSOOCandidate = sizeof(ConcreteEF) <= sizeof(void *) && // NOLINT
-                       alignof(ConcreteEF) <= alignof(void *) &&
-                       std::is_trivially_copyable_v<ConcreteEF>;
+  static constexpr bool IsSOOCandidate =
+      sizeof(ConcreteEF) <= sizeof(void *) && // NOLINT
+      alignof(ConcreteEF) <= alignof(void *) &&
+      std::is_trivially_copyable_v<ConcreteEF>;
 
 protected:
   enum class AllocationPolicy {
@@ -82,7 +82,9 @@ protected:
   struct RefCountedBase {
     mutable std::atomic_size_t Rc = 0;
   };
-  template <typename T> struct RefCounted : RefCountedBase { T Value; };
+  template <typename T> struct RefCounted : RefCountedBase {
+    T Value;
+  };
 
   template <typename T> struct CachedRefCounted : RefCounted<T> {
     EdgeFunctionSingletonCache<T> *Cache{};
@@ -222,22 +224,21 @@ public:
 
   /// Implicit-conversion constructor from EdgeFunctionRef. Increments the
   /// ref-count if not small-object optimized
-  template <typename ConcreteEF,
-            typename = std::enable_if_t<
-                !std::is_same_v<EdgeFunction, std::decay_t<ConcreteEF>> &&
-                IsEdgeFunction<ConcreteEF>>>
-  EdgeFunction(EdgeFunctionRef<ConcreteEF> CEF) noexcept
-      : EdgeFunction(CEF.Instance,
-                     {&VTableFor<ConcreteEF>, [CEF] {
-                        if constexpr (IsSOOCandidate<ConcreteEF>) {
-                          (void)CEF;
-                          return AllocationPolicy::SmallObjectOptimized;
-                        } else {
-                          return CEF.IsCached
-                                     ? AllocationPolicy::CustomHeapAllocated
-                                     : AllocationPolicy::DefaultHeapAllocated;
-                        }
-                      }()}) {}
+  template <
+      typename ConcreteEF,
+      typename = std::enable_if_t<
+          !std::is_same_v<EdgeFunction, std::decay_t<ConcreteEF>>>>
+          EdgeFunction(EdgeFunctionRef<ConcreteEF> CEF) noexcept : EdgeFunction(
+              CEF.Instance,
+              {&VTableFor<ConcreteEF>, [CEF] {
+                 if constexpr (IsSOOCandidate<ConcreteEF>) {
+                   (void)CEF;
+                   return AllocationPolicy::SmallObjectOptimized;
+                 } else {
+                   return CEF.IsCached ? AllocationPolicy::CustomHeapAllocated
+                                       : AllocationPolicy::DefaultHeapAllocated;
+                 }
+               }()}) {}
 
   /// Conversion-constructor from any edge function (that satisfies the
   /// IsEdgeFunction trait). Stores a type-erased copy of CEF and allocates

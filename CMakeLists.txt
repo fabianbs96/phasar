@@ -11,7 +11,7 @@ if (NOT PHASAR_IN_TREE)
 endif ()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -43,7 +43,7 @@ enable_testing()
 # endif()
 
 set(PHASAR_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PHASAR_SRC_DIR}/cmake")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PHASAR_SRC_DIR}/modules")
 
 file(STRINGS ${PHASAR_SRC_DIR}/include/phasar/Config/Version.h VERSION_NUMBER_FILE)
 string(REPLACE " " ";" VERSION_NUMBER_FILE ${VERSION_NUMBER_FILE})
@@ -274,6 +274,31 @@ if (PHASAR_ENABLE_CLANG_TIDY_DURING_BUILD)
     # -warnings-as-errors=*;
   )
 endif ()
+
+add_compile_options(-fmodules-ts)
+
+#set(CMAKE_MODULE_PATH ${PHASAR_SRC_DIR}/modules)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmodule-file=NlohmannLogging=${CMAKE_MODULE_PATH}/NlohmannLogging.pcm")
+
+function(add_module name)
+    file(MAKE_DIRECTORY ${CMAKE_MODULE_PATH})
+    add_custom_target(${name}.pcm
+            COMMAND
+                ${CMAKE_CXX_COMPILER}
+                -std=c++20
+                -fmodules-ts
+                -I ${PHASAR_SRC_DIR}/include
+                -I ${Boost_INCLUDE_DIRS}
+                -I ${PHASAR_SRC_DIR}/external/json/single_include/
+                #-I ${SQLITE3_INCLUDE_DIR}
+                #-I ${SYSTEM}
+                -I ${LLVM_INCLUDE_DIRS}
+                -c ${CMAKE_CURRENT_SOURCE_DIR}/${ARGN}
+                # -Xclang -emit-module-interface
+                -o ${CMAKE_MODULE_PATH}/${name}.pcm
+            )
+endfunction()
+
 
 # Add PhASAR's subdirectories
 add_subdirectory(include)

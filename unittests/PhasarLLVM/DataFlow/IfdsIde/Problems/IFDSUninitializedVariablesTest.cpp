@@ -381,6 +381,19 @@ TEST_F(IFDSUninitializedVariablesTest, UninitTest_21_SHOULD_LEAK) {
   // 37 => {17}; actual leak
   compareResults(GroundTruth);
 }
+TEST_F (IFDSUninitializedVariablesTest, UninitTest_22_SHOULD_LEAK) {
+  
+  // doAnalysis("test_test_uninit_cpp_dbg.ll", {0, {"0"}}, {2, {"4"}}, {3, {"7"}}, {4, {"10"}}, {37, {"14"}});
+  initialize({PathToLlFiles + "test_test_uninit_cpp_dbg.ll"});
+  IFDSSolver Solver(*UninitProblem, &HA->getICFG());
+  Solver.solve();
+
+  map<int, set<string>> GroundTruth = {
+      {0, {"0"}}, {2, {"4"}}, {3, {"7"}}, {4, {"10"}}, {37, {"14"}}};
+ 
+  compareResults(GroundTruth);
+}
+
 int main(int Argc, char **Argv) {
   ::testing::InitGoogleTest(&Argc, Argv);
   return RUN_ALL_TESTS();
