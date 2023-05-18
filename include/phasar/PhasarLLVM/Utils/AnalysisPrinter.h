@@ -6,54 +6,54 @@
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
 #include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Printer.h"
 
+#include "llvm/ADT/None.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstddef>
 #include <ostream>
+#include <type_traits>
 #include <vector>
 
 namespace psr {
 
-template <typename AnalysisTemplate> struct Warnings {
-
-  using n_t = typename AnalysisTemplate::n_t;
-  using d_t = typename AnalysisTemplate::d_t;
-  using l_t = typename AnalysisTemplate::l_t;
-
+template <typename n_t, typename d_t, typename l_t> struct Warnings {
   n_t Instr;
   d_t Fact;
   l_t LatticeElement;
 };
 
-template <typename AnalysisTemplate> struct Results {
-  DataFlowAnalysisType Analysis;
-  std::vector<Warnings<AnalysisTemplate>> War;
+template <typename n_t, typename d_t, typename l_t> struct Results {
+  DataFlowAnalysisType AnalysisType;
+  std::vector<Warnings<n_t, d_t, l_t>> War;
 };
 
-template <typename AnalysisTemplate> class AnalysisPrinter {
+template <typename n_t, typename d_t, typename l_t, bool LatticePrinter = false>
+class AnalysisPrinter {
 private:
-  Results<AnalysisTemplate> Results;
+  const Results<n_t, d_t, l_t> &Results;
 
 public:
   virtual ~AnalysisPrinter() = default;
-  AnalysisPrinter(::psr::Results<AnalysisTemplate> Res) : Results(Res) {}
-  void getAnalysisResults(::psr::Results<AnalysisTemplate> Res);
+  AnalysisPrinter(const ::psr::Results<n_t, d_t, l_t> &Res) : Results(Res) {}
+
   virtual void emitAnalysisResults(llvm::raw_ostream &OS = llvm::outs()) {
 
-    // TODO: Switch the implementation based on Analysis ?
+    OS << "\n===== " << Results.AnalysisType << " =====\n";
 
     for (auto Iter = Results.War.begin(); Iter != Results.War.end(); Iter++) {
-      if (Iter->Instr != NULL) {
-        OS << "At IR statement: " << llvmIRToString(Iter->Instr) << "\n";
+      if (Iter->Instr) {
+        OS << "\nAt IR statement: " << llvmIRToString(Iter->Instr) << "\n";
       }
-      if (Iter->Fact != NULL) {
-        OS << "Fact: " << llvmIRToShortString(Iter->Fact);
+      if (Iter->Fact) {
+        OS << "Fact: " << llvmIRToShortString(Iter->Fact) << "\n";
       }
-      if (Iter->LatticeElement != 0) {
-        OS << "\n Value: " << Iter->LatticeElement << "\n";
+
+      if constexpr (LatticePrinter) {
+        OS << "Value: " << Iter->LatticeElement << "\n";
       }
     }
   }

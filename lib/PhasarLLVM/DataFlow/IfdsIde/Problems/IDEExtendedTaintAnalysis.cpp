@@ -17,6 +17,7 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/Helpers.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/KillIfSanitizedEdgeFunction.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/TransferEdgeFunction.h"
+#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
@@ -782,31 +783,26 @@ void IDEExtendedTaintAnalysis::printFunction(llvm::raw_ostream &OS,
 void IDEExtendedTaintAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
 
-  AnalysisResult.Analysis = DataFlowAnalysisType::IDEExtendedTaintAnalysis;
-
-  OS << "===== IDEExtendedTaintAnalysis-Results =====\n";
-
   if (!PostProcessed) {
     doPostProcessing(SR);
   }
 
   for (auto &[Inst, LeakSet] : Leaks) {
-    OS << "At ";
-    printNode(OS, Inst);
-    OS << "\n";
+
     for (const auto &Leak : LeakSet) {
 
-      Warnings<IDEExtendedTaintAnalysisDomain> War;
+      Warnings<n_t, const llvm::Value *, const llvm::Value *> War{};
 
       War.Instr = Inst;
-      War.Fact = makeFlowFact(Leak);
+      War.Fact = Leak;
+      War.LatticeElement = Leak;
 
-      AnalysisResult.War.push_back(War);
-
-      OS << "\t" << llvmIRToShortString(Leak) << "\n";
+      AnalysisResults.War.push_back(War);
     }
   }
-  OS << '\n';
+  AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *, false> Printer(
+      AnalysisResults);
+  Printer.emitAnalysisResults(OS);
 }
 
 // JoinLattice

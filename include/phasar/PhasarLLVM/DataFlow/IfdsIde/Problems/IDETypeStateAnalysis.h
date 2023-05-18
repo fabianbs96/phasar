@@ -14,6 +14,7 @@
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 
 #include "llvm/IR/InstrTypes.h"
 
@@ -174,7 +175,8 @@ private:
    */
   bool hasMatchingType(d_t V);
 
-  Results<IDETypeStateAnalysisDomain> AnalysisResult;
+  Results<n_t, d_t, l_t> AnalysisResults{DataFlowAnalysisType::None,
+                                         {}}; // Need to change from NoneType
 };
 
 } // namespace psr

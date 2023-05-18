@@ -615,20 +615,15 @@ void IDELinearConstantAnalysis::printEdgeFact(llvm::raw_ostream &OS,
 
 void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
-  OS << "\n====================== IDE-Linear-Constant-Analysis Report "
-        "======================\n";
 
   if (!IRDB->debugInfoAvailable()) {
-    // Emit only IR code, function name and module info
-    OS << "\nWARNING: No Debug Info available - emiting results without "
-          "source code mapping!\n";
+
     for (const auto *F : ICF->getAllFunctions()) {
       std::string FName = getFunctionNameFromIR(F);
-      OS << "\nFunction: " << FName << "\n----------"
-         << std::string(FName.size(), '-') << '\n';
+
       for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
 
-        AnalysisResult.Analysis =
+        AnalysisResults.AnalysisType =
             DataFlowAnalysisType::IDELinearConstantAnalysis;
 
         auto Results = SR.resultsAt(Stmt, true);
@@ -638,26 +633,21 @@ void IDELinearConstantAnalysis::emitTextReport(
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
 
-              Warnings<IDELinearConstantAnalysisDomain>
-                  War{}; // Change the type to any in future ...
+              Warnings<n_t, d_t, l_t> War{};
 
               War.Instr = Stmt;
               War.Fact = Res.first;
               War.LatticeElement = Res.second;
 
-              AnalysisResult.War.push_back(War);
+              AnalysisResults.War.push_back(War);
             }
           }
-          OS << '\n';
         }
       }
-      OS << '\n';
     }
 
-    // TODO:
-
-    AnalysisPrinter Printer(AnalysisResult);
-    Printer.emitAnalysisResults(llvm::outs());
+    AnalysisPrinter<n_t, d_t, l_t, true> Printer(AnalysisResults);
+    Printer.emitAnalysisResults(OS);
 
   } else {
     auto LcaResults = getLCAResults(SR);

@@ -14,6 +14,7 @@
 #include "phasar/Domain/LatticeDomain.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -137,7 +138,8 @@ public:
 
 private:
   const LLVMBasedICFG *ICF{};
-  Results<IDELinearConstantAnalysisDomain> AnalysisResult;
+  Results<n_t, d_t, l_t> AnalysisResults{
+      DataFlowAnalysisType::IDELinearConstantAnalysis, {}};
 };
 
 } // namespace psr

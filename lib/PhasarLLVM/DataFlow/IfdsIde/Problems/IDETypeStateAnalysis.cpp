@@ -740,90 +740,48 @@ void IDETypeStateAnalysis::emitTextReport(
 
   LLVMBasedCFG CFG;
 
-  AnalysisResult.Analysis = DataFlowAnalysisType::IDETypeStateAnalysis;
-
-  OS << "\n======= TYPE STATE RESULTS =======\n";
   for (const auto &F : IRDB->getAllFunctions()) {
-    OS << '\n' << getFunctionNameFromIR(F) << '\n';
     for (const auto &BB : *F) {
       for (const auto &I : BB) {
         auto Results = SR.resultsAt(&I, true);
 
         if (CFG.isExitInst(&I)) {
-          OS << "\nAt exit stmt: " << NtoString(&I) << '\n';
           for (auto Res : Results) {
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
-                OS << "\n=== ERROR STATE DETECTED ===\nAlloca: "
-                   << DtoString(Res.first) << '\n';
-                for (const auto *Pred : CFG.getPredsOf(&I)) {
-                  OS << "\nPredecessor: " << NtoString(Pred) << '\n';
-                  auto PredResults = SR.resultsAt(Pred, true);
-                  for (auto Res : PredResults) {
-                    if (Res.first == Alloca) {
-                      OS << "Pred State: " << LtoString(Res.second) << '\n';
-                    }
-                  }
-                }
-                OS << "============================\n";
-              } else {
-                OS << "\nAlloca : " << DtoString(Res.first)
-                   << "\nState  : " << LtoString(Res.second) << '\n';
+                // ERROR STATE DETECTED
+                Warnings<n_t, d_t, l_t> War{};
+
+                War.Instr = &I;
+                War.Fact = Res.first;
+                War.LatticeElement = Res.second;
+
+                AnalysisResults.War.push_back(War);
               }
-            } else {
-              OS << "\nInst: " << NtoString(&I) << '\n'
-                 << "Fact: " << DtoString(Res.first) << '\n'
-                 << "State: " << LtoString(Res.second) << '\n';
             }
-
-            Warnings<IDETypeStateAnalysisDomain>
-                War{}; // Change the type to any in future ...
-
-            War.Instr = &I;
-            War.Fact = Res.first;
-            War.LatticeElement = Res.second;
-
-            AnalysisResult.War.push_back(War);
           }
         } else {
           for (auto Res : Results) {
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
-                OS << "\n=== ERROR STATE DETECTED ===\nAlloca: "
-                   << DtoString(Res.first) << '\n'
-                   << "\nAt IR Inst: " << NtoString(&I) << '\n';
-                for (const auto *Pred : CFG.getPredsOf(&I)) {
-                  OS << "\nPredecessor: " << NtoString(Pred) << '\n';
-                  auto PredResults = SR.resultsAt(Pred, true);
-                  for (auto Res : PredResults) {
-                    if (Res.first == Alloca) {
-                      OS << "Pred State: " << LtoString(Res.second) << '\n';
-                    }
-                  }
-                }
-                OS << "============================\n";
+                // ERROR STATE DETECTED
+                Warnings<n_t, d_t, l_t> War{};
+
+                War.Instr = &I;
+                War.Fact = Res.first;
+                War.LatticeElement = Res.second;
+
+                AnalysisResults.War.push_back(War);
               }
-            } else {
-              OS << "\nInst: " << NtoString(&I) << '\n'
-                 << "Fact: " << DtoString(Res.first) << '\n'
-                 << "State: " << LtoString(Res.second) << '\n';
             }
-
-            Warnings<IDETypeStateAnalysisDomain>
-                War{}; // Change the type to any in future ...
-
-            War.Instr = &I;
-            War.Fact = Res.first;
-            War.LatticeElement = Res.second;
-
-            AnalysisResult.War.push_back(War);
           }
         }
+        AnalysisPrinter<n_t, d_t, l_t, false> Printer(AnalysisResults);
+        Printer.emitAnalysisResults(OS);
       }
     }
-    OS << "\n--------------------------------------------\n";
   }
 }
 
