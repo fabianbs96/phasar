@@ -790,14 +790,7 @@ void IDEExtendedTaintAnalysis::emitTextReport(
   for (auto &[Inst, LeakSet] : Leaks) {
 
     for (const auto &Leak : LeakSet) {
-
-      Warnings<n_t, const llvm::Value *, const llvm::Value *> War{};
-
-      War.Instr = Inst;
-      War.Fact = Leak;
-      War.LatticeElement = Leak;
-
-      AnalysisResults.War.push_back(War);
+      AnalysisResults.War.emplace_back(Inst, Leak, Leak);
     }
   }
   AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *, false> Printer(

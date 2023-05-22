@@ -24,6 +24,10 @@ template <typename n_t, typename d_t, typename l_t> struct Warnings {
   n_t Instr;
   d_t Fact;
   l_t LatticeElement;
+
+  // Constructor
+  Warnings(n_t Inst, d_t DfFact, l_t Lattice)
+      : Instr(Inst), Fact(DfFact), LatticeElement(Lattice) {}
 };
 
 template <typename n_t, typename d_t, typename l_t> struct Results {

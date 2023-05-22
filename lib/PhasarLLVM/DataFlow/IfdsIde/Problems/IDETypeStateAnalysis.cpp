@@ -751,13 +751,7 @@ void IDETypeStateAnalysis::emitTextReport(
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
                 // ERROR STATE DETECTED
-                Warnings<n_t, d_t, l_t> War{};
-
-                War.Instr = &I;
-                War.Fact = Res.first;
-                War.LatticeElement = Res.second;
-
-                AnalysisResults.War.push_back(War);
+                AnalysisResults.War.emplace_back(&I, Res.first, Res.second);
               }
             }
           }
@@ -767,13 +761,7 @@ void IDETypeStateAnalysis::emitTextReport(
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
                 // ERROR STATE DETECTED
-                Warnings<n_t, d_t, l_t> War{};
-
-                War.Instr = &I;
-                War.Fact = Res.first;
-                War.LatticeElement = Res.second;
-
-                AnalysisResults.War.push_back(War);
+                AnalysisResults.War.emplace_back(&I, Res.first, Res.second);
               }
             }
           }

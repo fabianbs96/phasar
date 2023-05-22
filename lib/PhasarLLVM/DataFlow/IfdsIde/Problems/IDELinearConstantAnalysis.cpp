@@ -623,23 +623,13 @@ void IDELinearConstantAnalysis::emitTextReport(
 
       for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
 
-        AnalysisResults.AnalysisType =
-            DataFlowAnalysisType::IDELinearConstantAnalysis;
-
         auto Results = SR.resultsAt(Stmt, true);
         stripBottomResults(Results);
         if (!Results.empty()) {
 
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
-
-              Warnings<n_t, d_t, l_t> War{};
-
-              War.Instr = Stmt;
-              War.Fact = Res.first;
-              War.LatticeElement = Res.second;
-
-              AnalysisResults.War.push_back(War);
+              AnalysisResults.War.emplace_back(Stmt, Res.first, Res.second);
             }
           }
         }
