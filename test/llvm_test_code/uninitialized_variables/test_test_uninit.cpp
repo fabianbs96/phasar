@@ -12,8 +12,7 @@ int main() {
   int i;
   int f = 0;
 
-  for (int n = 0; n < 3; n++) 
-  {
+  for (int n = 0; n < 3; n++) {
     f += foo(i);
   }
 
