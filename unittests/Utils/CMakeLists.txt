@@ -9,6 +9,10 @@ set(UtilsSources
   AnalysisPrinterTest.cpp
 )
 
+if(PHASAR_ENABLE_DYNAMIC_LOG)
+  list(APPEND UtilsSources LoggerTest.cpp)
+endif()
+
 foreach(TEST_SRC ${UtilsSources})
   add_phasar_unittest(${TEST_SRC})
 endforeach(TEST_SRC)
