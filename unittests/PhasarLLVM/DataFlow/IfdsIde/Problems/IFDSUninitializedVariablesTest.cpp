@@ -34,7 +34,6 @@ protected:
   std::optional<IFDSUninitializedVariables> UninitProblem;
 
   IFDSUninitializedVariablesTest() = default;
-  ~IFDSUninitializedVariablesTest() override = default;
 
   void initialize(const llvm::Twine &IRFile) {
     HA.emplace(IRFile, EntryPoints);
@@ -134,7 +133,7 @@ TEST_F(IFDSUninitializedVariablesTest, UninitTest_08_SHOULD_NOT_LEAK) {
   doAnalysis("global_variable_cpp_dbg.ll", {});
 }
 /****************************************************************************************
- * failssince @i is uninitialized in the c++ code, but initialized in the
+ * fails since @i is uninitialized in the c++ code, but initialized in the
  * LLVM-IR
  *
  *****************************************************************************************/
@@ -149,6 +148,9 @@ TEST_F(IFDSUninitializedVariablesTest, UninitTest_10_SHOULD_LEAK) {
 }
 
 TEST_F(IFDSUninitializedVariablesTest, UninitTest_11_SHOULD_NOT_LEAK) {
+  // all undef-uses are sanitized;
+  // However, the uninitialized variable j is read, which causes the analysis to
+  // report an undef-use
   doAnalysis("sanitizer_cpp_dbg.ll", {{6, {"2"}}});
 }
 //---------------------------------------------------------------------
