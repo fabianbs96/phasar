@@ -23,6 +23,8 @@
 #include <set>
 #include <string>
 
+#include <sys/types.h>
+
 namespace llvm {
 class Instruction;
 class Function;
@@ -54,9 +56,11 @@ public:
   using typename IDETabProblemType::t_t;
   using typename IDETabProblemType::v_t;
 
-  IDELinearConstantAnalysis(const LLVMProjectIRDB *IRDB,
-                            const LLVMBasedICFG *ICF,
-                            std::vector<std::string> EntryPoints = {"main"});
+  IDELinearConstantAnalysis(
+      const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
+      std::vector<std::string> EntryPoints = {"main"},
+      const AnalysisPrinter<n_t, d_t, l_t, true> &Printer = {
+          DataFlowAnalysisType::IDELinearConstantAnalysis});
 
   ~IDELinearConstantAnalysis() override;
 
@@ -138,8 +142,7 @@ public:
 
 private:
   const LLVMBasedICFG *ICF{};
-  Results<n_t, d_t, l_t> AnalysisResults{
-      DataFlowAnalysisType::IDELinearConstantAnalysis, {}};
+  AnalysisPrinter<n_t, d_t, l_t, true> Printer;
 };
 
 } // namespace psr

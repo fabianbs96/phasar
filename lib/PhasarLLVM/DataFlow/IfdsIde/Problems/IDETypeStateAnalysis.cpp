@@ -166,12 +166,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS << "TSConstant[" << EF.TSD->stateToString(EF.Value) << "]";
 }
 
-IDETypeStateAnalysis::IDETypeStateAnalysis(const LLVMProjectIRDB *IRDB,
-                                           LLVMAliasInfoRef PT,
-                                           const TypeStateDescription *TSD,
-                                           std::vector<std::string> EntryPoints)
+IDETypeStateAnalysis::IDETypeStateAnalysis(
+    const LLVMProjectIRDB *IRDB, LLVMAliasInfoRef PT,
+    const TypeStateDescription *TSD, std::vector<std::string> EntryPoints,
+    const AnalysisPrinter<n_t, d_t, l_t> &Printer)
     : IDETabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
-      TSD(TSD), PT(PT) {
+      TSD(TSD), PT(PT), Printer(Printer) {
   assert(TSD != nullptr);
   assert(PT);
 }
@@ -743,8 +743,9 @@ void IDETypeStateAnalysis::emitTextReport(
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
+                Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
                 // ERROR STATE DETECTED
-                AnalysisResults.War.emplace_back(&I, Res.first, Res.second);
+                Printer.onResult(War);
               }
             }
           }
@@ -753,14 +754,16 @@ void IDETypeStateAnalysis::emitTextReport(
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
+                Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
                 // ERROR STATE DETECTED
-                AnalysisResults.War.emplace_back(&I, Res.first, Res.second);
+                // Printer.onResult(Warnings{&I, Res.first, Res.second});
+                Printer.onResult(War);
               }
             }
           }
         }
-        AnalysisPrinter<n_t, d_t, l_t, false> Printer(AnalysisResults);
-        Printer.emitAnalysisResults(OS);
+
+        Printer.onFinalize(OS);
       }
     }
   }

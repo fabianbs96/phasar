@@ -6,19 +6,47 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
+#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
+#include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "TestConfig.h"
 #include "gtest/gtest.h"
-#include "llvm-14/llvm/IR/Instruction.h"
 
+#include <cstdio>
+#include <iostream>
+#include <ostream>
 #include <regex>
+
+#include <nlohmann/json.hpp>
 
 using namespace psr;
 
+class GroundTruthCollector
+    : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
+                             IDELinearConstantAnalysis::d_t,
+                             IDELinearConstantAnalysis::l_t, true> {
+public:
+  nlohmann::json GroundTruth;
+  // constructor init Groundtruth in each fixture
+  GroundTruthCollector(DataFlowAnalysisType AnalysisType)
+      : AnalysisPrinter<IDELinearConstantAnalysis::n_t,
+                        IDELinearConstantAnalysis::d_t,
+                        IDELinearConstantAnalysis::l_t, true>(AnalysisType){};
+
+  void onResult(
+      Warnings<IDELinearConstantAnalysis::n_t, IDELinearConstantAnalysis::d_t,
+               IDELinearConstantAnalysis::l_t>
+          War) override {
+    std::cout << "OVERRIDED ONRESULT CALLED\n";
+    nlohmann::json Json = getSrcCodeInfoFromIR(War.Fact);
+    std::cout << "Source code: " << Json.dump(2) << "\n";
+  }
+};
 class AnalysisPrinterTest : public ::testing::Test {
 protected:
   static constexpr auto PathToLlFiles =
@@ -27,6 +55,9 @@ protected:
 
   std::string doAnalysis(llvm::StringRef LlvmFilePath) {
     std::string Results;
+    GroundTruthCollector GroundTruthPrinter = {
+        DataFlowAnalysisType::IDELinearConstantAnalysis};
+
     llvm::raw_string_ostream Res(Results);
     HelperAnalyses HA(PathToLlFiles + LlvmFilePath, EntryPoints);
     // Compute the ICFG to possibly create the runtime model
@@ -37,7 +68,8 @@ protected:
     auto LCAProblem = createAnalysisProblem<IDELinearConstantAnalysis>(
         HA,
         std::vector{HasGlobalCtor ? LLVMBasedICFG::GlobalCRuntimeModelName.str()
-                                  : "main"});
+                                  : "main"},
+        GroundTruthPrinter);
     IDESolver LCASolver(LCAProblem, &ICFG);
     LCASolver.solve();
     LCASolver.emitTextReport(Res);
@@ -69,8 +101,10 @@ protected:
 };
 
 /* ============== BASIC TESTS ============== */
-TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
+TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
+  nlohmann::json GroundTruth;
   auto Results = doAnalysis("simple_cpp.ll");
+
   checkResults("simple_cpp.ll", Results);
 }
 

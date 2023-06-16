@@ -44,6 +44,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -262,9 +263,10 @@ struct BinOp {
 
 IDELinearConstantAnalysis::IDELinearConstantAnalysis(
     const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
-    std::vector<std::string> EntryPoints)
+    std::vector<std::string> EntryPoints,
+    const AnalysisPrinter<n_t, d_t, l_t, true> &Printer)
     : IDETabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
-      ICF(ICF) {
+      ICF(ICF), Printer(Printer) {
   assert(ICF != nullptr);
 }
 
@@ -597,7 +599,7 @@ void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
 
   if (!IRDB->debugInfoAvailable()) {
-
+    std::cout << "INSIDE EMIT TEXT REPORT!! \n";
     for (const auto *F : ICF->getAllFunctions()) {
       std::string FName = getFunctionNameFromIR(F);
 
@@ -609,15 +611,15 @@ void IDELinearConstantAnalysis::emitTextReport(
 
           for (auto Res : Results) {
             if (!Res.second.isBottom()) {
-              AnalysisResults.War.emplace_back(Stmt, Res.first, Res.second);
+              Warnings<n_t, d_t, l_t> War(Stmt, Res.first, Res.second);
+              Printer.onResult(War);
             }
           }
         }
       }
     }
 
-    AnalysisPrinter<n_t, d_t, l_t, true> Printer(AnalysisResults);
-    Printer.emitAnalysisResults(OS);
+    Printer.onFinalize(OS);
 
   } else {
     auto LcaResults = getLCAResults(SR);

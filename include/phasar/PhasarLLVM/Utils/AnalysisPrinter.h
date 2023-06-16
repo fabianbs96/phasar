@@ -6,6 +6,7 @@
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
 #include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
+#include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Printer.h"
 
@@ -14,50 +15,62 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstddef>
+#include <iostream>
 #include <ostream>
 #include <type_traits>
+#include <utility>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 namespace psr {
 
-template <typename n_t, typename d_t, typename l_t> struct Warnings {
-  n_t Instr;
-  d_t Fact;
-  l_t LatticeElement;
+template <typename N_t, typename D_t, typename L_t> struct Warnings {
+  N_t Instr;
+  D_t Fact;
+  L_t LatticeElement;
 
   // Constructor
-  Warnings(n_t Inst, d_t DfFact, l_t Lattice)
-      : Instr(Inst), Fact(DfFact), LatticeElement(Lattice) {}
+  Warnings(N_t Inst, D_t DfFact, L_t Lattice)
+      : Instr(std::move(Inst)), Fact(std::move(DfFact)),
+        LatticeElement(std::move(Lattice)) {}
 };
 
-template <typename n_t, typename d_t, typename l_t> struct Results {
+template <typename N_t, typename D_t, typename L_t> struct Results {
   DataFlowAnalysisType AnalysisType;
-  std::vector<Warnings<n_t, d_t, l_t>> War;
+  std::vector<Warnings<N_t, D_t, L_t>> War;
 };
 
-template <typename n_t, typename d_t, typename l_t, bool LatticePrinter = false>
+template <typename N_t, typename D_t, typename L_t, bool LatticePrinter = false>
 class AnalysisPrinter {
 private:
-  const Results<n_t, d_t, l_t> &Results;
+  Results<N_t, D_t, L_t> AnalysisResults;
 
 public:
   virtual ~AnalysisPrinter() = default;
-  AnalysisPrinter(const ::psr::Results<n_t, d_t, l_t> &Res) : Results(Res) {}
+  AnalysisPrinter(DataFlowAnalysisType AnalysisType)
+      : AnalysisResults{.AnalysisType = AnalysisType, .War = {}} {}
+  virtual void onResult(Warnings<N_t, D_t, L_t> War) {
+    std::cout << "ON RESULT IS CALLED\n";
+    AnalysisResults.War.push_back(War);
+  }
+  virtual void onInitialize(){};
+  virtual void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const {
 
-  virtual void emitAnalysisResults(llvm::raw_ostream &OS = llvm::outs()) {
+    OS << "\n===== " << AnalysisResults.AnalysisType << " =====\n";
 
-    OS << "\n===== " << Results.AnalysisType << " =====\n";
-
-    for (auto Iter = Results.War.begin(); Iter != Results.War.end(); Iter++) {
-      if (Iter->Instr) {
-        OS << "\nAt IR statement: " << llvmIRToString(Iter->Instr) << "\n";
+    for (auto Iter : AnalysisResults.War) {
+      if (Iter.Instr) {
+        OS << "\nAt IR statement: " << llvmIRToString(Iter.Instr) << "\n";
+        nlohmann::json Json = getSrcCodeInfoFromIR(Iter.Instr);
+        OS << "Source code : " << Json.dump(2) << "\n";
       }
-      if (Iter->Fact) {
-        OS << "Fact: " << llvmIRToShortString(Iter->Fact) << "\n";
+      if (Iter.Fact) {
+        OS << "Fact: " << llvmIRToShortString(Iter.Fact) << "\n";
       }
 
       if constexpr (LatticePrinter) {
-        OS << "Value: " << Iter->LatticeElement << "\n";
+        OS << "Value: " << Iter.LatticeElement << "\n";
       }
     }
   }

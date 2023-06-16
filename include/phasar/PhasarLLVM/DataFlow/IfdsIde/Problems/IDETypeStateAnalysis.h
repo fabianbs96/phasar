@@ -56,7 +56,9 @@ public:
 
   IDETypeStateAnalysis(const LLVMProjectIRDB *IRDB, LLVMAliasInfoRef PT,
                        const TypeStateDescription *TSD,
-                       std::vector<std::string> EntryPoints = {"main"});
+                       std::vector<std::string> EntryPoints = {"main"},
+                       const AnalysisPrinter<n_t, d_t, l_t> &Printer = {
+                           DataFlowAnalysisType::None});
 
   ~IDETypeStateAnalysis() override = default;
 
@@ -175,8 +177,7 @@ private:
    */
   bool hasMatchingType(d_t V);
 
-  Results<n_t, d_t, l_t> AnalysisResults{DataFlowAnalysisType::None,
-                                         {}}; // Need to change from NoneType
+  AnalysisPrinter<n_t, d_t, l_t> Printer;
 };
 
 } // namespace psr
