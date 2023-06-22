@@ -17,6 +17,7 @@
 #include "TestConfig.h"
 #include "gtest/gtest.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <iostream>
 #include <ostream>
@@ -30,35 +31,52 @@ class GroundTruthCollector
     : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
                              IDELinearConstantAnalysis::d_t,
                              IDELinearConstantAnalysis::l_t, true> {
+private:
+  size_t Count = 0;
+  size_t GroundTruthCount = 0;
+  std::vector<SourceCodeInfo> GroundTruth;
+
 public:
-  nlohmann::json GroundTruth;
   // constructor init Groundtruth in each fixture
-  GroundTruthCollector(DataFlowAnalysisType AnalysisType)
+  GroundTruthCollector(DataFlowAnalysisType AnalysisType,
+                       const std::vector<SourceCodeInfo> &GroundTruth,
+                       size_t GroundTruthCount)
       : AnalysisPrinter<IDELinearConstantAnalysis::n_t,
                         IDELinearConstantAnalysis::d_t,
-                        IDELinearConstantAnalysis::l_t, true>(AnalysisType){};
+                        IDELinearConstantAnalysis::l_t, true>(AnalysisType),
+        GroundTruthCount(GroundTruthCount), GroundTruth(GroundTruth){};
+
+  void removeElement(SourceCodeInfo G) {
+    auto Iter = std::find(GroundTruth.begin(), GroundTruth.end(), G);
+    GroundTruth.erase(Iter);
+  }
 
   void onResult(
       Warnings<IDELinearConstantAnalysis::n_t, IDELinearConstantAnalysis::d_t,
                IDELinearConstantAnalysis::l_t>
           War) override {
-    std::cout << "OVERRIDED ONRESULT CALLED\n";
-    nlohmann::json Json = getSrcCodeInfoFromIR(War.Fact);
-    std::cout << "Source code: " << Json.dump(2) << "\n";
+    for (auto G : GroundTruth) {
+      if (G.equivalentWith(getSrcCodeInfoFromIR(War.Fact))) {
+        Count++;
+        removeElement(G);
+        break;
+      }
+    }
+  }
+
+  void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const override {
+    EXPECT_TRUE(Count == GroundTruthCount);
   }
 };
+
 class AnalysisPrinterTest : public ::testing::Test {
 protected:
   static constexpr auto PathToLlFiles =
       PHASAR_BUILD_SUBFOLDER("linear_constant/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  std::string doAnalysis(llvm::StringRef LlvmFilePath) {
-    std::string Results;
-    GroundTruthCollector GroundTruthPrinter = {
-        DataFlowAnalysisType::IDELinearConstantAnalysis};
-
-    llvm::raw_string_ostream Res(Results);
+  void doAnalysisTest(llvm::StringRef LlvmFilePath,
+                      GroundTruthCollector &GroundTruthPrinter) {
     HelperAnalyses HA(PathToLlFiles + LlvmFilePath, EntryPoints);
     // Compute the ICFG to possibly create the runtime model
     auto &ICFG = HA.getICFG();
@@ -68,44 +86,28 @@ protected:
     auto LCAProblem = createAnalysisProblem<IDELinearConstantAnalysis>(
         HA,
         std::vector{HasGlobalCtor ? LLVMBasedICFG::GlobalCRuntimeModelName.str()
-                                  : "main"},
-        GroundTruthPrinter);
+                                  : "main"});
+    LCAProblem.setAnalysisPrinter(&GroundTruthPrinter);
     IDESolver LCASolver(LCAProblem, &ICFG);
     LCASolver.solve();
-    LCASolver.emitTextReport(Res);
-    return Res.str();
-  }
-
-  std::string findSubstring(const std::string &Results,
-                            const std::string &Pattern) {
-    size_t FoundPos = Results.find(Pattern);
-    if (FoundPos != std::string::npos) {
-      return Pattern;
-    }
-    return "";
-  }
-
-  void checkResults(llvm::StringRef LlvmFilePath, const std::string &Results) {
-    psr::HelperAnalyses HA(PathToLlFiles + LlvmFilePath, EntryPoints);
-
-    // Test Instruction ID:5
-    std::string GroundTruth =
-        llvmIRToString(HA.getProjectIRDB().getInstruction(5));
-    std::regex Pattern(R"(, !psr\.id !\d+ \| ID: \d+)");
-    std::string TrimmedGroundTruth =
-        std::regex_replace(GroundTruth, Pattern, "");
-    std::string TrimmedResults = findSubstring(Results, TrimmedGroundTruth);
-
-    EXPECT_EQ(TrimmedGroundTruth, TrimmedResults);
+    LCASolver.emitTextReport();
   }
 };
 
 /* ============== BASIC TESTS ============== */
 TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
-  nlohmann::json GroundTruth;
-  auto Results = doAnalysis("simple_cpp.ll");
-
-  checkResults("simple_cpp.ll", Results);
+  std::vector<SourceCodeInfo> GroundTruth = {{.SourceCodeLine = "int i = 4;",
+                                              .SourceCodeFunctionName = "main",
+                                              .Line = 2,
+                                              .Column = 7},
+                                             {.SourceCodeLine = "int j = 5;",
+                                              .SourceCodeFunctionName = "main",
+                                              .Line = 3,
+                                              .Column = 7}};
+  GroundTruthCollector GroundTruthPrinter = {
+      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
+      GroundTruth.size()};
+  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 
 // main function for the test case

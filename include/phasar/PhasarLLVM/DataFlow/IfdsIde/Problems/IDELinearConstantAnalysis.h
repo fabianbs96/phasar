@@ -56,11 +56,14 @@ public:
   using typename IDETabProblemType::t_t;
   using typename IDETabProblemType::v_t;
 
-  IDELinearConstantAnalysis(
-      const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
-      std::vector<std::string> EntryPoints = {"main"},
-      const AnalysisPrinter<n_t, d_t, l_t, true> &Printer = {
-          DataFlowAnalysisType::IDELinearConstantAnalysis});
+  IDELinearConstantAnalysis(const LLVMProjectIRDB *IRDB,
+                            const LLVMBasedICFG *ICF,
+
+                            std::vector<std::string> EntryPoints = {"main"});
+
+  void setAnalysisPrinter(AnalysisPrinter<n_t, d_t, l_t, true> *P) {
+    Printer = P;
+  }
 
   ~IDELinearConstantAnalysis() override;
 
@@ -142,7 +145,7 @@ public:
 
 private:
   const LLVMBasedICFG *ICF{};
-  AnalysisPrinter<n_t, d_t, l_t, true> Printer;
+  AnalysisPrinter<n_t, d_t, l_t, true> *Printer;
 };
 
 } // namespace psr
