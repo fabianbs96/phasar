@@ -51,8 +51,7 @@ public:
   AnalysisPrinter(DataFlowAnalysisType AnalysisType)
       : AnalysisResults{.AnalysisType = AnalysisType, .War = {}} {}
   virtual void onResult(Warnings<N_t, D_t, L_t> War) {
-    std::cout << "ON RESULT IS CALLED\n";
-    AnalysisResults.War.push_back(War);
+    AnalysisResults.War.emplace_back(std::move(War));
   }
   virtual void onInitialize(){};
   virtual void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const {
@@ -62,8 +61,6 @@ public:
     for (auto Iter : AnalysisResults.War) {
       if (Iter.Instr) {
         OS << "\nAt IR statement: " << llvmIRToString(Iter.Instr) << "\n";
-        nlohmann::json Json = getSrcCodeInfoFromIR(Iter.Instr);
-        OS << "Source code : " << Json.dump(2) << "\n";
       }
       if (Iter.Fact) {
         OS << "Fact: " << llvmIRToShortString(Iter.Fact) << "\n";

@@ -597,40 +597,40 @@ void IDELinearConstantAnalysis::printEdgeFact(llvm::raw_ostream &OS,
 void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
 
-  if (!IRDB->debugInfoAvailable()) {
-    for (const auto *F : ICF->getAllFunctions()) {
-      std::string FName = getFunctionNameFromIR(F);
+  // if (!IRDB->debugInfoAvailable()) {
+  for (const auto *F : ICF->getAllFunctions()) {
+    std::string FName = getFunctionNameFromIR(F);
 
-      for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
+    for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
 
-        auto Results = SR.resultsAt(Stmt, true);
-        stripBottomResults(Results);
-        if (!Results.empty()) {
+      auto Results = SR.resultsAt(Stmt, true);
+      stripBottomResults(Results);
+      if (!Results.empty()) {
 
-          for (auto Res : Results) {
-            if (!Res.second.isBottom()) {
-              Warnings<n_t, d_t, l_t> War(Stmt, Res.first, Res.second);
-              Printer->onResult(War);
-            }
+        for (auto Res : Results) {
+          if (!Res.second.isBottom()) {
+            Warnings<n_t, d_t, l_t> War(Stmt, Res.first, Res.second);
+            Printer->onResult(War);
           }
         }
       }
     }
-
-    Printer->onFinalize(OS);
-
-  } else {
-    auto LcaResults = getLCAResults(SR);
-    for (const auto &Entry : LcaResults) {
-      OS << "\nFunction: " << Entry.first
-         << "\n==========" << std::string(Entry.first.size(), '=') << '\n';
-      for (auto FResult : Entry.second) {
-        FResult.second.print(OS);
-        OS << "--------------------------------------\n\n";
-      }
-      OS << '\n';
-    }
   }
+
+  Printer->onFinalize(OS);
+
+  // } else {
+  //   auto LcaResults = getLCAResults(SR);
+  //   for (const auto &Entry : LcaResults) {
+  //     OS << "\nFunction: " << Entry.first
+  //        << "\n==========" << std::string(Entry.first.size(), '=') << '\n';
+  //     for (auto FResult : Entry.second) {
+  //       FResult.second.print(OS);
+  //       OS << "--------------------------------------\n\n";
+  //     }
+  //     OS << '\n';
+  //   }
+  // }
 }
 
 void IDELinearConstantAnalysis::stripBottomResults(

@@ -110,6 +110,8 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
   doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 
+// TODO: Tc for 0,1 elem in GT
+
 // main function for the test case
 int main(int Argc, char **Argv) {
   ::testing::InitGoogleTest(&Argc, Argv);

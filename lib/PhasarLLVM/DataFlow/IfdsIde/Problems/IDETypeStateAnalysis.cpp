@@ -756,7 +756,6 @@ void IDETypeStateAnalysis::emitTextReport(
               if (Res.second == TSD->error()) {
                 Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
                 // ERROR STATE DETECTED
-                // Printer.onResult(Warnings{&I, Res.first, Res.second});
                 Printer.onResult(War);
               }
             }
