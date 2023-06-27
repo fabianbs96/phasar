@@ -65,6 +65,7 @@ public:
   }
 
   void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const override {
+    ASSERT_NE(GroundTruthCount, 0);
     EXPECT_TRUE(Count == GroundTruthCount);
   }
 };
@@ -95,7 +96,8 @@ protected:
 };
 
 /* ============== BASIC TESTS ============== */
-TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
+
+TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
   std::vector<SourceCodeInfo> GroundTruth = {{.SourceCodeLine = "int i = 4;",
                                               .SourceCodeFunctionName = "main",
                                               .Line = 2,
@@ -110,7 +112,38 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
   doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 
-// TODO: Tc for 0,1 elem in GT
+TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
+  std::vector<SourceCodeInfo> GroundTruth = {
+      {.SourceCodeLine = "int k = i + j;",
+       .SourceCodeFunctionName = "main",
+       .Line = 4,
+       .Column = 11}};
+  GroundTruthCollector GroundTruthPrinter = {
+      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
+      GroundTruth.size()};
+  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+}
+
+/* ============== ERROR TESTS ============== */
+
+TEST_F(AnalysisPrinterTest, HandleBasicTest_03) {
+  std::vector<SourceCodeInfo> GroundTruth = {{.SourceCodeLine = "int i = 6;",
+                                              .SourceCodeFunctionName = "main",
+                                              .Line = 2,
+                                              .Column = 7}};
+  GroundTruthCollector GroundTruthPrinter = {
+      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
+      GroundTruth.size()};
+  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+}
+
+TEST_F(AnalysisPrinterTest, HandleBasicTest_04) {
+  std::vector<SourceCodeInfo> GroundTruth = {};
+  GroundTruthCollector GroundTruthPrinter = {
+      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
+      GroundTruth.size()};
+  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+}
 
 // main function for the test case
 int main(int Argc, char **Argv) {
