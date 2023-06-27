@@ -13,9 +13,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDETypeStateAnalysis.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSSolverTest.h"
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
@@ -23,7 +21,6 @@
 
 #include <filesystem>
 #include <string>
-#include <llvm-14/llvm/Support/raw_ostream.h>
 
 using namespace psr;
 
@@ -63,6 +60,7 @@ int main(int Argc, const char **Argv) {
     // Alternative way of solving an IFDS/IDEProblem:
     auto IDEResults = solveIDEProblem(M, HA.getICFG());
     IDEResults.dumpResults(HA.getICFG(), M);
+
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }
