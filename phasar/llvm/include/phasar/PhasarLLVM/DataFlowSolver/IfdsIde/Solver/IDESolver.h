@@ -377,6 +377,11 @@ public:
                                         IDEProblem.getZeroValue());
   }
 
+  [[nodiscard]] const JumpFunctions<AnalysisDomainTy, Container> &
+  getJumpFunctions() const noexcept {
+    return *JumpFn;
+  }
+
 protected:
   // have a shared point to allow for a copy constructor of IDESolver
   IDETabulationProblem<AnalysisDomainTy, Container> &IDEProblem;

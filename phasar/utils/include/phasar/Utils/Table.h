@@ -186,6 +186,12 @@ public:
     return Tab[RowKey][ColumnKey];
   }
 
+  [[nodiscard]] const V &get(R RowKey, C ColumnKey) const {
+    // Returns the value corresponding to the given row and column keys, or null
+    // if no such mapping exists.
+    return Tab.at(RowKey).at(ColumnKey);
+  }
+
   V remove(R RowKey, C ColumnKey) {
     // Removes the mapping, if any, associated with the given keys.
     V Val = Tab[RowKey][ColumnKey];
