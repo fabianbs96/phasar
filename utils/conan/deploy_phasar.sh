@@ -22,4 +22,6 @@ set -euo pipefail
     
     echo "${cmd[@]}"
     "${cmd[@]}"
+
+    echo "Successfully built $package"
 )
