@@ -14,7 +14,7 @@ set -euo pipefail
     package="phasar/$calver+$short_hash@"
     
     # from conanfile.txt
-    options=(-o llvm:shared=False -o llvm:enable_debug=True -o llvm:with_project_clang=True -o llvm:with_project_openmp=True -o llvm:keep_binaries_regex="^(clang|clang\+\+|opt)$")
+    options=(-o llvm:shared=False -o llvm:enable_debug=True -o llvm:with_project_clang=True -o llvm:with_project_openmp=True -o llvm:keep_binaries_regex="^(clang|clang\+\+|opt)$" -o llvm:with_runtime_compiler-rt=True)
     cmd=(conan create "$(pwd)/phasar/" "$package" "${options[@]}")
     if [ "$#" -gt 0 ]; then
         user_options+=("$@")
