@@ -18,8 +18,7 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_RESOLVER_OTFRESOLVER_H_
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/CHAResolver.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h"
-#include "phasar/Utils/Soundness.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 
 #include <set>
 #include <string>
@@ -36,19 +35,17 @@ class Value;
 
 namespace psr {
 
-class ProjectIRDB;
 class LLVMBasedICFG;
 class LLVMTypeHierarchy;
 
-class OTFResolver : public CHAResolver {
+class OTFResolver : public Resolver {
 protected:
   LLVMBasedICFG &ICF;
-  LLVMPointsToInfo &PT;
-  Soundness S;
+  LLVMAliasInfoRef PT;
 
 public:
-  OTFResolver(ProjectIRDB &IRDB, LLVMTypeHierarchy &TH, LLVMBasedICFG &ICF,
-              LLVMPointsToInfo &PT, Soundness S = Soundness::Soundy);
+  OTFResolver(LLVMProjectIRDB &IRDB, LLVMTypeHierarchy &TH, LLVMBasedICFG &ICF,
+              LLVMAliasInfoRef PT);
 
   ~OTFResolver() override = default;
 
@@ -64,7 +61,7 @@ public:
   FunctionSetTy resolveFunctionPointer(const llvm::CallBase *CallSite) override;
 
   static std::set<const llvm::Type *>
-  getReachableTypes(const LLVMPointsToInfo::PointsToSetTy &Values);
+  getReachableTypes(const LLVMAliasInfo::AliasSetTy &Values);
 
   static std::vector<std::pair<const llvm::Value *, const llvm::Value *>>
   getActualFormalPointerPairs(const llvm::CallBase *CallSite,

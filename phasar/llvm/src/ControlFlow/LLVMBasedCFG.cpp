@@ -8,8 +8,9 @@
  *****************************************************************************/
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
+
+#include "phasar/ControlFlow/SpecialMemberFunctionType.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedBackwardCFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/SpecialMemberFunctionType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -251,7 +252,7 @@ detail::LLVMBasedCFGImpl<Derived>::getSpecialMemberFunctionTypeImpl(
                  {"aSEOS_", SpecialMemberFunctionType::MoveAssignment}};
   llvm::SmallVector<std::pair<std::size_t, SpecialMemberFunctionType>> Found;
   std::size_t Blacklist = 0;
-  auto It = std::begin(Codes);
+  const auto *It = std::begin(Codes);
   while (It != std::end(Codes)) {
     if (std::size_t Index = FunctionName.find(It->first, Blacklist)) {
       if (Index != llvm::StringRef::npos) {

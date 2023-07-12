@@ -14,21 +14,31 @@
  *      Author: philipp
  */
 
-#ifndef PHASAR_UTILS_LLVMSHORTHANDS_H_
-#define PHASAR_UTILS_LLVMSHORTHANDS_H_
+#ifndef PHASAR_PHASARLLVM_UTILS_LLVMSHORTHANDS_H
+#define PHASAR_PHASARLLVM_UTILS_LLVMSHORTHANDS_H
+
+#include "phasar/Utils/Utilities.h"
+
+#include "llvm/ADT/DenseMap.h"
 
 #include <string>
 #include <vector>
 
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/ModuleSlotTracker.h"
-#include "llvm/IR/Value.h"
-#include "llvm/Support/Compiler.h"
-
-#include "phasar/Utils/Utilities.h"
+namespace llvm {
+class Value;
+class Function;
+class FunctionType;
+class ModuleSlotTracker;
+class Argument;
+class Instruction;
+class StoreInst;
+class BranchInst;
+class Module;
+class CallInst;
+} // namespace llvm
 
 namespace psr {
+class LLVMProjectIRDB;
 
 /**
  * @brief Checks if the given LLVM Value is a LLVM Function Pointer.
@@ -37,6 +47,14 @@ namespace psr {
  * otherwise.
  */
 bool isFunctionPointer(const llvm::Value *V) noexcept;
+
+/**
+ * @brief Checks if the given LLVM Type is a integer like struct.
+ * @param V LLVM Type.
+ * @return True, if given LLVM Type is a struct like this %TSi = type <{ i64 }>.
+ * False, otherwise.
+ */
+bool isIntegerLikeType(const llvm::Type *T) noexcept;
 
 /**
  * @brief Checks if the given LLVM Value is either a alloca instruction or a
@@ -57,20 +75,28 @@ llvm::ModuleSlotTracker &getModuleSlotTrackerFor(const llvm::Value *V);
 /**
  * @brief Returns a string representation of a LLVM Value.
  */
-std::string llvmIRToString(const llvm::Value *V);
+[[nodiscard]] std::string llvmIRToString(const llvm::Value *V);
 
 /**
  * @brief Similar to llvmIRToString, but removes the metadata from the output as
  * they are not always stable. Prefer this function over llvmIRToString, if you
  * are comparing the string representations of LLVM iR instructions.
  */
-std::string llvmIRToStableString(const llvm::Value *V);
+[[nodiscard]] std::string llvmIRToStableString(const llvm::Value *V);
 
 /**
  * @brief Same as @link(llvmIRToString) but tries to shorten the
  *        resulting string
  */
 std::string llvmIRToShortString(const llvm::Value *V);
+
+/**
+ * @brief Returns a string-representation of a LLVM type.
+ *
+ * @param Shorten Tries to shorten the output
+ */
+[[nodiscard]] std::string llvmTypeToString(const llvm::Type *Ty,
+                                           bool Shorten = false);
 
 LLVM_DUMP_METHOD void dumpIRValue(const llvm::Value *V);
 LLVM_DUMP_METHOD void dumpIRValue(const llvm::Instruction *V);
@@ -105,8 +131,6 @@ std::optional<unsigned> getFunctionId(const llvm::Function *F);
  * underlying types for their ID's, size_t and string respectively.
  */
 struct LLVMValueIDLess {
-  StringIDLess Sless;
-  inline LLVMValueIDLess() noexcept : Sless(StringIDLess()) {}
   bool operator()(const llvm::Value *Lhs, const llvm::Value *Rhs) const;
 };
 
@@ -233,15 +257,12 @@ bool isVarAnnotationIntrinsic(const llvm::Function *F);
 llvm::StringRef getVarAnnotationIntrinsicName(const llvm::CallInst *CallInst);
 
 class ModulesToSlotTracker {
-  friend class ProjectIRDB;
+  friend class LLVMProjectIRDB;
   friend class LLVMBasedICFG;
   friend class LLVMZeroValue;
 
 private:
-  static inline llvm::SmallDenseMap<const llvm::Module *,
-                                    std::unique_ptr<llvm::ModuleSlotTracker>, 2>
-      MToST{};
-
+  static void setMSTForModule(const llvm::Module *Module);
   static void updateMSTForModule(const llvm::Module *Module);
   static void deleteMSTForModule(const llvm::Module *Module);
 

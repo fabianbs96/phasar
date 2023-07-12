@@ -7,6 +7,30 @@
  *     Philipp Schubert, Fabian Schiebel and others
  *****************************************************************************/
 
+#include "phasar/Config/Configuration.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
+#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
+#include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
+#include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Logger.h"
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/IR/Dominators.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/Linker/Linker.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "TestConfig.h"
 #include "gtest/gtest.h"
 
 #include <algorithm>
@@ -15,35 +39,12 @@
 #include <string>
 #include <vector>
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/IR/Dominators.h"
-#include "llvm/IR/InstrTypes.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include "phasar/Config/Configuration.h"
-#include "phasar/DB/ProjectIRDB.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
-#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Problems/IDELinearConstantAnalysis.h"
-#include "phasar/PhasarLLVM/DataFlowSolver/IfdsIde/Solver/IDESolver.h"
-#include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMPointsToSet.h"
-#include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
-#include "phasar/Utils/Logger.h"
-
-#include "TestConfig.h"
-
 using namespace std;
 using namespace psr;
 
 class LLVMBasedICFGGlobCtorDtorTest : public ::testing::Test {
 protected:
-  const std::string PathToLLFiles = "llvm_test_code/globals/";
+  static constexpr auto PathToLLFiles = PHASAR_BUILD_SUBFOLDER("globals/");
 
   void SetUp() override { ValueAnnotationPass::resetValueID(); }
 
@@ -81,9 +82,9 @@ protected:
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, CtorTest) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_ctor_1.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_ctor_1.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
 
@@ -99,12 +100,21 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, CtorTest) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, CtorTest2) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_ctor_2_1.ll",
-                    PathToLLFiles + "globals_ctor_2_2.ll"},
-                   IRDBOptions::WPA);
-  llvm::errs() << "> After linker\n";
+  llvm::LLVMContext Ctx;
+  auto M1 = LLVMProjectIRDB::getParsedIRModuleOrNull(
+      PathToLLFiles + "globals_ctor_2_1.ll", Ctx);
+  auto M2 = LLVMProjectIRDB::getParsedIRModuleOrNull(
+      PathToLLFiles + "globals_ctor_2_2.ll", Ctx);
+
+  ASSERT_NE(nullptr, M1);
+  ASSERT_NE(nullptr, M2);
+
+  auto LinkerError = llvm::Linker::linkModules(*M1, std::move(M2));
+  ASSERT_FALSE(LinkerError);
+
+  LLVMProjectIRDB IRDB(std::move(M1), /*DoPreprocessing*/ true);
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
 
@@ -120,9 +130,9 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, CtorTest2) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, DtorTest1) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_dtor_1.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_dtor_1.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
 
@@ -153,24 +163,24 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, DtorTest1) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest1) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_1.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_1.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
 
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   Solver.solve();
 
   // Solver.dumpResults();
 
-  auto *FooInit = IRDB.getInstruction(6);
-  auto *LoadX = IRDB.getInstruction(11);
-  auto *End = IRDB.getInstruction(13);
+  const auto *FooInit = IRDB.getInstruction(6);
+  const auto *LoadX = IRDB.getInstruction(11);
+  const auto *End = IRDB.getInstruction(13);
   const auto *Foo = IRDB.getGlobalVariableDefinition("foo");
 
   auto FooValueAfterInit = Solver.resultAt(FooInit, Foo);
@@ -189,25 +199,25 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest1) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest2) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_2.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_2.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   Solver.solve();
 
   // Solver.dumpResults();
 
-  auto *FooInit = IRDB.getInstruction(7);
-  auto *BarInit = IRDB.getInstruction(11);
-  auto *LoadX = IRDB.getInstruction(20);
-  auto *LoadY = IRDB.getInstruction(21);
-  auto *End = IRDB.getInstruction(23);
+  const auto *FooInit = IRDB.getInstruction(7);
+  const auto *BarInit = IRDB.getInstruction(11);
+  const auto *LoadX = IRDB.getInstruction(20);
+  const auto *LoadY = IRDB.getInstruction(21);
+  const auto *End = IRDB.getInstruction(23);
   const auto *Foo = IRDB.getGlobalVariableDefinition("foo");
   const auto *Bar = IRDB.getGlobalVariableDefinition("bar");
 
@@ -230,27 +240,27 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest2) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest3) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_3.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_3.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy, /*IncludeGlobals*/ true);
 
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   Solver.solve();
 
   // Solver.dumpResults();
 
-  auto *FooInit = IRDB.getInstruction(7);
+  const auto *FooInit = IRDB.getInstruction(7);
   // FIXME Why is 10 missing in the results set?
-  auto *BarInit = IRDB.getInstruction(11);
-  auto *LoadX = IRDB.getInstruction(18);
-  auto *LoadY = IRDB.getInstruction(19);
-  auto *End = IRDB.getInstruction(21);
+  const auto *BarInit = IRDB.getInstruction(11);
+  const auto *LoadX = IRDB.getInstruction(18);
+  const auto *LoadY = IRDB.getInstruction(19);
+  const auto *End = IRDB.getInstruction(21);
   const auto *Foo = IRDB.getGlobalVariableDefinition("foo");
   const auto *Bar = IRDB.getGlobalVariableDefinition("bar");
 
@@ -274,26 +284,26 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest3) {
 // Fails due to exception handling
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, DISABLED_LCATest4) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_4.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_4.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(
       &IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT, Soundness::Soundy,
       /*IncludeGlobals*/ true); // We have no real global initializers here, but
                                 // just keep the flag IncludeGlobals=true
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   Solver.solve();
 
   // Solver.dumpResults();
 
-  auto *FooGet = IRDB.getInstruction(17);
-  auto *LoadFoo = IRDB.getInstruction(16);
-  auto *LoadX = IRDB.getInstruction(34);
-  auto *End = IRDB.getInstruction(36);
+  const auto *FooGet = IRDB.getInstruction(17);
+  const auto *LoadFoo = IRDB.getInstruction(16);
+  const auto *LoadX = IRDB.getInstruction(34);
+  const auto *End = IRDB.getInstruction(36);
 
   auto FooValueAfterGet = Solver.resultAt(FooGet, LoadFoo);
 
@@ -307,26 +317,26 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, DISABLED_LCATest4) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest4_1) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_4_1.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_4_1.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(
       &IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT, Soundness::Soundy,
       /*IncludeGlobals*/ true); // We have no real global initializers here, but
                                 // just keep the flag IncludeGlobals=true
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   Solver.solve();
 
   Solver.dumpResults();
 
-  auto *FooGet = IRDB.getInstruction(15);
-  auto *LoadFoo = IRDB.getInstruction(14);
-  auto *LoadX = IRDB.getInstruction(20);
-  auto *End = IRDB.getInstruction(22);
+  const auto *FooGet = IRDB.getInstruction(15);
+  const auto *LoadFoo = IRDB.getInstruction(14);
+  const auto *LoadX = IRDB.getInstruction(20);
+  const auto *End = IRDB.getInstruction(22);
 
   auto FooValueAfterGet = Solver.resultAt(FooGet, LoadFoo);
 
@@ -340,19 +350,19 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest4_1) {
 
 TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest5) {
 
-  ProjectIRDB IRDB({PathToLLFiles + "globals_lca_5.ll"});
+  LLVMProjectIRDB IRDB({PathToLLFiles + "globals_lca_5.ll"});
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Soundy,
                      /*IncludeGlobals*/ true);
   IDELinearConstantAnalysis Problem(
-      &IRDB, &TH, &ICFG, &PT, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
+      &IRDB, &ICFG, {LLVMBasedICFG::GlobalCRuntimeModelName.str()});
 
-  IDESolver Solver(Problem);
+  IDESolver Solver(Problem, &ICFG);
 
   // const auto *GlobalDtor =
-  //     ICFG.getRegisteredDtorsCallerOrNull(IRDB.getWPAModule());
+  //     ICFG.getRegisteredDtorsCallerOrNull(IRDB.getModule());
 
   // ASSERT_NE(nullptr, GlobalDtor);
 
@@ -363,8 +373,8 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, LCATest5) {
   Solver.dumpResults();
 
   // FIXME: Why is the 27 missing in the results set?
-  auto *AfterGlobalInit = IRDB.getInstruction(4);
-  auto *AtMainPrintF = IRDB.getInstruction(29);
+  const auto *AfterGlobalInit = IRDB.getInstruction(4);
+  const auto *AtMainPrintF = IRDB.getInstruction(29);
 
   const auto *Foo = IRDB.getGlobalVariableDefinition("foo");
 

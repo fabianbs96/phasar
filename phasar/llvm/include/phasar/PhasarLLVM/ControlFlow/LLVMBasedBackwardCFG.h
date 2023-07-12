@@ -10,7 +10,6 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDBACKWARDCFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDBACKWARDCFG_H_
 
-#include "phasar/PhasarLLVM/ControlFlow/CFGBase.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 
 namespace llvm {
@@ -20,7 +19,7 @@ class Instruction;
 
 namespace psr {
 
-class ProjectIRDB;
+class LLVMProjectIRDB;
 class LLVMBasedBackwardCFG;
 
 class LLVMBasedBackwardCFG
@@ -31,7 +30,7 @@ class LLVMBasedBackwardCFG
 
 public:
   LLVMBasedBackwardCFG(bool IgnoreDbgInstructions = true) noexcept;
-  LLVMBasedBackwardCFG(const ProjectIRDB &IRDB,
+  LLVMBasedBackwardCFG(const LLVMProjectIRDB &IRDB,
                        bool IgnoreDbgInstructions = true);
 
 private:

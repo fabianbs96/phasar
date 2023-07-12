@@ -7,9 +7,9 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Utilities.h"
@@ -142,7 +142,8 @@ struct SourceCodeInfoWithIR : public SourceCodeInfo {
   std::string IR;
 };
 
-static void to_json(nlohmann::json &J, const SourceCodeInfoWithIR &Info) {
+static void to_json(nlohmann::json &J, // NOLINT
+                    const SourceCodeInfoWithIR &Info) {
   to_json(J, static_cast<const SourceCodeInfo &>(Info));
   J["IR"] = Info.IR;
 }

@@ -7,14 +7,14 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include <algorithm>
-#include <utility>
+#include "phasar/PhasarLLVM/TypeHierarchy/LLVMVFTable.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/Operator.h"
 
-#include "phasar/PhasarLLVM/TypeHierarchy/LLVMVFTable.h"
+#include <algorithm>
+#include <utility>
 
 using namespace psr;
 
@@ -56,7 +56,7 @@ LLVMVFTable::getVFVectorFromIRVTable(const llvm::ConstantStruct &VT) {
     if (const auto *CA = llvm::dyn_cast<llvm::ConstantArray>(Op)) {
       // Start iterating at offset 2, because offset 0 is vbase offset, offset 1
       // is RTTI
-      for (auto It = std::next(CA->operands().begin(), 2);
+      for (const auto *It = std::next(CA->operands().begin(), 2);
            It != CA->operands().end(); ++It) {
         const auto &COp = *It;
         if (const auto *CE = llvm::dyn_cast<llvm::ConstantExpr>(COp)) {

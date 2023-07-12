@@ -10,16 +10,16 @@
 #ifndef PHASAR_UTILS_STABLEVECTOR_H_
 #define PHASAR_UTILS_STABLEVECTOR_H_
 
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <memory>
 #include <type_traits>
-
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/MathExtras.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace psr {
 
@@ -199,33 +199,32 @@ public:
     Pos = Blck + (Other.Pos - Other.Start);
   }
 
-  friend void swap(StableVector &LHS, StableVector &RHS) noexcept {
-    std::swap(LHS.Blocks, RHS.Blocks);
-    std::swap(LHS.Start, RHS.Start);
-    std::swap(LHS.Pos, RHS.Pos);
-    std::swap(LHS.End, RHS.End);
-    std::swap(LHS.Size, RHS.Size);
-    std::swap(LHS.BlockIdx, RHS.BlockIdx);
+  void swap(StableVector &Other) noexcept {
+    std::swap(Blocks, Other.Blocks);
+    std::swap(Start, Other.Start);
+    std::swap(Pos, Other.Pos);
+    std::swap(End, Other.End);
+    std::swap(Size, Other.Size);
+    std::swap(BlockIdx, Other.BlockIdx);
 
     if constexpr (std::allocator_traits<
                       allocator_type>::propagate_on_container_swap::value) {
-      std::swap(LHS.Alloc, RHS.Alloc);
+      std::swap(Alloc, Other.Alloc);
     } else {
-      assert(LHS.Alloc == RHS.Alloc &&
+      assert(Alloc == Other.Alloc &&
              "Do not swap two StableVectors with incompatible "
              "allocators that do not propagate on swap!");
     }
   }
-
-  void swap(StableVector &Other) noexcept { swap(*this, Other); }
-
-  StableVector &operator=(StableVector Other) noexcept {
-    swap(*this, Other);
-    return *this;
+  friend void swap(StableVector &LHS, StableVector &RHS) noexcept {
+    LHS.swap(RHS);
   }
 
+  // This would be silently expensive... If you really want this, call clone()
+  StableVector &operator=(const StableVector &) = delete;
+
   StableVector &operator=(StableVector &&Other) noexcept {
-    swap(*this, Other);
+    swap(Other);
     return *this;
   }
 
@@ -509,7 +508,7 @@ private:
       End = Blocks.back() + Size;
     }
 
-    auto Ret = Blocks[BlockIdx];
+    auto *Ret = Blocks[BlockIdx];
 
     Start = Ret;
     Pos = Ret + 1;

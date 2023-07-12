@@ -1,17 +1,17 @@
+#include "gtest/gtest.h"
+// -- Need gtest for the FRIEND_TEST macro
+
 #include "phasar/Config/Configuration.h"
-#include "phasar/DB/ProjectIRDB.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/TypeGraphs/CachedTypeGraph.h"
 #include "phasar/PhasarLLVM/Pointer/TypeGraphs/LazyTypeGraph.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Utilities.h"
 
-#include "gtest/gtest.h"
-
-#include "boost/graph/isomorphism.hpp"
+#include "llvm/Support/ManagedStatic.h"
 
 #include "TestConfig.h"
-
-#include "llvm/Support/ManagedStatic.h"
+#include "boost/graph/isomorphism.hpp"
 
 using namespace std;
 using namespace psr;
@@ -19,8 +19,8 @@ using namespace psr;
 namespace psr {
 
 TEST(TypeGraphTest, AddType) {
-  ProjectIRDB IRDB({"llvm_test_code/basic/two_structs.ll"});
-  llvm::Module *M = IRDB.getModule("llvm_test_code/basic/two_structs.ll");
+  LLVMProjectIRDB IRDB({"llvm_test_code/basic/two_structs.ll"});
+  llvm::Module *M = IRDB.getModule();
 
   unsigned int NbStruct = 0;
 
@@ -48,8 +48,8 @@ TEST(TypeGraphTest, AddType) {
 }
 
 TEST(TypeGraphTest, ReverseTypePropagation) {
-  ProjectIRDB IRDB({"llvm_test_code/basic/seven_structs.ll"});
-  llvm::Module *M = IRDB.getModule("llvm_test_code/basic/seven_structs.ll");
+  LLVMProjectIRDB IRDB({"llvm_test_code/basic/seven_structs.ll"});
+  llvm::Module *M = IRDB.getModule();
 
   unsigned int NbStruct = 0;
   llvm::StructType *StructA = nullptr;
@@ -192,8 +192,8 @@ TEST(TypeGraphTest, ReverseTypePropagation) {
 }
 
 TEST(TypeGraphTest, AddLinkSimple) {
-  ProjectIRDB IRDB({"llvm_test_code/basic/two_structs.ll"});
-  llvm::Module *M = IRDB.getModule("llvm_test_code/basic/two_structs.ll");
+  LLVMProjectIRDB IRDB({"llvm_test_code/basic/two_structs.ll"});
+  llvm::Module *M = IRDB.getModule();
 
   unsigned int NbStruct = 0;
   llvm::StructType *StructA = nullptr;
@@ -260,8 +260,8 @@ TEST(TypeGraphTest, AddLinkSimple) {
 }
 
 TEST(TypeGraphTest, TypeAggregation) {
-  ProjectIRDB IRDB({"llvm_test_code/basic/seven_structs.ll"});
-  llvm::Module *M = IRDB.getModule("llvm_test_code/basic/seven_structs.ll");
+  LLVMProjectIRDB IRDB({"llvm_test_code/basic/seven_structs.ll"});
+  llvm::Module *M = IRDB.getModule();
 
   unsigned int NbStruct = 0;
   llvm::StructType *StructA = nullptr;

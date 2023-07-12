@@ -13,12 +13,32 @@ set -uo pipefail
         mkdir -p "phasar/$1/test/resource"
     }
 
+    force_git_mv() {
+        from="$1"
+        to="$2"
+        if [ -f "$1" ]; then
+            if ! git mv "$from" "$to" 2>/dev/null; then
+                rm "$to" 2>/dev/null || true
+                # carefull with git rm/git add!
+                # git rm "$to" 2>/dev/null || true
+                git mv "$from" "$to" || git mv --force "$from" "$to" || mv -f "$from" "$to" || true
+                # if ! git mv --force "$from" "$to"; then
+                #     if [ 4 -le "$(git diff "$from" | wc -l)" ]; then
+                #         # merge one commit later, only if no change
+                #         git add "$from"
+                #         echo "added \"$from\""
+                #     fi
+                # fi
+            fi
+        fi
+    }
+
     moveInclude() {
         if [ -d include ]; then
             mapfile -t headers < <(cd "include/" && find . -wholename "*phasar/$1/*.h*" -or -wholename "*phasar/$1/*.def*")
             for header in "${headers[@]}"; do
                 mkdir -p "$(dirname "phasar/$2/include/$header")"
-                git mv "include/$header" "phasar/$2/include/$header"
+                force_git_mv "include/$header" "phasar/$2/include/$header"
             done
         fi
     }
@@ -28,7 +48,7 @@ set -uo pipefail
             mapfile -t sources < <(cd "lib/$1/" && find . -iname "*.cpp")
             for src in "${sources[@]}"; do
                 mkdir -p "$(dirname "phasar/$2/src/$src")"
-                git mv "lib/$1/$src" "phasar/$2/src/$src"
+                force_git_mv "lib/$1/$src" "phasar/$2/src/$src"
             done
         fi
     }
@@ -38,13 +58,13 @@ set -uo pipefail
             mapfile -t sources < <(cd "unittests/$1/" && find . -iname "*.cpp")
             for src in "${sources[@]}"; do
                 mkdir -p "$(dirname "phasar/$2/test/src/$src")"
-                git mv "unittests/$1/$src" "phasar/$2/test/src/$src"
+                force_git_mv "unittests/$1/$src" "phasar/$2/test/src/$src"
             done
 
             mapfile -t headers < <(cd "unittests/$1/" && find . -iname "*.h*")
             for header in "${headers[@]}"; do
                 mkdir -p "$(dirname "phasar/$2/test/include/$header")"
-                git mv "unittests/$1/$header" "phasar/$2/test/include/$header"
+                force_git_mv "unittests/$1/$header" "phasar/$2/test/include/$header"
             done
         fi
     }
@@ -65,6 +85,13 @@ set -uo pipefail
     processTarget PhasarPass pass
     processTarget Utils utils
     processTarget PhasarLLVM llvm
+    # added after folder restructure phasar-x-test
+    processTarget AnalysisStrategy analysisstrategy
+    processTarget ControlFlow controlflow
+    processTarget DataFlow dataflow
+    processTarget Domain domain
+    processTarget Pointer pointer
+    processTarget TypeHierarchy typehierarchy
     echo "simpliest migration done"
     printf '\n\n\n'
 
@@ -113,6 +140,10 @@ set -uo pipefail
     mkdir -p  phasar/test-utils/include/
     git mv unittests/TestUtils/TestConfig.h phasar/test-utils/include/TestConfig.h 2>/dev/null
     check "unittests" -not -name "CMakeLists.txt" -and -not -name ".clang-tidy"
+
+    (
+        git mv --force tools/phasar-cli/phasar-cli.cpp phasar/cli/src/phasar-cli.cpp 2>/dev/null && git add phasar/cli/src/phasar-cli.cpp 
+    ) || true
 
     # replaced CMakeLists
     git rm -rf cmake/{phasar_macros,limit-ninja-jobs,dependencies}.cmake &> /dev/null || true
@@ -167,8 +198,16 @@ set -uo pipefail
     #moved ./lib/PhasarLLVM/Utils/LLVMShorthands.cpp ./phasar/llvm/src/Utils/LLVMShorthands.cpp
     #moved ./phasar/llvm/src/Utils/LLVMIRToSrc.cpp ./phasar/utils/src/LLVMIRToSrc.cpp
     
-    # stage 2, handlinug current merge requests
+    # stage 2, handling current merge requests
     status="$(git status)"
+    gitAddFilesWithoutChanges() {
+        for file in "$@"; do
+            if ! grep -Eq '^<<<+ ' "$file"; then
+                git add "$file" 2>/dev/null
+            fi
+        done
+    }
+
 
     mapfile -t both_deleted < <(echo "$status" | grep -Po '(?<=both deleted:).*' | xargs printf '%s\n')
     echo "assuming if upstream and fork deleted a file -> we can remove it from merge"
@@ -203,11 +242,34 @@ set -uo pipefail
     mapfile -t added_by_them < <(echo "$status" | grep -Po '(?<=added by them:).*' | grep -v llvm_test_code | xargs printf '%s\n')
     echo "assuming if added upstream -> we need to add it, if below llvm_test_code use git mv to change the filename appropriate!"
     if [ -n "${added_by_them[*]}" ]; then
-        git add "${added_by_them[@]}"
+        gitAddFilesWithoutChanges "${added_by_them[@]}"
     fi
     printf '\n\n\n\n'
 
 
+
+        
+    mapfile -t both_modified < <(echo "$status" | grep -Po '(?<=both modified:).*' | xargs printf '%s\n')
+    echo "assuming if both modified -> check if modification is real, most of the time it isn't"
+    for f in "${both_modified[@]}"; do
+        if [ -n "$f" ] && [ -f "$f" ] && [ 4 -eq "$(git diff "$f" | wc -l)" ]; then
+            echo "quickfix, file changed without any actual changes, directly adding \"$f\""
+            # e.g. in such case:
+            # diff --cc phasar/llvm/include/phasar/PhasarLLVM/DB/LLVMProjectIRDB.h
+            # index d1b1789d,d1b1789d..00000000
+            # --- a/phasar/llvm/include/phasar/PhasarLLVM/DB/LLVMProjectIRDB.h
+            # +++ b/phasar/llvm/include/phasar/PhasarLLVM/DB/LLVMProjectIRDB.h
+            git add "$f"
+        fi
+    done
+    printf '\n\n\n\n'
+
+
+
+    # TODO documentation if added by us
+    # e.g. if files are moved upstream or git lost track of it ...
+    # upstream should always have prio! Else you have to deal with more conflicts after merging it back into.
+    # Suggested: rm file, git add file || fix upstream before merge
 
     # cleanup empty directories
     find . -type d -empty -delete

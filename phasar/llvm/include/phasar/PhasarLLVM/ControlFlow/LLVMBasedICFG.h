@@ -17,41 +17,31 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDICFG_H_
 
-#include "phasar/PhasarLLVM/ControlFlow/CFGBase.h"
-#include "phasar/PhasarLLVM/ControlFlow/ICFGBase.h"
+#include "phasar/ControlFlow/CallGraph.h"
+#include "phasar/ControlFlow/CallGraphAnalysisType.h"
+#include "phasar/ControlFlow/ICFGBase.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/CallGraphAnalysisType.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Utils/LLVMBasedContainerConfig.h"
 #include "phasar/Utils/MaybeUniquePtr.h"
+#include "phasar/Utils/MemoryResource.h"
 #include "phasar/Utils/Soundness.h"
-
-#include "nlohmann/json.hpp"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "nlohmann/json.hpp"
+
 #include <memory>
 
-#include "phasar/Utils/MemoryResource.h"
-
-/// On some MAC systems, <memory_resource> is still not fully implemented, so do
-/// a workaround here
-
-#if HAS_MEMORY_RESOURCE
-#include <memory_resource>
-#else
-#include "llvm/Support/Allocator.h"
-#endif
-
 namespace psr {
-class ProjectIRDB;
-class LLVMPointsToInfo;
-class ProjectIRDB;
 class LLVMTypeHierarchy;
+class LLVMProjectIRDB;
 
 class LLVMBasedICFG;
 template <> struct CFGTraits<LLVMBasedICFG> : CFGTraits<LLVMBasedCFG> {};
@@ -60,10 +50,6 @@ class LLVMBasedICFG : public LLVMBasedCFG, public ICFGBase<LLVMBasedICFG> {
   friend ICFGBase;
 
   struct Builder;
-
-  struct OnlyDestroyDeleter {
-    template <typename T> void operator()(T *Data) { std::destroy_at(Data); }
-  };
 
 public:
   static constexpr llvm::StringLiteral GlobalCRuntimeModelName =
@@ -86,20 +72,28 @@ public:
   /// \param IncludeGlobals Properly include global constructors/destructors
   /// into the ICFG, if true. Requires to generate artificial functions into the
   /// IRDB. True by default
-  explicit LLVMBasedICFG(ProjectIRDB *IRDB, CallGraphAnalysisType CGType,
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, CallGraphAnalysisType CGType,
                          llvm::ArrayRef<std::string> EntryPoints = {},
                          LLVMTypeHierarchy *TH = nullptr,
-                         LLVMPointsToInfo *PT = nullptr,
+                         LLVMAliasInfoRef PT = nullptr,
                          Soundness S = Soundness::Soundy,
                          bool IncludeGlobals = true);
+
+  /// Creates an ICFG with an already given call-graph
+  explicit LLVMBasedICFG(CallGraph<n_t, f_t> CG, LLVMProjectIRDB *IRDB,
+                         LLVMTypeHierarchy *TH = nullptr);
+
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB,
+                         const nlohmann::json &SerializedCG,
+                         LLVMTypeHierarchy *TH = nullptr);
 
   ~LLVMBasedICFG();
 
   LLVMBasedICFG(const LLVMBasedICFG &) = delete;
   LLVMBasedICFG &operator=(const LLVMBasedICFG &) = delete;
 
-  LLVMBasedICFG(LLVMBasedICFG &&) noexcept = delete;
-  LLVMBasedICFG &operator=(LLVMBasedICFG &&) noexcept = delete;
+  LLVMBasedICFG(LLVMBasedICFG &&) noexcept = default;
+  LLVMBasedICFG &operator=(LLVMBasedICFG &&) noexcept = default;
 
   /// Exports the whole ICFG (not only the call-graph) as DOT.
   ///
@@ -112,15 +106,18 @@ public:
   [[nodiscard]] nlohmann::json
   exportICFGAsJson(bool WithSourceCodeInfo = true) const;
 
-  /// For compatibility reasons with rest of IntelliSecTest
-  [[nodiscard]] nlohmann::json exportICFGAsSourceCodeJson() const;
+  [[nodiscard]] size_t getNumVertexFunctions() const noexcept {
+    return CG.getNumVertexFunctions();
+  }
 
   /// Returns all functions from the underlying IRDB that are part of the ICFG,
   /// i.e. that are reachable from the entry-points
-  [[nodiscard]] llvm::ArrayRef<f_t> getAllVertexFunctions() const noexcept;
+  [[nodiscard]] auto getAllVertexFunctions() const noexcept {
+    return CG.getAllVertexFunctions();
+  }
 
   /// Gets the underlying IRDB
-  [[nodiscard]] ProjectIRDB *getIRDB() const noexcept { return IRDB; }
+  [[nodiscard]] LLVMProjectIRDB *getIRDB() const noexcept { return IRDB; }
 
   using CFGBase::print;
   using ICFGBase::print;
@@ -151,50 +148,23 @@ private:
   [[nodiscard]] bool isIndirectFunctionCallImpl(n_t Inst) const;
   [[nodiscard]] bool isVirtualFunctionCallImpl(n_t Inst) const;
   [[nodiscard]] std::vector<n_t> allNonCallStartNodesImpl() const;
-  [[nodiscard]] llvm::ArrayRef<f_t>
-  getCalleesOfCallAtImpl(n_t Inst) const noexcept;
-  [[nodiscard]] llvm::ArrayRef<n_t> getCallersOfImpl(f_t Fun) const noexcept;
   [[nodiscard]] llvm::SmallVector<n_t> getCallsFromWithinImpl(f_t Fun) const;
   [[nodiscard]] llvm::SmallVector<n_t, 2>
   getReturnSitesOfCallAtImpl(n_t Inst) const;
   void printImpl(llvm::raw_ostream &OS) const;
   [[nodiscard]] nlohmann::json getAsJsonImpl() const;
+  [[nodiscard]] const CallGraph<n_t, f_t> &getCallGraphImpl() const noexcept {
+    return CG;
+  }
 
   [[nodiscard]] llvm::Function *buildCRuntimeGlobalCtorsDtorsModel(
       llvm::Module &M, llvm::ArrayRef<llvm::Function *> UserEntryPoints);
 
-  // -------------------- Utilities --------------------
+  // ---
 
-  llvm::SmallVector<const llvm::Instruction *> *
-  addFunctionVertex(const llvm::Function *F);
-  llvm::SmallVector<const llvm::Function *> *
-  addInstructionVertex(const llvm::Instruction *Inst);
-
-  void addCallEdge(const llvm::Instruction *CS, const llvm::Function *Callee);
-  void addCallEdge(const llvm::Instruction *CS,
-                   llvm::SmallVector<const llvm::Function *> *Callees,
-                   const llvm::Function *Callee);
-
-#if HAS_MEMORY_RESOURCE
-  std::pmr::monotonic_buffer_resource MRes;
-#else
-  llvm::BumpPtrAllocator MRes;
-#endif
-
-  llvm::DenseMap<const llvm::Instruction *,
-                 std::unique_ptr<llvm::SmallVector<const llvm::Function *>,
-                                 OnlyDestroyDeleter>>
-      CalleesAt;
-  llvm::DenseMap<const llvm::Function *,
-                 std::unique_ptr<llvm::SmallVector<const llvm::Instruction *>,
-                                 OnlyDestroyDeleter>>
-      CallersOf;
-
-  llvm::SmallVector<const llvm::Function *, 0> VertexFunctions;
-
+  CallGraph<const llvm::Instruction *, const llvm::Function *> CG;
   llvm::DenseSet<const llvm::Instruction *> UnsoundCallSites;
-
-  ProjectIRDB *IRDB = nullptr;
+  LLVMProjectIRDB *IRDB = nullptr;
   MaybeUniquePtr<LLVMTypeHierarchy, true> TH;
   size_t NumEdges = 0;
   size_t TotalRuntimeEdgesAdded = 0;

@@ -9,7 +9,6 @@
 #ifndef PHASAR_UTILS_DEBUGOUTPUT_H
 #define PHASAR_UTILS_DEBUGOUTPUT_H
 
-#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/SmallBitVector.h"
@@ -67,9 +66,7 @@ template <typename OS_t, typename T> void printHelper(OS_t &OS, const T &Data) {
   } else if constexpr (is_iterable_v<ElemTy>) {
     OS << "{ ";
     bool Frst = true;
-    size_t Cnt = 0;
     for (auto &&Elem : Data) {
-      ++Cnt;
       if (Frst) {
         Frst = false;
       } else {
@@ -98,9 +95,9 @@ template <typename T> struct PrettyPrinter {
 };
 
 template <typename T>
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              const PrettyPrinter<T> &P) {
-  OS << P;
+std::ostream &operator<<(std::ostream &OS, const PrettyPrinter<T> &P) {
+  llvm::raw_os_ostream ROS(OS);
+  ROS << P;
   return OS;
 }
 

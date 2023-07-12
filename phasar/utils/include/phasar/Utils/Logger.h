@@ -10,17 +10,17 @@
 #ifndef PHASAR_UTILS_LOGGER_H
 #define PHASAR_UTILS_LOGGER_H
 
-#include <map>
-#include <optional>
-#include <string>
-#include <type_traits>
-#include <variant>
-
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h" // LLVM_UNLIKELY
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <map>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <variant>
 
 namespace psr {
 
@@ -94,44 +94,7 @@ private:
       const std::variant<StdStream, std::string> &StreamVariant);
 };
 
-#define IF_LOG_ENABLED(computation)                                            \
-  IF_LOG_ENABLED_BOOL(Logger::isLoggingEnabled(), computation)
-
 #ifdef DYNAMIC_LOG
-
-#define PHASAR_LOG(message) PHASAR_LOG_LEVEL(DEBUG, message)
-
-#define PHASAR_LOG_LEVEL(level, message)                                       \
-  IF_LOG_ENABLED_BOOL(                                                         \
-      Logger::isLoggingEnabled() && (level) >= Logger::getLoggerFilterLevel(), \
-      do {                                                                     \
-        auto &S = Logger::getLogStream(level, std::nullopt);                   \
-        Logger::addLinePrefix(S, level, std::nullopt);                         \
-        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
-        S << message << '\n';                                                  \
-      } while (false);)
-
-#define PHASAR_LOG_LEVEL_CAT(level, cat, message)                              \
-  IF_LOG_ENABLED_BOOL(                                                         \
-      Logger::isLoggingEnabled() &&                                            \
-          (level) >= Logger::getLoggerFilterLevel() &&                         \
-          Logger::logCategory(cat, level),                                     \
-      do {                                                                     \
-        auto &S = Logger::getLogStream(level, cat);                            \
-        Logger::addLinePrefix(S, level, cat);                                  \
-        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
-        S << message << '\n';                                                  \
-      } while (false);)
-
-#define PHASAR_LOG_CAT(cat, message)                                           \
-  IF_LOG_ENABLED_BOOL(                                                         \
-      Logger::isLoggingEnabled() && Logger::logCategory(cat, std::nullopt),    \
-      do {                                                                     \
-        auto &S = Logger::getLogStream(std::nullopt, cat);                     \
-        Logger::addLinePrefix(S, std::nullopt, cat);                           \
-        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
-        S << message << '\n';                                                  \
-      } while (false);)
 
 // For performance reason, we want to disable any
 // formatting computation that would go straight into
@@ -142,15 +105,66 @@ private:
     computation;                                                               \
   }
 
-#define IS_LOG_ENABLED Logger::isLoggingEnabled()
+#define IS_LOG_ENABLED ::psr::Logger::isLoggingEnabled()
+
+#define IF_LOG_ENABLED(computation)                                            \
+  IF_LOG_ENABLED_BOOL(::psr::Logger::isLoggingEnabled(), computation)
+
+#define PHASAR_LOG_LEVEL(level, message)                                       \
+  IF_LOG_ENABLED_BOOL(                                                         \
+      ::psr::Logger::isLoggingEnabled() &&                                     \
+          (::psr::SeverityLevel::level) >=                                     \
+              ::psr::Logger::getLoggerFilterLevel(),                           \
+      do {                                                                     \
+        auto &Stream = ::psr::Logger::getLogStream(                            \
+            ::psr::SeverityLevel::level, std::nullopt);                        \
+        ::psr::Logger::addLinePrefix(Stream, ::psr::SeverityLevel::level,      \
+                                     std::nullopt);                            \
+        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
+        Stream << message << '\n';                                             \
+      } while (false);)
+
+#define PHASAR_LOG(message) PHASAR_LOG_LEVEL(DEBUG, message)
+
+#define PHASAR_LOG_LEVEL_CAT(level, cat, message)                              \
+  IF_LOG_ENABLED_BOOL(                                                         \
+      ::psr::Logger::isLoggingEnabled() &&                                     \
+          (::psr::SeverityLevel::level) >=                                     \
+              ::psr::Logger::getLoggerFilterLevel() &&                         \
+          ::psr::Logger::logCategory(cat, ::psr::SeverityLevel::level),        \
+      do {                                                                     \
+        auto &Stream =                                                         \
+            ::psr::Logger::getLogStream(::psr::SeverityLevel::level, cat);     \
+        ::psr::Logger::addLinePrefix(Stream, ::psr::SeverityLevel::level,      \
+                                     cat);                                     \
+        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
+        Stream << message << '\n';                                             \
+      } while (false);)
+
+#define PHASAR_LOG_CAT(cat, message)                                           \
+  IF_LOG_ENABLED_BOOL(                                                         \
+      ::psr::Logger::isLoggingEnabled() &&                                     \
+          ::psr::Logger::logCategory(cat, std::nullopt),                       \
+      do {                                                                     \
+        auto &Stream = ::psr::Logger::getLogStream(std::nullopt, cat);         \
+        ::psr::Logger::addLinePrefix(Stream, std::nullopt, cat);               \
+        /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                       \
+        Stream << message << '\n';                                             \
+      } while (false);)
 
 #else
-#define IF_LOG_ENABLED(computation)
-#define IF_LOG_ENABLED_BOOL(condition, computation) ((void)0)
-#define PHASAR_LOG(computation) ((void)0)
-#define PHASAR_LOG_CAT(cat, message) ((void)0)
-#define PHASAR_LOG_LEVEL_CAT(level, cat, message) ((void)0)
-#define PHASAR_LOG_LEVEL(level, message) ((void)0)
+#define IF_LOG_ENABLED_BOOL(condition, computation)                            \
+  {}
+#define IF_LOG_ENABLED(computation)                                            \
+  {}
+#define PHASAR_LOG(computation)                                                \
+  {}
+#define PHASAR_LOG_CAT(cat, message)                                           \
+  {}
+#define PHASAR_LOG_LEVEL_CAT(level, cat, message)                              \
+  {}
+#define PHASAR_LOG_LEVEL(level, message)                                       \
+  {}
 #define IS_LOG_ENABLED false
 #endif
 
