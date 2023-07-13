@@ -30,21 +30,12 @@ using namespace psr;
 class GroundTruthCollector
     : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
                              IDELinearConstantAnalysis::d_t,
-                             IDELinearConstantAnalysis::l_t, true> {
-private:
-  size_t Count = 0;
-  size_t GroundTruthCount = 0;
-  std::vector<SourceCodeInfo> GroundTruth;
-
+                             IDELinearConstantAnalysis::l_t> {
 public:
   // constructor init Groundtruth in each fixture
-  GroundTruthCollector(DataFlowAnalysisType AnalysisType,
-                       const std::vector<SourceCodeInfo> &GroundTruth,
+  GroundTruthCollector(const std::vector<SourceCodeInfo> &GroundTruth,
                        size_t GroundTruthCount)
-      : AnalysisPrinter<IDELinearConstantAnalysis::n_t,
-                        IDELinearConstantAnalysis::d_t,
-                        IDELinearConstantAnalysis::l_t, true>(AnalysisType),
-        GroundTruthCount(GroundTruthCount), GroundTruth(GroundTruth){};
+      : GroundTruthCount(GroundTruthCount), GroundTruth(GroundTruth){};
 
   void removeElement(SourceCodeInfo G) {
     auto Iter = std::find(GroundTruth.begin(), GroundTruth.end(), G);
@@ -58,7 +49,8 @@ public:
     for (auto G : GroundTruth) {
       if (G.equivalentWith(getSrcCodeInfoFromIR(War.Fact))) {
         Count++;
-        removeElement(G);
+        removeElement(
+            G); // TODO: make it to llvm::DenseSet instead of std::vector
         break;
       }
     }
@@ -68,6 +60,11 @@ public:
     ASSERT_NE(GroundTruthCount, 0);
     EXPECT_TRUE(Count == GroundTruthCount);
   }
+
+private:
+  size_t Count = 0;
+  size_t GroundTruthCount = 0;
+  std::vector<SourceCodeInfo> GroundTruth;
 };
 
 class AnalysisPrinterTest : public ::testing::Test {
@@ -106,9 +103,7 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
                                               .SourceCodeFunctionName = "main",
                                               .Line = 3,
                                               .Column = 7}};
-  GroundTruthCollector GroundTruthPrinter = {
-      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
-      GroundTruth.size()};
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
   doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 
@@ -118,10 +113,10 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
        .SourceCodeFunctionName = "main",
        .Line = 4,
        .Column = 11}};
-  GroundTruthCollector GroundTruthPrinter = {
-      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
-      GroundTruth.size()};
-  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
+  doAnalysisTest("simple_cpp_dbg.ll",
+                 GroundTruthPrinter); // TODO: re-use existing files and remove
+                                      // this new file
 }
 
 /* ============== ERROR TESTS ============== */
@@ -131,17 +126,13 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_03) {
                                               .SourceCodeFunctionName = "main",
                                               .Line = 2,
                                               .Column = 7}};
-  GroundTruthCollector GroundTruthPrinter = {
-      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
-      GroundTruth.size()};
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
   doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 
 TEST_F(AnalysisPrinterTest, HandleBasicTest_04) {
   std::vector<SourceCodeInfo> GroundTruth = {};
-  GroundTruthCollector GroundTruthPrinter = {
-      DataFlowAnalysisType::IDELinearConstantAnalysis, GroundTruth,
-      GroundTruth.size()};
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
   doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
 }
 

@@ -61,9 +61,7 @@ public:
 
                             std::vector<std::string> EntryPoints = {"main"});
 
-  void setAnalysisPrinter(AnalysisPrinter<n_t, d_t, l_t, true> *P) {
-    Printer = P;
-  }
+  void setAnalysisPrinter(AnalysisPrinter<n_t, d_t, l_t> *P) { Printer = P; }
 
   ~IDELinearConstantAnalysis() override;
 
@@ -145,7 +143,7 @@ public:
 
 private:
   const LLVMBasedICFG *ICF{};
-  AnalysisPrinter<n_t, d_t, l_t, true> *Printer;
+  AnalysisPrinter<n_t, d_t, l_t> *Printer;
 };
 
 } // namespace psr
