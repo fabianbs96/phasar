@@ -166,12 +166,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS << "TSConstant[" << EF.TSD->stateToString(EF.Value) << "]";
 }
 
-IDETypeStateAnalysis::IDETypeStateAnalysis(
-    const LLVMProjectIRDB *IRDB, LLVMAliasInfoRef PT,
-    const TypeStateDescription *TSD, std::vector<std::string> EntryPoints,
-    const AnalysisPrinter<n_t, d_t, l_t> &Printer)
+IDETypeStateAnalysis::IDETypeStateAnalysis(const LLVMProjectIRDB *IRDB,
+                                           LLVMAliasInfoRef PT,
+                                           const TypeStateDescription *TSD,
+                                           std::vector<std::string> EntryPoints)
     : IDETabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
-      TSD(TSD), PT(PT), Printer(Printer) {
+      TSD(TSD), PT(PT), Printer(nullptr) {
   assert(TSD != nullptr);
   assert(PT);
 }
@@ -745,7 +745,7 @@ void IDETypeStateAnalysis::emitTextReport(
               if (Res.second == TSD->error()) {
                 Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
                 // ERROR STATE DETECTED
-                Printer.onResult(War);
+                Printer->onResult(War);
               }
             }
           }
@@ -756,13 +756,13 @@ void IDETypeStateAnalysis::emitTextReport(
               if (Res.second == TSD->error()) {
                 Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
                 // ERROR STATE DETECTED
-                Printer.onResult(War);
+                Printer->onResult(War);
               }
             }
           }
         }
 
-        Printer.onFinalize(OS);
+        Printer->onFinalize(OS);
       }
     }
   }

@@ -597,6 +597,7 @@ void IDELinearConstantAnalysis::printEdgeFact(llvm::raw_ostream &OS,
 void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
 
+  // TODO: revert it back! FULL FILE .CPP AND .H
   // if (!IRDB->debugInfoAvailable()) {
   for (const auto *F : ICF->getAllFunctions()) {
     std::string FName = getFunctionNameFromIR(F);

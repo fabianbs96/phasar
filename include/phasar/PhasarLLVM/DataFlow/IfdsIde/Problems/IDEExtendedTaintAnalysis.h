@@ -180,18 +180,16 @@ public:
   /// The GetDomTree parameter can be used to inject a custom DominatorTree
   /// analysis or the results from a LLVM pass computing dominator trees
   template <typename GetDomTree = DefaultDominatorTreeAnalysis>
-  IDEExtendedTaintAnalysis(
-      const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
-      LLVMAliasInfoRef PT, const LLVMTaintConfig *TSF,
-      std::vector<std::string> EntryPoints, unsigned Bound,
-      bool DisableStrongUpdates,
-      GetDomTree &&GDT = DefaultDominatorTreeAnalysis{},
-      const AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *>
-          &Printer = {DataFlowAnalysisType::IDEExtendedTaintAnalysis})
+  IDEExtendedTaintAnalysis(const LLVMProjectIRDB *IRDB,
+                           const LLVMBasedICFG *ICF, LLVMAliasInfoRef PT,
+                           const LLVMTaintConfig *TSF,
+                           std::vector<std::string> EntryPoints, unsigned Bound,
+                           bool DisableStrongUpdates,
+                           GetDomTree &&GDT = DefaultDominatorTreeAnalysis{})
       : base_t(IRDB, std::move(EntryPoints), std::nullopt), AnalysisBase(TSF),
         PT(PT), ICF(ICF), BBO(std::forward<GetDomTree>(GDT)),
         FactFactory(IRDB->getNumInstructions()),
-        DL(IRDB->getModule()->getDataLayout()), Printer(Printer), Bound(Bound),
+        DL(IRDB->getModule()->getDataLayout()), Bound(Bound),
         PostProcessed(DisableStrongUpdates),
         DisableStrongUpdates(DisableStrongUpdates) {
     assert(PT);
@@ -204,6 +202,11 @@ public:
 
     /// TODO: Once we have better AliasInfo, do a dynamic_cast over PT and
     /// set HasPreciseAliasInfo accordingly
+  }
+
+  void setAnalysisPrinter(
+      AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *> *P) {
+    Printer = P;
   }
 
   ~IDEExtendedTaintAnalysis() override = default;
@@ -290,7 +293,7 @@ private:
   AbstractMemoryLocationFactory<d_t> FactFactory;
   const llvm::DataLayout &DL;
 
-  AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *> Printer;
+  AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *> *Printer{};
 
 #ifdef XTAINT_DIAGNOSTICS
   llvm::DenseSet<d_t> allTaintedValues;
