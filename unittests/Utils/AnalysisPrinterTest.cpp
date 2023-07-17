@@ -49,8 +49,7 @@ public:
     for (auto G : GroundTruth) {
       if (G.equivalentWith(getSrcCodeInfoFromIR(War.Fact))) {
         Count++;
-        removeElement(
-            G); // TODO: make it to llvm::DenseSet instead of std::vector
+        removeElement(G); // make it to llvm::DenseSet instead of std::vector
         break;
       }
     }
