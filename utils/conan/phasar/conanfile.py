@@ -39,7 +39,7 @@ class PhasarConan(ConanFile):
     generators = "cmake"
     
     requires = [
-        "llvm/[>=14.0.0 <15.0.0]@phasar/develop",
+        "llvm/[>=14.0.0 <15.0.0]",
         "boost/[>=1.72.0 <=1.80.0]",
         "gtest/[>=1.10.0 <2.0.0]",
         "sqlite3/[>=3.36.0 <4.0.0]",
