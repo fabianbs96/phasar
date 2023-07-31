@@ -1,0 +1,81 @@
+R"({"$schema": "http: //json-schema.org/draft-07/schema#",
+"title": "IDESolver Configuration",
+"description": "An IDESolver Configuration",
+"type": "object",
+"properties": {
+    "name": {
+        "type": "string",
+        "description": "Name of this IDESolver configuration"
+    },
+    "version": {
+        "type": "number",
+        "description": "Version of this IDESolver configuration"
+    },
+    "functions": {
+        "description": "Array of functions you want to include in your analysis",
+        "type": "array",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Name of the function in the llvm IR, look for possible mangling"
+            },
+            "ret": {
+                "enum": [
+                    "JumpFunctions",
+                    "WorkList",
+                    "Endsummary",
+                    "IncomingTab"
+                ],
+                "description": "Tags the values"
+            },
+            "params": {
+                "description": "Tags function parameters",
+                "properties": {
+                    "source": {
+                        "description": "Zero based indices of JumpFunctions",
+                        "type": "array",
+                        "properties": {
+                            "type": [
+                                "number",
+                                "string"
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "required": [
+            "name",
+            "params"
+        ]
+    },
+    "variables": {
+        "type": "array",
+        "properties": {
+            "scope": {
+                "type": "string"
+            },
+            "name": {
+                "type": "string"
+            },
+            "line": {
+                "type": "number"
+            },
+            "cat": {
+                "enum": [
+                    "JumpFunctions",
+                    "WorkList",
+                    "Endsummary",
+                    "IncomingTab"
+                ]
+            }
+        },
+        "required": [
+            "scope",
+            "name",
+            "cat"
+        ]
+    }
+}
+}
+)"_json
