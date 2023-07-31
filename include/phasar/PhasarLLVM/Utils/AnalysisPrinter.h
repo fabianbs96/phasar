@@ -32,9 +32,17 @@ template <typename AnalysisDomainTy> class AnalysisPrinter {
 public:
   virtual ~AnalysisPrinter() = default;
   AnalysisPrinter() : AnalysisResults{.War = {}} {}
+
+  AnalysisPrinter(const AnalysisPrinter &) = delete;
+  AnalysisPrinter &operator=(const AnalysisPrinter &) = delete;
+
+  AnalysisPrinter(AnalysisPrinter &&) = delete;
+  AnalysisPrinter &operator=(AnalysisPrinter &&) = delete;
+
   virtual void onResult(Warnings<AnalysisDomainTy> War) {
     AnalysisResults.War.emplace_back(std::move(War));
   }
+
   virtual void onInitialize(){};
   virtual void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const {
     for (auto Iter : AnalysisResults.War) {
