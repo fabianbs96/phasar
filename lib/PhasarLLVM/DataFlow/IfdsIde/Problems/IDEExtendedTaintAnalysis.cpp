@@ -37,7 +37,16 @@
 #include <algorithm>
 #include <type_traits>
 
-namespace psr::XTaint {
+namespace psr {
+template <> std::string lToString<XTaint::EdgeDomain>(XTaint::EdgeDomain V) {
+  std::string IRBuffer;
+  llvm::raw_string_ostream RSO(IRBuffer);
+  RSO << V;
+  RSO.flush();
+  return llvm::StringRef(IRBuffer).ltrim().str();
+}
+
+namespace XTaint {
 
 InitialSeeds<IDEExtendedTaintAnalysis::n_t, IDEExtendedTaintAnalysis::d_t,
              IDEExtendedTaintAnalysis::l_t>
@@ -235,12 +244,9 @@ void IDEExtendedTaintAnalysis::reportLeakIfNecessary(
     const llvm::Value *LeakCandidate) {
   if (isSink(SinkCandidate, Inst)) {
     Leaks[Inst].insert(LeakCandidate);
-    Warnings<IDEExtendedTaintAnalysisDomain> War(Inst, nullptr, LeakCandidate);
-    War.Instr = Inst;
-    War.LatticeElement = LeakCandidate;
-    //(Inst, LeakCandidate,
-    //                                             LeakCandidate);
-    Printer.onResult(War);
+    Warnings<IDEExtendedTaintAnalysisDomain> War(
+        Inst, makeFlowFact(LeakCandidate), Top{});
+    Printer->onResult(War);
   }
 }
 
@@ -787,13 +793,13 @@ void IDEExtendedTaintAnalysis::emitTextReport(
   for (auto &[Inst, LeakSet] : Leaks) {
 
     for (const auto &Leak : LeakSet) {
-      Warnings<IDEExtendedTaintAnalysisDomain> War(Inst, Leak, Leak);
-
-      Printer.onResult(War);
+      Warnings<IDEExtendedTaintAnalysisDomain> War(Inst, makeFlowFact(Leak),
+                                                   Top{});
+      Printer->onResult(War);
     }
   }
 
-  Printer.onFinalize(OS);
+  Printer->onFinalize(OS);
 }
 
 // JoinLattice
@@ -953,4 +959,6 @@ LeakMap_t IDEExtendedTaintAnalysis::getAllLeaks(
   return std::move(Leaks);
 }
 
-} // namespace psr::XTaint
+} // namespace XTaint
+
+} // namespace psr

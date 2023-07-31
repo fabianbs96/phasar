@@ -29,9 +29,7 @@ using namespace psr;
 
 // Use template to variate between Typesate and Taint analysis
 class GroundTruthCollector
-    : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
-                             IDELinearConstantAnalysis::d_t,
-                             IDELinearConstantAnalysis::l_t> {
+    : public AnalysisPrinter<IDELinearConstantAnalysisDomain> {
 public:
   // constructor init Groundtruth in each fixture
   GroundTruthCollector(const std::vector<SourceCodeInfo> &GroundTruth,
@@ -43,10 +41,7 @@ public:
     GroundTruth.erase(Iter);
   }
 
-  void onResult(
-      Warnings<IDELinearConstantAnalysis::n_t, IDELinearConstantAnalysis::d_t,
-               IDELinearConstantAnalysis::l_t>
-          War) override {
+  void onResult(Warnings<IDELinearConstantAnalysisDomain> War) override {
     for (auto G : GroundTruth) {
       if (G.equivalentWith(getSrcCodeInfoFromIR(War.Fact))) {
         Count++;

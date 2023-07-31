@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
+#include <string>
 #include <utility>
 
 namespace psr {
@@ -45,6 +46,12 @@ namespace psr {
 /// applicable for small-object optimization!
 ///
 ///
+
+template <>
+std::string
+lToString<TypeStateDescription::State>(TypeStateDescription::State V) {
+  return std::to_string(V);
+}
 
 // customize the edge function composer
 struct TSEdgeFunctionComposer
@@ -744,9 +751,9 @@ void IDETypeStateAnalysis::emitTextReport(
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
                 Warnings<IDETypeStateAnalysisDomain> War(&I, Res.first,
-                                                         Res.second);
+                                                         TSD->error());
                 // ERROR STATE DETECTED
-                Printer.onResult(War);
+                Printer->onResult(War);
               }
             }
           }
@@ -756,15 +763,15 @@ void IDETypeStateAnalysis::emitTextReport(
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
                 Warnings<IDETypeStateAnalysisDomain> War(&I, Res.first,
-                                                         Res.second);
+                                                         TSD->error());
                 // ERROR STATE DETECTED
-                Printer.onResult(War);
+                Printer->onResult(War);
               }
             }
           }
         }
 
-        Printer.onFinalize(OS);
+        Printer->onFinalize(OS);
       }
     }
   }

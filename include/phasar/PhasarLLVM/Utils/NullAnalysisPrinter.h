@@ -1,19 +1,18 @@
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-#include "phasar/Utils/Printer.h"
 
 namespace psr {
 
 template <typename AnalysisDomainTy>
 class NullAnalysisPrinter : public AnalysisPrinter<AnalysisDomainTy> {
 public:
-  static NullAnalysisPrinter getInstance() {
+  static const NullAnalysisPrinter *getInstance() {
     static auto Instance = NullAnalysisPrinter();
-    return Instance;
+    return &Instance;
   }
 
-  void onInitialize() override{};
-  void onResult(Warnings<AnalysisDomainTy> /*War*/) override{};
-  void onFinalize(llvm::raw_ostream & /*OS*/) const override{};
+  void onInitialize() override;
+  void onResult(Warnings<AnalysisDomainTy> /*War*/) override;
+  void onFinalize(llvm::raw_ostream & /*OS*/) override;
 
 private:
   NullAnalysisPrinter() = default;
