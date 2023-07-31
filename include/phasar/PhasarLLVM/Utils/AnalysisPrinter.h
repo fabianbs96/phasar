@@ -5,7 +5,7 @@
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/Domain/LatticeDomain.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
+#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <optional>
 #include <ostream>
 #include <type_traits>
 #include <utility>
@@ -26,48 +27,61 @@
 
 namespace psr {
 
-template <typename N_t, typename D_t, typename L_t> struct Warnings {
-  N_t Instr;
-  D_t Fact;
-  L_t LatticeElement;
+template <typename AnalysisDomainTy> struct Warnings {
+  typename AnalysisDomainTy::n_t Instr;
+  typename AnalysisDomainTy::d_t Fact;
+  typename AnalysisDomainTy::l_t LatticeElement;
 
   // Constructor
-  Warnings(N_t Inst, D_t DfFact, L_t Lattice)
+  Warnings(typename AnalysisDomainTy::n_t Inst,
+           typename AnalysisDomainTy::d_t DfFact,
+           typename AnalysisDomainTy::l_t Lattice)
       : Instr(std::move(Inst)), Fact(std::move(DfFact)),
         LatticeElement(std::move(Lattice)) {}
 };
 
-template <typename N, typename D, typename L> struct Results {
-  std::vector<Warnings<N, D, L>> War;
+template <typename AnalysisDomainTy> struct Results {
+  std::vector<Warnings<AnalysisDomainTy>> War;
 };
 
 // TODO: explicit-template-instantiation
-template <typename N, typename D, typename L> class AnalysisPrinter {
+template <typename AnalysisDomainTy>
+class AnalysisPrinter : public NodePrinter<AnalysisDomainTy>,
+                        public DataFlowFactPrinter<AnalysisDomainTy>,
+                        public EdgeFactPrinter<AnalysisDomainTy> {
 public:
   virtual ~AnalysisPrinter() = default;
   AnalysisPrinter() : AnalysisResults{.War = {}} {}
-  virtual void onResult(Warnings<N, D, L> War) {
+  virtual void onResult(Warnings<AnalysisDomainTy> War) {
     AnalysisResults.War.emplace_back(std::move(War));
   }
   virtual void onInitialize(){};
   virtual void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const {
 
     for (auto Iter : AnalysisResults.War) {
-      if (Iter.Instr) {
-        OS << "\nAt IR statement: " << llvmIRToString(Iter.Instr) << "\n";
-      }
-      if (Iter.Fact) {
-        OS << "Fact: " << llvmIRToShortString(Iter.Fact) << "\n";
-      }
 
-      if constexpr (std::is_same_v<L, BinaryDomain>) {
-        OS << "Value: " << Iter.LatticeElement << "\n";
+      OS << "\nAt IR statement: " << this->NtoString(Iter.Instr) << "\n";
+
+      OS << "Fact: " << this->DtoString(Iter.Fact) << "\n";
+
+      if constexpr (std::is_same_v<typename AnalysisDomainTy::l_t,
+                                   BinaryDomain>) {
+        OS << "Value: " << this->LtoString(Iter.LatticeElement) << "\n";
       }
     }
   }
 
+  void printNode(llvm::raw_ostream &OS,
+                 typename AnalysisDomainTy::n_t Stmt) const override;
+
+  void printDataFlowFact(llvm::raw_ostream &OS,
+                         typename AnalysisDomainTy::d_t Fact) const override;
+
+  void printEdgeFact(llvm::raw_ostream &OS,
+                     typename AnalysisDomainTy::l_t L) const override;
+
 private:
-  Results<N, D, L> AnalysisResults;
+  Results<AnalysisDomainTy> AnalysisResults;
 };
 
 } // namespace psr

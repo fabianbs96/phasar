@@ -13,8 +13,6 @@
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/Domain/LatticeDomain.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -22,8 +20,6 @@
 #include <memory>
 #include <set>
 #include <string>
-
-#include <sys/types.h>
 
 namespace llvm {
 class Instruction;
@@ -58,10 +54,7 @@ public:
 
   IDELinearConstantAnalysis(const LLVMProjectIRDB *IRDB,
                             const LLVMBasedICFG *ICF,
-
                             std::vector<std::string> EntryPoints = {"main"});
-
-  void setAnalysisPrinter(AnalysisPrinter<n_t, d_t, l_t> *P) { Printer = P; }
 
   ~IDELinearConstantAnalysis() override;
 
@@ -143,7 +136,6 @@ public:
 
 private:
   const LLVMBasedICFG *ICF{};
-  AnalysisPrinter<n_t, d_t, l_t> *Printer;
 };
 
 } // namespace psr

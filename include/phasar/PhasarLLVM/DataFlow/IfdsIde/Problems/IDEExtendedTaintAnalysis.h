@@ -204,11 +204,6 @@ public:
     /// set HasPreciseAliasInfo accordingly
   }
 
-  void setAnalysisPrinter(
-      AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *> *P) {
-    Printer = P;
-  }
-
   ~IDEExtendedTaintAnalysis() override = default;
 
   // Flow functions
@@ -293,7 +288,7 @@ private:
   AbstractMemoryLocationFactory<d_t> FactFactory;
   const llvm::DataLayout &DL;
 
-  AnalysisPrinter<n_t, const llvm::Value *, const llvm::Value *> *Printer{};
+  // TaintAnalysisPrinter *Printer{};
 
 #ifdef XTAINT_DIAGNOSTICS
   llvm::DenseSet<d_t> allTaintedValues;

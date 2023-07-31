@@ -12,17 +12,12 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
 #include "phasar/DataFlow/IfdsIde/FlowFunctions.h"
-#include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
-#include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFlowFunctions.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
-#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -42,9 +37,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/raw_ostream.h"
 
-#include <iostream>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -265,7 +258,7 @@ IDELinearConstantAnalysis::IDELinearConstantAnalysis(
     const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
     std::vector<std::string> EntryPoints)
     : IDETabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
-      ICF(ICF), Printer(nullptr) {
+      ICF(ICF) {
   assert(ICF != nullptr);
 }
 
@@ -596,42 +589,44 @@ void IDELinearConstantAnalysis::printEdgeFact(llvm::raw_ostream &OS,
 
 void IDELinearConstantAnalysis::emitTextReport(
     const SolverResults<n_t, d_t, l_t> &SR, llvm::raw_ostream &OS) {
-
-  // TODO: revert it back! FULL FILE .CPP AND .H
-  // if (!IRDB->debugInfoAvailable()) {
-  for (const auto *F : ICF->getAllFunctions()) {
-    std::string FName = getFunctionNameFromIR(F);
-
-    for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
-
-      auto Results = SR.resultsAt(Stmt, true);
-      stripBottomResults(Results);
-      if (!Results.empty()) {
-
-        for (auto Res : Results) {
-          if (!Res.second.isBottom()) {
-            Warnings<n_t, d_t, l_t> War(Stmt, Res.first, Res.second);
-            Printer->onResult(War);
+  OS << "\n====================== IDE-Linear-Constant-Analysis Report "
+        "======================\n";
+  if (!IRDB->debugInfoAvailable()) {
+    // Emit only IR code, function name and module info
+    OS << "\nWARNING: No Debug Info available - emiting results without "
+          "source code mapping!\n";
+    for (const auto *F : ICF->getAllFunctions()) {
+      std::string FName = getFunctionNameFromIR(F);
+      OS << "\nFunction: " << FName << "\n----------"
+         << std::string(FName.size(), '-') << '\n';
+      for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
+        auto Results = SR.resultsAt(Stmt, true);
+        stripBottomResults(Results);
+        if (!Results.empty()) {
+          OS << "At IR statement: " << NtoString(Stmt) << '\n';
+          for (auto Res : Results) {
+            if (!Res.second.isBottom()) {
+              OS << "   Fact: " << DtoString(Res.first)
+                 << "\n  Value: " << LtoString(Res.second) << '\n';
+            }
           }
+          OS << '\n';
         }
       }
+      OS << '\n';
+    }
+  } else {
+    auto LcaResults = getLCAResults(SR);
+    for (const auto &Entry : LcaResults) {
+      OS << "\nFunction: " << Entry.first
+         << "\n==========" << std::string(Entry.first.size(), '=') << '\n';
+      for (auto FResult : Entry.second) {
+        FResult.second.print(OS);
+        OS << "--------------------------------------\n\n";
+      }
+      OS << '\n';
     }
   }
-
-  Printer->onFinalize(OS);
-
-  // } else {
-  //   auto LcaResults = getLCAResults(SR);
-  //   for (const auto &Entry : LcaResults) {
-  //     OS << "\nFunction: " << Entry.first
-  //        << "\n==========" << std::string(Entry.first.size(), '=') << '\n';
-  //     for (auto FResult : Entry.second) {
-  //       FResult.second.print(OS);
-  //       OS << "--------------------------------------\n\n";
-  //     }
-  //     OS << '\n';
-  //   }
-  // }
 }
 
 void IDELinearConstantAnalysis::stripBottomResults(

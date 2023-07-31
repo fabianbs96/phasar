@@ -235,9 +235,12 @@ void IDEExtendedTaintAnalysis::reportLeakIfNecessary(
     const llvm::Value *LeakCandidate) {
   if (isSink(SinkCandidate, Inst)) {
     Leaks[Inst].insert(LeakCandidate);
-    Warnings<n_t, const llvm::Value *, const llvm::Value *> War(
-        Inst, LeakCandidate, LeakCandidate);
-    Printer->onResult(War);
+    Warnings<IDEExtendedTaintAnalysisDomain> War(Inst, nullptr, LeakCandidate);
+    War.Instr = Inst;
+    War.LatticeElement = LeakCandidate;
+    //(Inst, LeakCandidate,
+    //                                             LeakCandidate);
+    Printer.onResult(War);
   }
 }
 
@@ -784,14 +787,13 @@ void IDEExtendedTaintAnalysis::emitTextReport(
   for (auto &[Inst, LeakSet] : Leaks) {
 
     for (const auto &Leak : LeakSet) {
-      Warnings<n_t, const llvm::Value *, const llvm::Value *> War(Inst, Leak,
-                                                                  Leak);
+      Warnings<IDEExtendedTaintAnalysisDomain> War(Inst, Leak, Leak);
 
-      Printer->onResult(War);
+      Printer.onResult(War);
     }
   }
 
-  Printer->onFinalize(OS);
+  Printer.onFinalize(OS);
 }
 
 // JoinLattice

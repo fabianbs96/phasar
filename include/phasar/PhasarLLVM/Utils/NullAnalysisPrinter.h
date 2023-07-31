@@ -1,13 +1,10 @@
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
+#include "phasar/Utils/Printer.h"
 
-using namespace psr;
-// TODO: make it singleton
-class NullAnalysisPrinter
-    : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
-                             IDELinearConstantAnalysis::d_t,
-                             IDELinearConstantAnalysis::l_t> {
+namespace psr {
+
+template <typename AnalysisDomainTy>
+class NullAnalysisPrinter : public AnalysisPrinter<AnalysisDomainTy> {
 public:
   static NullAnalysisPrinter getInstance() {
     static auto Instance = NullAnalysisPrinter();
@@ -15,12 +12,11 @@ public:
   }
 
   void onInitialize() override{};
-  void onResult(
-      Warnings<IDELinearConstantAnalysis::n_t, IDELinearConstantAnalysis::d_t,
-               IDELinearConstantAnalysis::l_t>
-          War) override{};
-  void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const override{};
+  void onResult(Warnings<AnalysisDomainTy> /*War*/) override{};
+  void onFinalize(llvm::raw_ostream & /*OS*/) const override{};
 
 private:
   NullAnalysisPrinter() = default;
 };
+
+} // namespace psr

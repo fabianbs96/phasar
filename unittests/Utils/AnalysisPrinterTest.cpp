@@ -27,6 +27,7 @@
 
 using namespace psr;
 
+// Use template to variate between Typesate and Taint analysis
 class GroundTruthCollector
     : public AnalysisPrinter<IDELinearConstantAnalysis::n_t,
                              IDELinearConstantAnalysis::d_t,

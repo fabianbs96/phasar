@@ -18,6 +18,8 @@
 #include "phasar/DataFlow/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
+#include "phasar/PhasarLLVM/Utils/NullAnalysisPrinter.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Soundness.h"
@@ -39,12 +41,10 @@ struct HasNoConfigurationType;
 template <typename AnalysisDomainTy,
           typename Container = std::set<typename AnalysisDomainTy::d_t>>
 class IDETabulationProblem : public FlowFunctions<AnalysisDomainTy, Container>,
-                             public NodePrinter<AnalysisDomainTy>,
-                             public DataFlowFactPrinter<AnalysisDomainTy>,
                              public FunctionPrinter<AnalysisDomainTy>,
                              public EdgeFunctions<AnalysisDomainTy>,
                              public JoinLattice<AnalysisDomainTy>,
-                             public EdgeFactPrinter<AnalysisDomainTy> {
+                             public AnalysisPrinter<AnalysisDomainTy> {
 public:
   using ProblemAnalysisDomain = AnalysisDomainTy;
   using d_t = typename AnalysisDomainTy::d_t;
@@ -62,10 +62,12 @@ public:
                                 std::vector<std::string> EntryPoints,
                                 std::optional<d_t> ZeroValue)
       : IRDB(IRDB), EntryPoints(std::move(EntryPoints)),
-        ZeroValue(std::move(ZeroValue)) {
+        ZeroValue(std::move(ZeroValue)),
+        Printer(NullAnalysisPrinter<AnalysisDomainTy>::getInstance()) {
     assert(IRDB != nullptr);
   }
 
+  void setAnalysisPrinter(AnalysisPrinter<AnalysisDomainTy> *P) { Printer = P; }
   virtual ~IDETabulationProblem() = default;
 
   /// Returns an edge function that represents the top element of the analysis.
@@ -102,6 +104,8 @@ public:
   [[nodiscard]] IFDSIDESolverConfig &getIFDSIDESolverConfig() {
     return SolverConfig;
   }
+
+  // TODO: Add a Printer object with default NullAnalysisPrinter and a setter
 
   /// Generates a text report of the results that is written to the specified
   /// output stream.
@@ -152,6 +156,8 @@ protected:
   IFDSIDESolverConfig SolverConfig{};
 
   [[maybe_unused]] Soundness SF = Soundness::Soundy;
+
+  AnalysisPrinter<AnalysisDomainTy> Printer{};
 };
 
 } // namespace psr

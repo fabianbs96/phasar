@@ -58,7 +58,7 @@ public:
                        const TypeStateDescription *TSD,
                        std::vector<std::string> EntryPoints = {"main"});
 
-  void setAnalysisPrinter(AnalysisPrinter<n_t, d_t, l_t> *P) { Printer = P; }
+  // void setAnalysisPrinter(TypeStateAnalysisPrinter *P) { Printer = P; }
 
   ~IDETypeStateAnalysis() override = default;
 
@@ -177,7 +177,7 @@ private:
    */
   bool hasMatchingType(d_t V);
 
-  AnalysisPrinter<n_t, d_t, l_t> *Printer;
+  // TypeStateAnalysisPrinter *Printer;
 };
 
 } // namespace psr

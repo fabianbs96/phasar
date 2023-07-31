@@ -171,7 +171,7 @@ IDETypeStateAnalysis::IDETypeStateAnalysis(const LLVMProjectIRDB *IRDB,
                                            const TypeStateDescription *TSD,
                                            std::vector<std::string> EntryPoints)
     : IDETabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
-      TSD(TSD), PT(PT), Printer(nullptr) {
+      TSD(TSD), PT(PT) {
   assert(TSD != nullptr);
   assert(PT);
 }
@@ -743,9 +743,10 @@ void IDETypeStateAnalysis::emitTextReport(
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
-                Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
+                Warnings<IDETypeStateAnalysisDomain> War(&I, Res.first,
+                                                         Res.second);
                 // ERROR STATE DETECTED
-                Printer->onResult(War);
+                Printer.onResult(War);
               }
             }
           }
@@ -754,15 +755,16 @@ void IDETypeStateAnalysis::emitTextReport(
             if (const auto *Alloca =
                     llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
               if (Res.second == TSD->error()) {
-                Warnings<n_t, d_t, l_t> War(&I, Res.first, Res.second);
+                Warnings<IDETypeStateAnalysisDomain> War(&I, Res.first,
+                                                         Res.second);
                 // ERROR STATE DETECTED
-                Printer->onResult(War);
+                Printer.onResult(War);
               }
             }
           }
         }
 
-        Printer->onFinalize(OS);
+        Printer.onFinalize(OS);
       }
     }
   }
