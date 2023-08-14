@@ -9,6 +9,8 @@
 
 #include "phasar/Domain/BinaryDomain.h"
 
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -26,3 +28,12 @@ std::string psr::to_string(BinaryDomain B) {
 llvm::raw_ostream &psr::operator<<(llvm::raw_ostream &OS, BinaryDomain B) {
   return OS << to_string(B);
 }
+namespace psr {
+template <> std::string dToString<BinaryDomain>(BinaryDomain V) {
+  return to_string(V);
+}
+
+template <> std::string lToString<BinaryDomain>(BinaryDomain V) {
+  return to_string(V);
+}
+} // namespace psr

@@ -9,6 +9,8 @@
 
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDEInstInteractionAnalysis.h"
 
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Value.h"
@@ -128,4 +130,8 @@ bool IDEIIAFlowFact::operator<(const IDEIIAFlowFact &Other) const {
 
 bool IDEIIAFlowFact::operator==(const llvm::Value *V) const {
   return BaseVal == V && FieldDesc.empty();
+}
+
+template <> std::string psr::dToString<IDEIIAFlowFact>(IDEIIAFlowFact /*V*/) {
+  return "";
 }

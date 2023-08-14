@@ -5,6 +5,8 @@
 #ifndef PHASAR_PHASARLLVM_DOMAIN_EXTENDEDVALUE_H
 #define PHASAR_PHASARLLVM_DOMAIN_EXTENDEDVALUE_H
 
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+
 #include <cassert>
 #include <functional>
 #include <string>
@@ -161,6 +163,10 @@ private:
   long VarArgIndex = -1L;
   long CurrentVarArgIndex = -1L;
 };
+
+template <> inline std::string dToString<ExtendedValue>(ExtendedValue V) {
+  return llvmIRToString(V.getValue());
+}
 
 } // namespace psr
 

@@ -46,6 +46,11 @@ template <> std::string lToString<XTaint::EdgeDomain>(XTaint::EdgeDomain V) {
   return llvm::StringRef(IRBuffer).ltrim().str();
 }
 
+template <>
+std::string dToString<AbstractMemoryLocation>(AbstractMemoryLocation V) {
+  return DToString(V);
+}
+
 namespace XTaint {
 
 InitialSeeds<IDEExtendedTaintAnalysis::n_t, IDEExtendedTaintAnalysis::d_t,

@@ -19,6 +19,7 @@
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/NullAnalysisPrinter.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Soundness.h"
@@ -63,7 +64,8 @@ public:
                                 std::vector<std::string> EntryPoints,
                                 std::optional<d_t> ZeroValue)
       : IRDB(IRDB), EntryPoints(std::move(EntryPoints)),
-        ZeroValue(std::move(ZeroValue)), Printer(nullptr) {
+        ZeroValue(std::move(ZeroValue)),
+        Printer(NullAnalysisPrinter<AnalysisDomainTy>::getInstance()) {
     assert(IRDB != nullptr);
   }
 

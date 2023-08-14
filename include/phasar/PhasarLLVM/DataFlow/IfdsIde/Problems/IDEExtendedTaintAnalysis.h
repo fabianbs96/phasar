@@ -334,6 +334,8 @@ public:
     return FactFactory.getNumOverApproximatedFacts();
   }
 #endif
+
+  AnalysisPrinter<IDEExtendedTaintAnalysisDomain> TAPrinter;
 };
 
 } // namespace XTaint
@@ -351,7 +353,10 @@ public:
                            GetDomTree &&GDT = DefaultDominatorTreeAnalysis{})
       : XTaint::IDEExtendedTaintAnalysis(
             IRDB, ICF, PT, &TSF, std::move(EntryPoints), BOUND,
-            !USE_STRONG_UPDATES, std::forward<GetDomTree>(GDT)) {}
+            !USE_STRONG_UPDATES, std::forward<GetDomTree>(GDT)) {
+    IDETabulationProblem<IDEExtendedTaintAnalysisDomain>::setAnalysisPrinter(
+        &TAPrinter);
+  }
 
   using ConfigurationTy = LLVMTaintConfig;
 };

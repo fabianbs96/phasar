@@ -58,8 +58,6 @@ public:
                        const TypeStateDescription *TSD,
                        std::vector<std::string> EntryPoints = {"main"});
 
-  // void setAnalysisPrinter(TypeStateAnalysisPrinter *P) { Printer = P; }
-
   ~IDETypeStateAnalysis() override = default;
 
   // start formulating our analysis by specifying the parts required for IFDS
@@ -133,6 +131,8 @@ public:
   void emitTextReport(const SolverResults<n_t, d_t, l_t> &SR,
                       llvm::raw_ostream &OS = llvm::outs()) override;
 
+  // AnalysisPrinter<IDETypeStateAnalysisDomain> TSPrinter;
+
 private:
   const TypeStateDescription *TSD{};
   std::map<const llvm::Value *, LLVMAliasInfo::AliasSetTy> AliasCache;
@@ -176,8 +176,6 @@ private:
    * @brief Checks if the type machtes the type of interest.
    */
   bool hasMatchingType(d_t V);
-
-  // TypeStateAnalysisPrinter *Printer;
 };
 
 } // namespace psr
