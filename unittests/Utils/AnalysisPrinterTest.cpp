@@ -3,132 +3,142 @@
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDEExtendedTaintAnalysis.h"
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
-
-#include "llvm/ADT/StringRef.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "TestConfig.h"
 #include "gtest/gtest.h"
 
-#include <cstddef>
-#include <cstdio>
-#include <iostream>
-#include <ostream>
-#include <regex>
-
 #include <nlohmann/json.hpp>
 
+using namespace std;
 using namespace psr;
+using json = nlohmann::json;
+
+using CallBackPairTy = std::pair<IDEExtendedTaintAnalysis<>::config_callback_t,
+                                 IDEExtendedTaintAnalysis<>::config_callback_t>;
 
 // Use template to variate between Typesate and Taint analysis
 class GroundTruthCollector
-    : public AnalysisPrinter<IDELinearConstantAnalysisDomain> {
+    : public AnalysisPrinter<IDEExtendedTaintAnalysisDomain> {
 public:
   // constructor init Groundtruth in each fixture
-  GroundTruthCollector(const std::vector<SourceCodeInfo> &GroundTruth,
-                       size_t GroundTruthCount)
-      : GroundTruthCount(GroundTruthCount), GroundTruth(GroundTruth){};
+  GroundTruthCollector(map<int, set<string>> &GroundTruth)
+      : GroundTruth(GroundTruth){};
 
-  void removeElement(SourceCodeInfo G) {
-    auto Iter = std::find(GroundTruth.begin(), GroundTruth.end(), G);
-    GroundTruth.erase(Iter);
-  }
-
-  void onResult(Warnings<IDELinearConstantAnalysisDomain> War) override {
-    for (auto G : GroundTruth) {
-      if (G.equivalentWith(getSrcCodeInfoFromIR(War.Fact))) {
-        Count++;
-        removeElement(G); // make it to llvm::DenseSet instead of std::vector
-        break;
+  void findAndRemove(std::map<int, std::set<std::string>> &Map1,
+                     std::map<int, std::set<std::string>> &Map2) {
+    std::vector<int> KeysToRemove;
+    for (const auto &Entry : Map1) {
+      auto Iter = Map2.find(Entry.first);
+      if (Iter != Map2.end() && Iter->second == Entry.second) {
+        KeysToRemove.push_back(Entry.first);
       }
+    }
+    for (const auto &Key : KeysToRemove) {
+      Map2.erase(Key);
     }
   }
 
-  void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const override {
-    ASSERT_NE(GroundTruthCount, 0);
-    EXPECT_TRUE(Count == GroundTruthCount);
+  void onResult(Warnings<IDEExtendedTaintAnalysisDomain> War) override {
+    map<int, set<string>> FoundLeak;
+    int SinkId = stoi(getMetaDataID(War.Instr));
+    set<string> LeakedValueIds;
+    LeakedValueIds.insert(getMetaDataID((War.Fact)->base()));
+    FoundLeak.emplace(SinkId, LeakedValueIds);
+    findAndRemove(FoundLeak, GroundTruth);
+  }
+
+  void onFinalize(llvm::raw_ostream & /*OS*/ = llvm::outs()) const override {
+    EXPECT_TRUE(GroundTruth.empty());
   }
 
 private:
-  size_t Count = 0;
-  size_t GroundTruthCount = 0;
-  std::vector<SourceCodeInfo> GroundTruth;
+  map<int, set<string>> GroundTruth;
 };
 
 class AnalysisPrinterTest : public ::testing::Test {
 protected:
-  static constexpr auto PathToLlFiles =
-      PHASAR_BUILD_SUBFOLDER("linear_constant/");
+  static constexpr auto PathToLlFiles = PHASAR_BUILD_SUBFOLDER("xtaint/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  void doAnalysisTest(llvm::StringRef LlvmFilePath,
-                      GroundTruthCollector &GroundTruthPrinter) {
-    HelperAnalyses HA(PathToLlFiles + LlvmFilePath, EntryPoints);
-    // Compute the ICFG to possibly create the runtime model
-    auto &ICFG = HA.getICFG();
-    auto HasGlobalCtor = HA.getProjectIRDB().getFunctionDefinition(
-                             LLVMBasedICFG::GlobalCRuntimeModelName) != nullptr;
+  void
+  doAnalysisTest(llvm::StringRef IRFile, GroundTruthCollector &GTPrinter,
+                 std::variant<std::monostate, json *, CallBackPairTy> Config) {
+    HelperAnalyses HA(PathToLlFiles + IRFile, EntryPoints);
 
-    auto LCAProblem = createAnalysisProblem<IDELinearConstantAnalysis>(
-        HA,
-        std::vector{HasGlobalCtor ? LLVMBasedICFG::GlobalCRuntimeModelName.str()
-                                  : "main"});
-    LCAProblem.setAnalysisPrinter(&GroundTruthPrinter);
-    IDESolver LCASolver(LCAProblem, &ICFG);
-    LCASolver.solve();
-    LCASolver.emitTextReport();
+    auto TC =
+        std::visit(Overloaded{[&](std::monostate) {
+                                return LLVMTaintConfig(HA.getProjectIRDB());
+                              },
+                              [&](json *JS) {
+                                auto Ret =
+                                    LLVMTaintConfig(HA.getProjectIRDB(), *JS);
+                                return Ret;
+                              },
+                              [&](CallBackPairTy &&CB) {
+                                return LLVMTaintConfig(std::move(CB.first),
+                                                       std::move(CB.second));
+                              }},
+                   std::move(Config));
+
+    auto TaintProblem =
+        createAnalysisProblem<IDEExtendedTaintAnalysis<>>(HA, TC, EntryPoints);
+
+    TaintProblem.setAnalysisPrinter(&GTPrinter);
+    IDESolver Solver(TaintProblem, &HA.getICFG());
+    Solver.solve();
+
+    TaintProblem.emitTextReport(Solver.getSolverResults());
   }
 };
 
 /* ============== BASIC TESTS ============== */
 
 TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
-  std::vector<SourceCodeInfo> GroundTruth = {{.SourceCodeLine = "int i = 4;",
-                                              .SourceCodeFunctionName = "main",
-                                              .Line = 2,
-                                              .Column = 7},
-                                             {.SourceCodeLine = "int j = 5;",
-                                              .SourceCodeFunctionName = "main",
-                                              .Line = 3,
-                                              .Column = 7}};
-  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
-  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+  map<int, set<string>> GroundTruth;
+  GroundTruth[7] = {"0"};
+
+  json Config = R"!({
+    "name": "XTaintTest",
+    "version": 1.0,
+    "functions": [
+      {
+        "file": "xtaint01.cpp",
+        "name": "main",
+        "params": {
+          "source": [
+            0
+          ]
+        }
+      },
+      {
+        "file": "xtaint01.cpp",
+        "name": "_Z5printi",
+        "params": {
+          "sink": [
+            0
+          ]
+        }
+      }
+    ]
+    })!"_json;
+
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth};
+  doAnalysisTest("xtaint01_json_cpp_dbg.ll", GroundTruthPrinter, &Config);
 }
 
-TEST_F(AnalysisPrinterTest, HandleBasicTest_02) {
-  std::vector<SourceCodeInfo> GroundTruth = {
-      {.SourceCodeLine = "int k = i + j;",
-       .SourceCodeFunctionName = "main",
-       .Line = 4,
-       .Column = 11}};
-  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
-  doAnalysisTest("simple_cpp_dbg.ll",
-                 GroundTruthPrinter); // TODO: re-use existing files and remove
-                                      // this new file
-}
+TEST_F(AnalysisPrinterTest, XTaint01) {
+  map<int, set<string>> GroundTruth;
 
-/* ============== ERROR TESTS ============== */
-
-TEST_F(AnalysisPrinterTest, HandleBasicTest_03) {
-  std::vector<SourceCodeInfo> GroundTruth = {{.SourceCodeLine = "int i = 6;",
-                                              .SourceCodeFunctionName = "main",
-                                              .Line = 2,
-                                              .Column = 7}};
-  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
-  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
-}
-
-TEST_F(AnalysisPrinterTest, HandleBasicTest_04) {
-  std::vector<SourceCodeInfo> GroundTruth = {};
-  GroundTruthCollector GroundTruthPrinter = {GroundTruth, GroundTruth.size()};
-  doAnalysisTest("simple_cpp_dbg.ll", GroundTruthPrinter);
+  GroundTruth[15] = {"8"};
+  GroundTruthCollector GroundTruthPrinter = {GroundTruth};
+  doAnalysisTest("xtaint01_cpp.ll", GroundTruthPrinter, std::monostate{});
 }
 
 // main function for the test case

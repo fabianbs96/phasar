@@ -181,8 +181,6 @@ IDETypeStateAnalysis::IDETypeStateAnalysis(const LLVMProjectIRDB *IRDB,
       TSD(TSD), PT(PT) {
   assert(TSD != nullptr);
   assert(PT);
-  // IDETabulationProblem<IDETypeStateAnalysisDomain>::setAnalysisPrinter(
-  //     &TSPrinter);
 }
 
 // Start formulating our analysis by specifying the parts required for IFDS

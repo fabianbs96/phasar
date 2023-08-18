@@ -131,8 +131,6 @@ public:
   void emitTextReport(const SolverResults<n_t, d_t, l_t> &SR,
                       llvm::raw_ostream &OS = llvm::outs()) override;
 
-  // AnalysisPrinter<IDETypeStateAnalysisDomain> TSPrinter;
-
 private:
   const TypeStateDescription *TSD{};
   std::map<const llvm::Value *, LLVMAliasInfo::AliasSetTy> AliasCache;

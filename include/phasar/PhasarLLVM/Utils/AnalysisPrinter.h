@@ -49,7 +49,7 @@ public:
 
       OS << "\nAt IR statement: " << psr::nToString(Iter.Instr) << "\n";
 
-      OS << "Fact: " << psr::dToString(Iter.Fact) << "\n";
+      OS << "\tFact: " << psr::dToString(Iter.Fact) << "\n";
 
       if constexpr (std::is_same_v<typename AnalysisDomainTy::l_t,
                                    BinaryDomain>) {
