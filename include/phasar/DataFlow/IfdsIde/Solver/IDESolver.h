@@ -44,6 +44,7 @@
 
 #include "nlohmann/json.hpp"
 
+#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -52,6 +53,8 @@
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
+
+#include <nlohmann/json_fwd.hpp>
 
 namespace psr {
 
@@ -82,7 +85,8 @@ public:
       : IDEProblem(Problem), ZeroValue(Problem.getZeroValue()), ICF(ICF),
         SolverConfig(Problem.getIFDSIDESolverConfig()),
         CachedFlowEdgeFunctions(Problem), AllTop(Problem.allTopFunction()),
-        JumpFn(std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>()),
+        //        JumpFn(std::make_shared<JumpFunctions<AnalysisDomainTy,
+        //        Container>>()),
         Seeds(Problem.initialSeeds()) {
     assert(ICF != nullptr);
   }
@@ -500,6 +504,7 @@ protected:
     PAMM_GET_INSTANCE;
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
+    auto JumpFn = loadJumpFunctions();
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
       auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
       if (!LookupResults) {
@@ -588,6 +593,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG,
                          "   Target D: " << DToString(Edge.factAtTarget())));
 
+    auto JumpFn = loadJumpFunctions();
+
     auto FwdLookupRes =
         JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
     if (FwdLookupRes) {
@@ -666,6 +673,7 @@ protected:
   // should be made a callable at some point
   void valueComputationTask(const std::vector<n_t> &Values) {
     PAMM_GET_INSTANCE;
+    auto JumpFn = loadJumpFunctions();
     for (n_t n : Values) {
       for (n_t SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
         using TableCell = typename Table<d_t, d_t, EdgeFunction<l_t>>::Cell;
@@ -813,6 +821,8 @@ protected:
     }
     printEndSummaryTab();
     printIncomingTab();
+
+    auto JumpFn = loadJumpFunctions();
     // for each incoming call edge already processed
     //(see processCall(..))
     for (const auto &Entry : Inc) {
@@ -1045,6 +1055,7 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
+    auto JumpFn = loadJumpFunctions();
     EdgeFunction<l_t> JumpFnE = [&]() {
       const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
       if (RevLookupResult) {
@@ -1698,6 +1709,70 @@ private:
     return consumeSolverResults();
   }
 
+  /*
+  d_t SourceVal, n_t Target, d_t TargetVal,
+                   EdgeFunction<l_t> EdgeFunc
+  */
+
+  d_t stringToVal(const std::string &Str) {
+    d_t Test;
+    return Test;
+  }
+
+  n_t stringToTarget(const std::string &Str) {
+    n_t Test;
+    return Test;
+  }
+
+  EdgeFunction<l_t> stringToEdgeFunction(const std::string &Str) {
+    EdgeFunction<l_t> Test;
+    return Test;
+  }
+
+  std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
+  loadJumpFunctions() {
+    nlohmann::json File(PathToJumpFunctionsFile);
+    auto JumpFn =
+        (std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>());
+    JumpFn->addFunction(
+        stringToVal(File["JumpFunctions"]["SourceVal"]),
+        stringToTarget(File["JumpFunctions"]["Target"]),
+        stringToVal(File["JumpFunctions"]["TargetVal"]),
+        stringToEdgeFunction(File["JumpFunctions"]["EdgeFunc"]));
+
+    return std::move(JumpFn);
+  }
+
+  /*
+    TODO:
+    Bessere und effizientere Methode, um Daten zu laden und speichern.
+    Vielleicht im Konstruktor von IDESolver einen JSON file stream öffnen und im
+    Destruktor schließen?
+
+    Serialization in IDESolverSerialization verschieben
+  */
+
+  void
+  serializeJumpFunctions(JumpFunctions<AnalysisDomainTy, Container> JumpFn) {
+    /*
+      TODO:
+    */
+  }
+
+  template <typename Data> void saveDataInJSON(Data D) {
+    nlohmann::json JSON(PathToJumpFunctionsFile);
+
+    if (std::is_same<Data, JumpFunctions<AnalysisDomainTy, Container>>::value) {
+      serializeJumpFunctions(D);
+    } else {
+      PHASAR_LOG_LEVEL(ERROR, "Template type not recognized!");
+    }
+
+    std::ofstream FileStream;
+    FileStream << JSON;
+    FileStream.close();
+  }
+
   /// -- Data members
 
   IDETabulationProblem<AnalysisDomainTy, Container> &IDEProblem;
@@ -1718,7 +1793,9 @@ private:
 
   EdgeFunction<l_t> AllTop;
 
-  std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
+  // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
+
+  const std::string PathToJumpFunctionsFile = "phasar/DataFlow/IfdsIde/Solver/";
 
   std::map<std::tuple<n_t, d_t, n_t, d_t>, std::vector<EdgeFunction<l_t>>>
       IntermediateEdgeFunctions;
