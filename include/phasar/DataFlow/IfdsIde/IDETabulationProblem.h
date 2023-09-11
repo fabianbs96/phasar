@@ -18,7 +18,7 @@
 #include "phasar/DataFlow/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/DefaultAnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/NullAnalysisPrinter.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Printer.h"
@@ -69,7 +69,9 @@ public:
     assert(IRDB != nullptr);
   }
 
-  void setAnalysisPrinter(AnalysisPrinter<AnalysisDomainTy> *P) { Printer = P; }
+  void setAnalysisPrinter(DefaultAnalysisPrinter<AnalysisDomainTy> *P) {
+    Printer = P;
+  }
 
   virtual ~IDETabulationProblem() = default;
 
@@ -160,7 +162,7 @@ protected:
 
   [[maybe_unused]] Soundness SF = Soundness::Soundy;
 
-  AnalysisPrinter<AnalysisDomainTy> *Printer;
+  AnalysisPrinterBase<AnalysisDomainTy> *Printer;
 };
 
 } // namespace psr

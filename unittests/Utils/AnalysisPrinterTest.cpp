@@ -1,5 +1,3 @@
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
@@ -8,6 +6,7 @@
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
+#include "phasar/PhasarLLVM/Utils/DefaultAnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
@@ -25,7 +24,7 @@ using CallBackPairTy = std::pair<IDEExtendedTaintAnalysis<>::config_callback_t,
 
 // Use template to variate between Typesate and Taint analysis
 class GroundTruthCollector
-    : public AnalysisPrinter<IDEExtendedTaintAnalysisDomain> {
+    : public DefaultAnalysisPrinter<IDEExtendedTaintAnalysisDomain> {
 public:
   // constructor init Groundtruth in each fixture
   GroundTruthCollector(map<int, set<string>> &GroundTruth)

@@ -13,8 +13,6 @@
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 
 #include "llvm/IR/InstrTypes.h"
 

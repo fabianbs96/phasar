@@ -1,12 +1,12 @@
 #ifndef PHASAR_PHASARLLVM_UTILS_NULLANALYSISPRINTER_H
 #define PHASAR_PHASARLLVM_UTILS_NULLANALYSISPRINTER_H
 
-#include "phasar/PhasarLLVM/Utils/AnalysisPrinter.h"
+#include "phasar/PhasarLLVM/Utils/AnalysisPrinterBase.h"
 
 namespace psr {
 
 template <typename AnalysisDomainTy>
-class NullAnalysisPrinter : public AnalysisPrinter<AnalysisDomainTy> {
+class NullAnalysisPrinter final : public AnalysisPrinterBase<AnalysisDomainTy> {
 public:
   static NullAnalysisPrinter *getInstance() {
     static auto Instance = NullAnalysisPrinter();
