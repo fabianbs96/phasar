@@ -13,6 +13,7 @@
 #include "TestConfig.h"
 #include "gtest/gtest.h"
 
+#include <llvm/ADT/DenseMap.h>
 #include <nlohmann/json.hpp>
 
 using namespace std;
@@ -27,29 +28,26 @@ class GroundTruthCollector
     : public DefaultAnalysisPrinter<IDEExtendedTaintAnalysisDomain> {
 public:
   // constructor init Groundtruth in each fixture
-  GroundTruthCollector(map<int, set<string>> &GroundTruth)
+  GroundTruthCollector(llvm::DenseMap<int, set<string>> &GroundTruth)
       : GroundTruth(GroundTruth){};
 
-  void findAndRemove(std::map<int, std::set<std::string>> &Map1,
-                     std::map<int, std::set<std::string>> &Map2) {
-    std::vector<int> KeysToRemove;
-    for (const auto &Entry : Map1) {
-      auto Iter = Map2.find(Entry.first);
-      if (Iter != Map2.end() && Iter->second == Entry.second) {
-        KeysToRemove.push_back(Entry.first);
+  void findAndRemove(llvm::DenseMap<int, std::set<std::string>> &Map1,
+                     llvm::DenseMap<int, std::set<std::string>> &Map2) {
+    for (auto Entry = Map1.begin(); Entry != Map1.end();) {
+      auto Iter = Map2.find(Entry->first);
+      if (Iter != Map2.end() && Iter->second == Entry->second) {
+        Map2.erase(Iter);
       }
-    }
-    for (const auto &Key : KeysToRemove) {
-      Map2.erase(Key);
+      ++Entry;
     }
   }
 
   void onResult(Warnings<IDEExtendedTaintAnalysisDomain> War) override {
-    map<int, set<string>> FoundLeak;
+    llvm::DenseMap<int, set<string>> FoundLeak;
     int SinkId = stoi(getMetaDataID(War.Instr));
     set<string> LeakedValueIds;
     LeakedValueIds.insert(getMetaDataID((War.Fact)->base()));
-    FoundLeak.emplace(SinkId, LeakedValueIds);
+    FoundLeak.try_emplace(SinkId, LeakedValueIds);
     findAndRemove(FoundLeak, GroundTruth);
   }
 
@@ -58,7 +56,7 @@ public:
   }
 
 private:
-  map<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, set<string>> GroundTruth;
 };
 
 class AnalysisPrinterTest : public ::testing::Test {
@@ -100,7 +98,7 @@ protected:
 /* ============== BASIC TESTS ============== */
 
 TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
-  map<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, set<string>> GroundTruth;
   GroundTruth[7] = {"0"};
 
   json Config = R"!({
@@ -133,7 +131,7 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
 }
 
 TEST_F(AnalysisPrinterTest, XTaint01) {
-  map<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, set<string>> GroundTruth;
 
   GroundTruth[15] = {"8"};
   GroundTruthCollector GroundTruthPrinter = {GroundTruth};
