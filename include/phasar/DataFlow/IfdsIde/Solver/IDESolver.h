@@ -38,6 +38,7 @@
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
+#include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -1749,27 +1750,28 @@ private:
       }
   */
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
-  loadJumpFunctions() {
-    nlohmann::json JSON(PathToJumpFunctionsFile);
-    auto JumpFn =
-        (std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>());
+  loadJumpFunctions(const llvm::Twine &PathToJSONs) {
+    auto JSON = readJsonFile(PathToJSONs);
+    auto ReturnContainer =
+        std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>();
+
     if (!JSON.contains("JumpFunctions")) {
       return;
     }
-    auto JSONJumpFn = JSON["JumpFunctions"];
-    for (int Index = 0; JSONJumpFn.contains("Function" + std::to_string(Index));
+
+    auto JumpFn = JSON["JumpFunctions"];
+    for (int Index = 0; JumpFn.contains("Function" + std::to_string(Index));
          Index++) {
-      auto JSONJumpFnFunction = JSONJumpFn["Function" + std::to_string(Index)];
+      auto CurrentFn = JumpFn["Function" + std::to_string(Index)];
       for (int InnerIndex = 0;
-           JSONJumpFnFunction.contains("Function" + std::to_string(InnerIndex));
+           CurrentFn.contains("Function" + std::to_string(InnerIndex));
            InnerIndex++) {
-        JumpFn->addFunction(
-            stringToVal(JSONJumpFnFunction["d_t"]),
-            stringToTarget(JSONJumpFnFunction["n_t"]),
-            stringToVal(
-                JSONJumpFnFunction["vec" + std::to_string(InnerIndex)].at(0)),
+        ReturnContainer->addFunction(
+            stringToVal(CurrentFn["d_t"]), stringToTarget(CurrentFn["n_t"]),
+            stringToVal(CurrentFn["vec" + std::to_string(InnerIndex)].at(0)),
+            // TODO: check if this works correctly
             stringToEdgeFunction(
-                JSONJumpFnFunction["vec" + std::to_string(InnerIndex)].at(1)));
+                CurrentFn["vec" + std::to_string(InnerIndex)].at(1)));
       }
     }
 
@@ -1788,10 +1790,11 @@ private:
     // TODO:
   }
 
-  // std::set<n_t> UnbalancedRetSites;
-  std::set<n_t> loadUnbalancedRetSites(const llvm::Twine &PathToJSONs) {
+  // std::set<n_t> UnbalancedRetSites
+  std::shared_ptr<std::set<n_t>>
+  loadUnbalancedRetSites(const llvm::Twine &PathToJSONs) {
     auto File = readJsonFile(PathToJSONs);
-    std::set<n_t> ToReturn;
+    std::shared_ptr<std::set<n_t>> ToReturn = std::make_shared<std::set<n_t>>();
 
     size_t NumberOfSites = File.count("UnbalancedRetSites");
 
@@ -1803,20 +1806,12 @@ private:
         break;
       }
 
-      // TODO:
-      // ToReturn.insert(StringToN(File[UnbalancedRetSites +
-      // std::to_string(Index)]));
+      ToReturn.insert(
+          stringToVal(File[UnbalancedRetSites + std::to_string(Index)]));
     }
 
-    return ToReturn;
+    return std::move(ToReturn);
   }
-
-  /*
-    TODO:
-    Bessere und effizientere Methode, um Daten zu laden und speichern.
-    Vielleicht im Konstruktor von IDESolver einen JSON file stream öffnen und im
-    Destruktor schließen?
-  */
 
   // JumpFunctions<AnalysisDomainTy, Container> &JumpFn
   void saveDataInJSON(
@@ -1834,11 +1829,10 @@ private:
       JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
 
       size_t InnerIndex = 0;
-      // add the vector of pairs
+      // add each l_t of the EdgeFunctions of the vector. The d_t is the same as
+      // the first one (I think...)
       for (const auto &Element : Row.at(2)) {
-        JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
-            .push_back(DToString(Element.at(0)));
-        JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
+        JSON["JumpFunctions"][CurrentName]["l_t" + std::to_string(InnerIndex)]
             .push_back(to_string(Element.at(1)));
       }
       Index++;
@@ -1859,15 +1853,20 @@ private:
       const std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
           &WorkListToSave,
       const std::string &PathToJSON) {
+    size_t Index = 0;
     for (const auto &Item : WorkListToSave) {
       nlohmann::json JSON;
 
-      // serialize PathEdge
-      /*
-        TODO: check iff PathEdge can be stringified by to_string
-        Für PathEdge Triple abspeichern
-      */
+      // TODO: double check if this actually is correct, or if instead of
+      // NToString etc, we have to go over the MetadataToString serialization
+      // way
+      JSON["PathEdge"][std::to_string(Index)]["n_t"] =
+          NToString(Item.first.first);
+      JSON["PathEdge"][std::to_string(Index)]["d_t"] =
+          DToString(Item.first.second);
+      JSON["PathEdge"][std::to_string(Index)]["l_t"] = LToString(Item.second);
 
+      Index++;
       std::error_code EC;
       llvm::raw_fd_ostream FileStream(PathToJSON, EC);
       if (EC) {
@@ -1891,6 +1890,8 @@ private:
       std::string CurrentRowName = "Row" + std::to_string(Index);
       JSON["EndsummaryTab"][CurrentRowName]["n_t"] = NToString(Row.at(0));
       JSON["EndsummaryTab"][CurrentRowName]["d_t"] = DToString(Row.at(1));
+      // TODO: check if EdgeFunction serialization is correct here (it probably
+      // isn't)
       JSON["EndsummaryTab"][CurrentRowName]["EdgeFunction"] =
           to_string(Row.at(2));
       Index++;
@@ -1905,25 +1906,23 @@ private:
     FileStream << JSON;
   }
 
-  void
-  serializeJumpFunctions(JumpFunctions<AnalysisDomainTy, Container> JumpFn) {
-    /*
-      TODO: implement
-    */
-  }
+  // std::set<n_t> UnbalancedRetSites
+  void saveDataInJSON(std::set<n_t> UnbalancedRetSitesToSave,
+                      const std::string &PathToJSON) {
+    nlohmann::json JSON;
 
-  template <typename Data> void saveDataInJSON(Data D) {
-    nlohmann::json JSON(PathToJumpFunctionsFile);
-
-    if (std::is_same<Data, JumpFunctions<AnalysisDomainTy, Container>>::value) {
-      serializeJumpFunctions(D);
-    } else {
-      PHASAR_LOG_LEVEL(ERROR, "Template type not recognized!");
+    // TODO:
+    for (const auto &Curr : UnbalancedRetSitesToSave) {
+      JSON["UnbalancedRetSites"].push_back(NToString(Curr));
     }
 
-    std::ofstream FileStream;
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
     FileStream << JSON;
-    FileStream.close();
   }
 
   /// -- Data members
