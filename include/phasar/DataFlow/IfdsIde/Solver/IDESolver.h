@@ -33,8 +33,10 @@
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/Utils/DOTGraph.h"
+#include "phasar/Utils/IO.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Logger.h"
+#include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/Utilities.h"
@@ -1728,19 +1730,85 @@ private:
     EdgeFunction<l_t> Test;
     return Test;
   }
+  /*
+  for (const auto &Row : JumpFunctionsToSave.NonEmptyForwardLookup) {
+        std::string CurrentName = "Function" + std::to_string(Index);
 
+        JSON["JumpFunctions"][CurrentName]["d_t"] = DToString(Row.at(0));
+        JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
+
+        size_t InnerIndex = 0;
+        // add the vector of pairs
+        for (const auto &Element : Row.at(2)) {
+          JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
+              .push_back(DToString(Element.at(0)));
+          JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
+              .push_back(to_string(Element.at(1)));
+        }
+        Index++;
+      }
+  */
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
   loadJumpFunctions() {
-    nlohmann::json File(PathToJumpFunctionsFile);
+    nlohmann::json JSON(PathToJumpFunctionsFile);
     auto JumpFn =
         (std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>());
-    JumpFn->addFunction(
-        stringToVal(File["JumpFunctions"]["SourceVal"]),
-        stringToTarget(File["JumpFunctions"]["Target"]),
-        stringToVal(File["JumpFunctions"]["TargetVal"]),
-        stringToEdgeFunction(File["JumpFunctions"]["EdgeFunc"]));
+    if (!JSON.contains("JumpFunctions")) {
+      return;
+    }
+    auto JSONJumpFn = JSON["JumpFunctions"];
+    for (int Index = 0; JSONJumpFn.contains("Function" + std::to_string(Index));
+         Index++) {
+      auto JSONJumpFnFunction = JSONJumpFn["Function" + std::to_string(Index)];
+      for (int InnerIndex = 0;
+           JSONJumpFnFunction.contains("Function" + std::to_string(InnerIndex));
+           InnerIndex++) {
+        JumpFn->addFunction(
+            stringToVal(JSONJumpFnFunction["d_t"]),
+            stringToTarget(JSONJumpFnFunction["n_t"]),
+            stringToVal(
+                JSONJumpFnFunction["vec" + std::to_string(InnerIndex)].at(0)),
+            stringToEdgeFunction(
+                JSONJumpFnFunction["vec" + std::to_string(InnerIndex)].at(1)));
+      }
+    }
 
     return std::move(JumpFn);
+  }
+
+  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> loadWorkList() {
+    // TODO:
+  }
+
+  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> loadEndsummaryTab() {
+    // TODO:
+  }
+
+  Table<n_t, d_t, std::map<n_t, Container>> loadIncomingTab() {
+    // TODO:
+  }
+
+  // std::set<n_t> UnbalancedRetSites;
+  std::set<n_t> loadUnbalancedRetSites(const llvm::Twine &PathToJSONs) {
+    auto File = readJsonFile(PathToJSONs);
+    std::set<n_t> ToReturn;
+
+    size_t NumberOfSites = File.count("UnbalancedRetSites");
+
+    for (int Index = 0; Index < NumberOfSites; Index++) {
+
+      if (File.find(UnbalancedRetSites + std::to_string(Index)) == File.end()) {
+        PHASAR_LOG_LEVEL(WARNING, "Counted: " + std::to_string(NumberOfSites) +
+                                      " Found: " + std::to_string(Index))
+        break;
+      }
+
+      // TODO:
+      // ToReturn.insert(StringToN(File[UnbalancedRetSites +
+      // std::to_string(Index)]));
+    }
+
+    return ToReturn;
   }
 
   /*
@@ -1748,9 +1816,94 @@ private:
     Bessere und effizientere Methode, um Daten zu laden und speichern.
     Vielleicht im Konstruktor von IDESolver einen JSON file stream öffnen und im
     Destruktor schließen?
-
-    Serialization in IDESolverSerialization verschieben
   */
+
+  // JumpFunctions<AnalysisDomainTy, Container> &JumpFn
+  void saveDataInJSON(
+      JumpFunctions<AnalysisDomainTy, Container> &JumpFunctionsToSave,
+      const std::string &PathToJSON) {
+    nlohmann::json JSON;
+
+    size_t Index = 0;
+    // Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>,
+    // 1>>
+    for (const auto &Row : JumpFunctionsToSave.NonEmptyForwardLookup) {
+      std::string CurrentName = "Function" + std::to_string(Index);
+
+      JSON["JumpFunctions"][CurrentName]["d_t"] = DToString(Row.at(0));
+      JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
+
+      size_t InnerIndex = 0;
+      // add the vector of pairs
+      for (const auto &Element : Row.at(2)) {
+        JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
+            .push_back(DToString(Element.at(0)));
+        JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
+            .push_back(to_string(Element.at(1)));
+      }
+      Index++;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
+  }
+
+  // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> WorkList
+  // Run loop over vector in another function
+  void saveDataInJSON(
+      const std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+          &WorkListToSave,
+      const std::string &PathToJSON) {
+    for (const auto &Item : WorkListToSave) {
+      nlohmann::json JSON;
+
+      // serialize PathEdge
+      /*
+        TODO: check iff PathEdge can be stringified by to_string
+        Für PathEdge Triple abspeichern
+      */
+
+      std::error_code EC;
+      llvm::raw_fd_ostream FileStream(PathToJSON, EC);
+      if (EC) {
+        PHASAR_LOG_LEVEL(ERROR, EC.message());
+        return;
+      }
+      FileStream << JSON;
+    }
+  }
+
+  // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryTab
+  void saveDataInJSON(
+      Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryTabToSave,
+      const std::string &PathToJSON) {
+    nlohmann::json JSON;
+
+    // TODO: look at the foreachCell + lambda method more
+
+    size_t Index = 0;
+    for (const auto &Row : EndsummaryTabToSave) {
+      std::string CurrentRowName = "Row" + std::to_string(Index);
+      JSON["EndsummaryTab"][CurrentRowName]["n_t"] = NToString(Row.at(0));
+      JSON["EndsummaryTab"][CurrentRowName]["d_t"] = DToString(Row.at(1));
+      JSON["EndsummaryTab"][CurrentRowName]["EdgeFunction"] =
+          to_string(Row.at(2));
+      Index++;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
+  }
 
   void
   serializeJumpFunctions(JumpFunctions<AnalysisDomainTy, Container> JumpFn) {
