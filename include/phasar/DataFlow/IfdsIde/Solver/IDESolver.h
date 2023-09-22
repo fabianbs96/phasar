@@ -1752,12 +1752,14 @@ private:
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
   loadJumpFunctions(const llvm::Twine &PathToJSONs) {
     auto JSON = readJsonFile(PathToJSONs);
-    auto ReturnContainer =
-        std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>();
 
     if (!JSON.contains("JumpFunctions")) {
-      return;
+      return std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>(
+          nullptr);
     }
+
+    auto ReturnContainer =
+        std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>();
 
     auto JumpFn = JSON["JumpFunctions"];
     for (int Index = 0; JumpFn.contains("Function" + std::to_string(Index));
@@ -1775,26 +1777,97 @@ private:
       }
     }
 
-    return std::move(JumpFn);
+    return std::move(ReturnContainer);
   }
 
-  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> loadWorkList() {
-    // TODO:
+  std::shared_ptr<std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>>
+  loadWorkList(const llvm::Twine &PathToJSONs) {
+    auto JSON = readJsonFile(PathToJSONs);
+
+    if (!JSON.contains("WorkList")) {
+      return std::shared_ptr<
+          std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>>(
+          nullptr);
+    }
+
+    // TODO: deduce size of worklist and initialize vector with it
+    std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+        ReturnContainer;
+
+    for (const auto &Curr : JSON["WorkList"]) {
+      ReturnContainer.push_back(
+          std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>(
+              PathEdge<n_t, d_t>(Curr["n_t"], Curr["d_t"]),
+              EdgeFunction<l_t>(Curr["l_t"])));
+    }
+
+    return std::move(ReturnContainer);
   }
 
-  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> loadEndsummaryTab() {
-    // TODO:
+  std::shared_ptr<Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>
+  loadEndsummaryTab(const llvm::Twine &PathToJSONs) {
+    auto JSON = readJsonFile(PathToJSONs);
+
+    if (!JSON.contains("EndsummaryTab")) {
+      return std::shared_ptr<
+          Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>(nullptr);
+    }
+
+    auto ReturnContainer =
+        std::make_shared<Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>();
+
+    for (const auto &Curr : JSON["EndsummaryTab"]) {
+      auto NVal = Curr["n_t"];
+      auto DVal = Curr["d_t"];
+
+      Table<n_t, d_t, EdgeFunction<l_t>> InnerTable;
+
+      for (const auto &InnerCurr : Curr["Table"]) {
+        // TODO: fix below
+        InnerTable.insert(InnerCurr["n_t"], InnerCurr["d_t"], InnerCurr["l_t"]);
+      }
+
+      ReturnContainer.insert(NVal, DVal, InnerTable);
+    }
+
+    return std::move(ReturnContainer);
   }
 
-  Table<n_t, d_t, std::map<n_t, Container>> loadIncomingTab() {
-    // TODO:
+  std::shared_ptr<Table<n_t, d_t, std::map<n_t, Container>>>
+  loadIncomingTab(const llvm::Twine &PathToJSONs) {
+    auto JSON = readJsonFile(PathToJSONs);
+
+    if (!JSON.contains("IncomingTab")) {
+      return std::shared_ptr<Table<n_t, d_t, std::map<n_t, Container>>>(
+          nullptr);
+    }
+
+    auto ReturnContainer =
+        std::make_shared<Table<n_t, d_t, std::map<n_t, Container>>>();
+
+    for (const auto &Curr : JSON["IncomingTab"]) {
+      auto NVal = Curr["n_t"];
+      auto DVal = Curr["d_t"];
+
+      std::map<n_t, Container> InnerMap;
+
+      for (const auto &InnerCurr : Curr["Table"]) {
+        // TODO: fix below
+        InnerMap.insert(InnerCurr["n_t"], InnerCurr["Container"]);
+      }
+
+      ReturnContainer.insert(NVal, DVal, InnerMap);
+    }
+
+    return std::move(ReturnContainer);
   }
 
   // std::set<n_t> UnbalancedRetSites
   std::shared_ptr<std::set<n_t>>
   loadUnbalancedRetSites(const llvm::Twine &PathToJSONs) {
     auto File = readJsonFile(PathToJSONs);
-    std::shared_ptr<std::set<n_t>> ToReturn = std::make_shared<std::set<n_t>>();
+    std::shared_ptr<std::set<n_t>> ReturnContainer =
+        std::make_shared<std::set<n_t>>();
 
     size_t NumberOfSites = File.count("UnbalancedRetSites");
 
@@ -1806,11 +1879,11 @@ private:
         break;
       }
 
-      ToReturn.insert(
+      ReturnContainer.insert(
           stringToVal(File[UnbalancedRetSites + std::to_string(Index)]));
     }
 
-    return std::move(ToReturn);
+    return std::move(ReturnContainer);
   }
 
   // JumpFunctions<AnalysisDomainTy, Container> &JumpFn
