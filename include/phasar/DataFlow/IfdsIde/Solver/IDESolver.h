@@ -32,22 +32,23 @@
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/DOTGraph.h"
-#include "phasar/Utils/IO.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
-#include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "nlohmann/json.hpp"
 
-#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -56,8 +57,6 @@
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
-
-#include <nlohmann/json_fwd.hpp>
 
 namespace psr {
 
@@ -88,8 +87,7 @@ public:
       : IDEProblem(Problem), ZeroValue(Problem.getZeroValue()), ICF(ICF),
         SolverConfig(Problem.getIFDSIDESolverConfig()),
         CachedFlowEdgeFunctions(Problem), AllTop(Problem.allTopFunction()),
-        //        JumpFn(std::make_shared<JumpFunctions<AnalysisDomainTy,
-        //        Container>>()),
+        JumpFn(std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>()),
         Seeds(Problem.initialSeeds()) {
     assert(ICF != nullptr);
   }
@@ -260,6 +258,78 @@ public:
   consumeSolverResults() noexcept(std::is_nothrow_move_constructible_v<d_t>) {
     return OwningSolverResults<n_t, d_t, l_t>(std::move(this->ValTab),
                                               std::move(ZeroValue));
+  }
+
+  std::string JumpFnJSONPath = "phasar/DataFlow/IfdsIde/Solver/IDESolverData/";
+
+  void saveDataToJSON(
+      const std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
+          JumpFunctionsToSave) {
+
+    /*
+      "Function1": [
+        "n_t": ...,
+        "d_t": ...,
+        "EdgeFn": [
+          {
+            "l_t1": ...,
+            "l_t2": ...,
+          }
+        ]
+      ],
+      "Function2": [
+        ...
+      ],
+      ...
+    */
+
+    // Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+    //      NonEmptyReverseLookup;
+
+    // get n_t
+    // get d_t
+    // MetadataIDTo... for EdgeFunctions
+    // Put into it's own JSON
+    // AllBottom and EdgeIdentity
+    nlohmann::json JSON;
+
+    size_t Index = 0;
+    // Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>,
+    // 1>>
+    for (const auto &Row : JumpFunctionsToSave.NonEmptyForwardLookup) {
+      std::string CurrentName = "Function" + std::to_string(Index);
+
+      JSON["JumpFunctions"][CurrentName]["d_t"] = DToString(Row.at(0));
+      JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
+
+      size_t InnerIndex = 0;
+      // add each l_t of the EdgeFunctions of the vector. The d_t is the same as
+      // the first one (I think...)
+      for (const auto &Element : Row.at(2).at(1)) {
+        if (auto EdgeID = llvm::dyn_cast<EdgeIdentity<l_t>>(Element)) {
+          JSON["JumpFunctions"][CurrentName]["l_t" + std::to_string(InnerIndex)]
+              .push_back(getMetaDataID(EdgeID));
+          continue;
+        }
+
+        if (auto AllBt = llvm::dyn_cast<AllBottom<l_t>>(Element)) {
+          JSON["JumpFunctions"][CurrentName]["l_t" + std::to_string(InnerIndex)]
+              .push_back(getMetaDataID(AllBt));
+          continue;
+        }
+
+        // in case that a cast to EdgeIdentity or AllBottom isn't possible
+      }
+      Index++;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(JumpFnJSONPath, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
   }
 
 protected:
@@ -507,7 +577,6 @@ protected:
     PAMM_GET_INSTANCE;
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
-    auto JumpFn = loadJumpFunctions();
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
       auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
       if (!LookupResults) {
@@ -596,8 +665,6 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG,
                          "   Target D: " << DToString(Edge.factAtTarget())));
 
-    auto JumpFn = loadJumpFunctions();
-
     auto FwdLookupRes =
         JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
     if (FwdLookupRes) {
@@ -676,7 +743,6 @@ protected:
   // should be made a callable at some point
   void valueComputationTask(const std::vector<n_t> &Values) {
     PAMM_GET_INSTANCE;
-    auto JumpFn = loadJumpFunctions();
     for (n_t n : Values) {
       for (n_t SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
         using TableCell = typename Table<d_t, d_t, EdgeFunction<l_t>>::Cell;
@@ -824,8 +890,6 @@ protected:
     }
     printEndSummaryTab();
     printIncomingTab();
-
-    auto JumpFn = loadJumpFunctions();
     // for each incoming call edge already processed
     //(see processCall(..))
     for (const auto &Entry : Inc) {
@@ -1058,7 +1122,6 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
-    auto JumpFn = loadJumpFunctions();
     EdgeFunction<l_t> JumpFnE = [&]() {
       const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
       if (RevLookupResult) {
@@ -1712,292 +1775,6 @@ private:
     return consumeSolverResults();
   }
 
-  /*
-  d_t SourceVal, n_t Target, d_t TargetVal,
-                   EdgeFunction<l_t> EdgeFunc
-  */
-
-  d_t stringToVal(const std::string &Str) {
-    d_t Test;
-    return Test;
-  }
-
-  n_t stringToTarget(const std::string &Str) {
-    n_t Test;
-    return Test;
-  }
-
-  EdgeFunction<l_t> stringToEdgeFunction(const std::string &Str) {
-    EdgeFunction<l_t> Test;
-    return Test;
-  }
-  /*
-  for (const auto &Row : JumpFunctionsToSave.NonEmptyForwardLookup) {
-        std::string CurrentName = "Function" + std::to_string(Index);
-
-        JSON["JumpFunctions"][CurrentName]["d_t"] = DToString(Row.at(0));
-        JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
-
-        size_t InnerIndex = 0;
-        // add the vector of pairs
-        for (const auto &Element : Row.at(2)) {
-          JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
-              .push_back(DToString(Element.at(0)));
-          JSON["JumpFunctions"][CurrentName]["vec" + std::to_string(InnerIndex)]
-              .push_back(to_string(Element.at(1)));
-        }
-        Index++;
-      }
-  */
-  std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
-  loadJumpFunctions(const llvm::Twine &PathToJSONs) {
-    auto JSON = readJsonFile(PathToJSONs);
-
-    if (!JSON.contains("JumpFunctions")) {
-      return std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>(
-          nullptr);
-    }
-
-    auto ReturnContainer =
-        std::make_shared<JumpFunctions<AnalysisDomainTy, Container>>();
-
-    auto JumpFn = JSON["JumpFunctions"];
-    for (int Index = 0; JumpFn.contains("Function" + std::to_string(Index));
-         Index++) {
-      auto CurrentFn = JumpFn["Function" + std::to_string(Index)];
-      for (int InnerIndex = 0;
-           CurrentFn.contains("Function" + std::to_string(InnerIndex));
-           InnerIndex++) {
-        ReturnContainer->addFunction(
-            stringToVal(CurrentFn["d_t"]), stringToTarget(CurrentFn["n_t"]),
-            stringToVal(CurrentFn["vec" + std::to_string(InnerIndex)].at(0)),
-            // TODO: check if this works correctly
-            stringToEdgeFunction(
-                CurrentFn["vec" + std::to_string(InnerIndex)].at(1)));
-      }
-    }
-
-    return std::move(ReturnContainer);
-  }
-
-  std::shared_ptr<std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>>
-  loadWorkList(const llvm::Twine &PathToJSONs) {
-    auto JSON = readJsonFile(PathToJSONs);
-
-    if (!JSON.contains("WorkList")) {
-      return std::shared_ptr<
-          std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>>(
-          nullptr);
-    }
-
-    // TODO: deduce size of worklist and initialize vector with it
-    std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
-        ReturnContainer;
-
-    for (const auto &Curr : JSON["WorkList"]) {
-      ReturnContainer.push_back(
-          std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>(
-              PathEdge<n_t, d_t>(Curr["n_t"], Curr["d_t"]),
-              EdgeFunction<l_t>(Curr["l_t"])));
-    }
-
-    return std::move(ReturnContainer);
-  }
-
-  std::shared_ptr<Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>
-  loadEndsummaryTab(const llvm::Twine &PathToJSONs) {
-    auto JSON = readJsonFile(PathToJSONs);
-
-    if (!JSON.contains("EndsummaryTab")) {
-      return std::shared_ptr<
-          Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>(nullptr);
-    }
-
-    auto ReturnContainer =
-        std::make_shared<Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>();
-
-    for (const auto &Curr : JSON["EndsummaryTab"]) {
-      auto NVal = Curr["n_t"];
-      auto DVal = Curr["d_t"];
-
-      Table<n_t, d_t, EdgeFunction<l_t>> InnerTable;
-
-      for (const auto &InnerCurr : Curr["Table"]) {
-        // TODO: fix below
-        InnerTable.insert(InnerCurr["n_t"], InnerCurr["d_t"], InnerCurr["l_t"]);
-      }
-
-      ReturnContainer.insert(NVal, DVal, InnerTable);
-    }
-
-    return std::move(ReturnContainer);
-  }
-
-  std::shared_ptr<Table<n_t, d_t, std::map<n_t, Container>>>
-  loadIncomingTab(const llvm::Twine &PathToJSONs) {
-    auto JSON = readJsonFile(PathToJSONs);
-
-    if (!JSON.contains("IncomingTab")) {
-      return std::shared_ptr<Table<n_t, d_t, std::map<n_t, Container>>>(
-          nullptr);
-    }
-
-    auto ReturnContainer =
-        std::make_shared<Table<n_t, d_t, std::map<n_t, Container>>>();
-
-    for (const auto &Curr : JSON["IncomingTab"]) {
-      auto NVal = Curr["n_t"];
-      auto DVal = Curr["d_t"];
-
-      std::map<n_t, Container> InnerMap;
-
-      for (const auto &InnerCurr : Curr["Table"]) {
-        // TODO: fix below
-        InnerMap.insert(InnerCurr["n_t"], InnerCurr["Container"]);
-      }
-
-      ReturnContainer.insert(NVal, DVal, InnerMap);
-    }
-
-    return std::move(ReturnContainer);
-  }
-
-  // std::set<n_t> UnbalancedRetSites
-  std::shared_ptr<std::set<n_t>>
-  loadUnbalancedRetSites(const llvm::Twine &PathToJSONs) {
-    auto File = readJsonFile(PathToJSONs);
-    std::shared_ptr<std::set<n_t>> ReturnContainer =
-        std::make_shared<std::set<n_t>>();
-
-    size_t NumberOfSites = File.count("UnbalancedRetSites");
-
-    for (int Index = 0; Index < NumberOfSites; Index++) {
-
-      if (File.find(UnbalancedRetSites + std::to_string(Index)) == File.end()) {
-        PHASAR_LOG_LEVEL(WARNING, "Counted: " + std::to_string(NumberOfSites) +
-                                      " Found: " + std::to_string(Index))
-        break;
-      }
-
-      ReturnContainer.insert(
-          stringToVal(File[UnbalancedRetSites + std::to_string(Index)]));
-    }
-
-    return std::move(ReturnContainer);
-  }
-
-  // JumpFunctions<AnalysisDomainTy, Container> &JumpFn
-  void saveDataInJSON(
-      JumpFunctions<AnalysisDomainTy, Container> &JumpFunctionsToSave,
-      const std::string &PathToJSON) {
-    nlohmann::json JSON;
-
-    size_t Index = 0;
-    // Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>,
-    // 1>>
-    for (const auto &Row : JumpFunctionsToSave.NonEmptyForwardLookup) {
-      std::string CurrentName = "Function" + std::to_string(Index);
-
-      JSON["JumpFunctions"][CurrentName]["d_t"] = DToString(Row.at(0));
-      JSON["JumpFunctions"][CurrentName]["n_t"] = NToString(Row.at(1));
-
-      size_t InnerIndex = 0;
-      // add each l_t of the EdgeFunctions of the vector. The d_t is the same as
-      // the first one (I think...)
-      for (const auto &Element : Row.at(2)) {
-        JSON["JumpFunctions"][CurrentName]["l_t" + std::to_string(InnerIndex)]
-            .push_back(to_string(Element.at(1)));
-      }
-      Index++;
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-    FileStream << JSON;
-  }
-
-  // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> WorkList
-  // Run loop over vector in another function
-  void saveDataInJSON(
-      const std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
-          &WorkListToSave,
-      const std::string &PathToJSON) {
-    size_t Index = 0;
-    for (const auto &Item : WorkListToSave) {
-      nlohmann::json JSON;
-
-      // TODO: double check if this actually is correct, or if instead of
-      // NToString etc, we have to go over the MetadataToString serialization
-      // way
-      JSON["PathEdge"][std::to_string(Index)]["n_t"] =
-          NToString(Item.first.first);
-      JSON["PathEdge"][std::to_string(Index)]["d_t"] =
-          DToString(Item.first.second);
-      JSON["PathEdge"][std::to_string(Index)]["l_t"] = LToString(Item.second);
-
-      Index++;
-      std::error_code EC;
-      llvm::raw_fd_ostream FileStream(PathToJSON, EC);
-      if (EC) {
-        PHASAR_LOG_LEVEL(ERROR, EC.message());
-        return;
-      }
-      FileStream << JSON;
-    }
-  }
-
-  // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryTab
-  void saveDataInJSON(
-      Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryTabToSave,
-      const std::string &PathToJSON) {
-    nlohmann::json JSON;
-
-    // TODO: look at the foreachCell + lambda method more
-
-    size_t Index = 0;
-    for (const auto &Row : EndsummaryTabToSave) {
-      std::string CurrentRowName = "Row" + std::to_string(Index);
-      JSON["EndsummaryTab"][CurrentRowName]["n_t"] = NToString(Row.at(0));
-      JSON["EndsummaryTab"][CurrentRowName]["d_t"] = DToString(Row.at(1));
-      // TODO: check if EdgeFunction serialization is correct here (it probably
-      // isn't)
-      JSON["EndsummaryTab"][CurrentRowName]["EdgeFunction"] =
-          to_string(Row.at(2));
-      Index++;
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-    FileStream << JSON;
-  }
-
-  // std::set<n_t> UnbalancedRetSites
-  void saveDataInJSON(std::set<n_t> UnbalancedRetSitesToSave,
-                      const std::string &PathToJSON) {
-    nlohmann::json JSON;
-
-    // TODO:
-    for (const auto &Curr : UnbalancedRetSitesToSave) {
-      JSON["UnbalancedRetSites"].push_back(NToString(Curr));
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(PathToJSON, EC);
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-    FileStream << JSON;
-  }
-
   /// -- Data members
 
   IDETabulationProblem<AnalysisDomainTy, Container> &IDEProblem;
@@ -2018,9 +1795,7 @@ private:
 
   EdgeFunction<l_t> AllTop;
 
-  // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
-
-  const std::string PathToJumpFunctionsFile = "phasar/DataFlow/IfdsIde/Solver/";
+  std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
 
   std::map<std::tuple<n_t, d_t, n_t, d_t>, std::vector<EdgeFunction<l_t>>>
       IntermediateEdgeFunctions;
