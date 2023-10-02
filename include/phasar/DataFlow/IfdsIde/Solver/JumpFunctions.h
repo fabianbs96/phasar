@@ -43,6 +43,12 @@ public:
   using d_t = typename AnalysisDomainTy::d_t;
   using n_t = typename AnalysisDomainTy::n_t;
 
+  const Table<n_t, d_t,
+              llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>> &
+  getNonEmptyReverseLookup() {
+    return NonEmptyReverseLookup;
+  }
+
 protected:
   // mapping from target node and value to a list of all source values and
   // associated functions where the list is implemented as a mapping from
