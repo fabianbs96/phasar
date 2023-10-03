@@ -261,8 +261,8 @@ public:
                                               std::move(ZeroValue));
   }
 
-  // TODO: check if path is valid / folder exists
-  std::string TestPath = "PathToJSON";
+  // TODO: check if path is valid / folder exists before usage
+  std::string TestPathJumpFn = "PathToJSON";
 
   // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
   // Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
@@ -301,7 +301,134 @@ public:
     }
 
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TestPath, EC);
+    llvm::raw_fd_ostream FileStream(TestPathJumpFn, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
+  }
+
+  // TODO: check if path is valid / folder exists before usage
+  std::string TestPathWorkList = "PathToJSON";
+
+  // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+  void
+  saveDataInJSON(std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+                     WorkListToSave) {
+
+    std::vector<std::string> PathEdge_MDID;
+    std::vector<std::string> EdgeFn_MDID;
+
+    for (const auto &Curr : WorkListToSave) {
+      PathEdge_MDID.insert(getMetaDataID(Curr.at(0)));
+      EdgeFn_MDID.insert(getMetaDataID(Curr.at(1)));
+    }
+
+    nlohmann::json JSON;
+
+    // TODO: check that PathEdge and EdgeFn_MDID have the same size
+    // TODO: do checks before using [Index] operator, so that segfaults are
+    // caught
+    for (size_t Index = 0; Index < PathEdge_MDID.size(); Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      JSON[CurrentName]["PathEdge"] = PathEdge_MDID[Index];
+      JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TestPathWorkList, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
+  }
+
+  // TODO: check if path is valid / folder exists before usage
+  std::string TestPathEndsummary = "PathToJSON";
+
+  // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
+  void saveDataInJSON(
+      Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToSave) {
+
+    std::vector<std::string> n_t_s;
+    std::vector<std::string> d_t_s;
+    std::vector<std::string> EdgeFn_MDID;
+
+    const Table<n_t, d_t,
+                llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+        &EndsummaryTable = EndsummaryToSave->getNonEmptyReverseLookup();
+
+    EndsummaryTable.foreachCell(
+        [this, &n_t_s, &d_t_s, &EdgeFn_MDID](const auto &Row, const auto &Col,
+                                             const auto &Val) {
+          n_t_s.insert(IDEProblem.NtoString(Row));
+          d_t_s.insert(IDEProblem.DtoString(Col));
+          EdgeFn_MDID.insert(getMetaDataID(Val));
+        });
+
+    nlohmann::json JSON;
+
+    // TODO: check that n_t_s d_t_s and EdgeFn_MDID have the same size
+    // TODO: do checks before using [Index] operator, so that segfaults are
+    // caught
+    // IDEA: maybe use another loop structure
+    for (size_t Index = 0; Index < n_t_s.size(); Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      JSON[CurrentName]["d_t"] = d_t_s[Index];
+      JSON[CurrentName]["n_t"] = n_t_s[Index];
+      JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TestPathEndsummary, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+    FileStream << JSON;
+  }
+
+  // TODO: check if path is valid / folder exists before usage
+  std::string TestPathIncomingTab = "PathToJSON";
+
+  // Table<n_t, d_t, std::map<n_t, Container>>
+  void
+  saveDataInJSON(Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToSave) {
+
+    std::vector<std::string> n_t_s;
+    std::vector<std::string> d_t_s;
+    std::vector<std::pair<std::string, std::string>> mapEntries;
+
+    const Table<n_t, d_t,
+                llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+        &IncomingTabTable = IncomingTabToSave->getNonEmptyReverseLookup();
+
+    IncomingTabTable.foreachCell([this, &n_t_s, &d_t_s,
+                                  &mapEntries](const auto &Row, const auto &Col,
+                                               const auto &Val) {
+      n_t_s.insert(IDEProblem.NtoString(Row));
+      d_t_s.insert(IDEProblem.DtoString(Col));
+      mapEntries.insert({IDEProblem.NtoString(Val[0]), getMetaDataID(Val[1])});
+    });
+
+    nlohmann::json JSON;
+
+    // TODO: check that n_t_s d_t_s and EdgeFn_MDID have the same size
+    // TODO: do checks before using [Index] operator, so that segfaults are
+    // caught
+    // IDEA: maybe use another loop structure
+    for (size_t Index = 0; Index < n_t_s.size(); Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      JSON[CurrentName]["d_t"] = d_t_s[Index];
+      JSON[CurrentName]["n_t"] = n_t_s[Index];
+      JSON[CurrentName]["map1"] = mapEntries[Index].first;
+      JSON[CurrentName]["map2"] = mapEntries[Index].second;
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TestPathIncomingTab, EC);
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
@@ -312,7 +439,7 @@ public:
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
   getJumpFunctions() {
     std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFnToReturn;
-    nlohmann::json JSON = readJsonFile(TestPath);
+    nlohmann::json JSON = readJsonFile(TestPathJumpFn);
 
     for (int Index = 0; JSON.contains("Function" + std::to_string(Index));
          Index++) {
@@ -326,6 +453,80 @@ public:
     }
 
     return JumpFnToReturn;
+  }
+
+  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> getWorkList() {
+    std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+        WorkListToReturn;
+    nlohmann::json JSON = readJsonFile(TestPathWorkList);
+
+    // for (size_t Index = 0; Index < PathEdge_MDID.size(); Index++) {
+    //   std::string CurrentName = "Entry" + std::to_string(Index);
+    //   JSON[CurrentName]["PathEdge"] = PathEdge_MDID[Index];
+    //   JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
+    // }
+
+    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      auto CurrPathEdge = JSON[CurrentName]["PathEdge"];
+      auto CurrEdgeFn = JSON[CurrentName]["EdgeFn"];
+      WorkListToReturn.insert(CurrPathEdge, CurrEdgeFn);
+    }
+
+    return std::move(WorkListToReturn);
+  }
+
+  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> getEndsummary() {
+    Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToReturn;
+    nlohmann::json JSON = readJsonFile(TestPathEndsummary);
+
+    // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
+    //   std::string CurrentName = "Entry" + std::to_string(Index);
+    //   JSON[CurrentName]["d_t"] = d_t_s[Index];
+    //   JSON[CurrentName]["n_t"] = n_t_s[Index];
+    //   JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
+    // }
+
+    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      auto n_t_val = JSON[CurrentName]["n_t"];
+      auto d_t_val = JSON[CurrentName]["d_t"];
+      auto EdgeFn_val = JSON[CurrentName]["EdgeFn"];
+
+      // TODO: check if this works
+      EndsummaryToReturn->insert(d_t_val, n_t_val, EdgeFn_val);
+    }
+
+    return std::move(EndsummaryToReturn);
+  }
+
+  Table<n_t, d_t, std::map<n_t, Container>> getIncomingTab() {
+    Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToReturn;
+    nlohmann::json JSON = readJsonFile(TestPathIncomingTab);
+
+    // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
+    //   std::string CurrentName = "Entry" + std::to_string(Index);
+    //   JSON[CurrentName]["d_t"] = d_t_s[Index];
+    //   JSON[CurrentName]["n_t"] = n_t_s[Index];
+    //   JSON[CurrentName]["map1"] = mapEntries[Index].first;
+    //   JSON[CurrentName]["map2"] = mapEntries[Index].second;
+    // }
+
+    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      auto n_t_val = JSON[CurrentName]["n_t"];
+      auto d_t_val = JSON[CurrentName]["d_t"];
+      auto map1_val = JSON[CurrentName]["map1"];
+      auto map2_val = JSON[CurrentName]["map2"];
+
+      // TODO: check if this works!
+      IncomingTabToReturn->insert(d_t_val, n_t_val, {map1_val, map2_val});
+    }
+
+    return std::move(IncomingTabToReturn);
   }
 
 protected:
