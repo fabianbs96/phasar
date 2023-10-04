@@ -68,21 +68,19 @@ protected:
                  std::variant<std::monostate, json *, CallBackPairTy> Config) {
     HelperAnalyses Helpers(PathToLlFiles + IRFile, EntryPoints);
 
-    auto TConfig =
-        std::visit(Overloaded{[&](std::monostate) {
-                                return LLVMTaintConfig(
-                                    Helpers.getProjectIRDB());
-                              },
-                              [&](json *JS) {
-                                auto Ret = LLVMTaintConfig(
-                                    Helpers.getProjectIRDB(), *JS);
-                                return Ret;
-                              },
-                              [&](CallBackPairTy &&CB) {
-                                return LLVMTaintConfig(std::move(CB.first),
-                                                       std::move(CB.second));
-                              }},
-                   std::move(Config));
+    auto TConfig = std::visit(
+        Overloaded{[&](std::monostate) {
+                     return LLVMTaintConfig(Helpers.getProjectIRDB());
+                   },
+                   [&](json *JS) {
+                     auto Ret = LLVMTaintConfig(Helpers.getProjectIRDB(), *JS);
+                     return Ret;
+                   },
+                   [&](CallBackPairTy &&CB) {
+                     return LLVMTaintConfig(std::move(CB.first),
+                                            std::move(CB.second));
+                   }},
+        std::move(Config));
 
     auto TaintProblem = createAnalysisProblem<IDEExtendedTaintAnalysis<>>(
         Helpers, TConfig, EntryPoints);
