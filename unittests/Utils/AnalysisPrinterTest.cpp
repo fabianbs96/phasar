@@ -16,7 +16,6 @@
 #include <llvm/ADT/DenseMap.h>
 #include <nlohmann/json.hpp>
 
-using namespace std;
 using namespace psr;
 using json = nlohmann::json;
 
@@ -28,7 +27,7 @@ class GroundTruthCollector
     : public DefaultAnalysisPrinter<IDEExtendedTaintAnalysisDomain> {
 public:
   // constructor init Groundtruth in each fixture
-  GroundTruthCollector(llvm::DenseMap<int, set<string>> &GroundTruth)
+  GroundTruthCollector(llvm::DenseMap<int, std::set<std::string>> &GroundTruth)
       : GroundTruth(GroundTruth){};
 
   void findAndRemove(llvm::DenseMap<int, std::set<std::string>> &Map1,
@@ -43,9 +42,9 @@ public:
   }
 
   void onResult(Warnings<IDEExtendedTaintAnalysisDomain> War) override {
-    llvm::DenseMap<int, set<string>> FoundLeak;
+    llvm::DenseMap<int, std::set<std::string>> FoundLeak;
     int SinkId = stoi(getMetaDataID(War.Instr));
-    set<string> LeakedValueIds;
+    std::set<std::string> LeakedValueIds;
     LeakedValueIds.insert(getMetaDataID((War.Fact)->base()));
     FoundLeak.try_emplace(SinkId, LeakedValueIds);
     findAndRemove(FoundLeak, GroundTruth);
@@ -56,7 +55,7 @@ public:
   }
 
 private:
-  llvm::DenseMap<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, std::set<std::string>> GroundTruth{};
 };
 
 class AnalysisPrinterTest : public ::testing::Test {
@@ -67,15 +66,16 @@ protected:
   void
   doAnalysisTest(llvm::StringRef IRFile, GroundTruthCollector &GTPrinter,
                  std::variant<std::monostate, json *, CallBackPairTy> Config) {
-    HelperAnalyses HA(PathToLlFiles + IRFile, EntryPoints);
+    HelperAnalyses Helpers(PathToLlFiles + IRFile, EntryPoints);
 
-    auto TC =
+    auto TConfig =
         std::visit(Overloaded{[&](std::monostate) {
-                                return LLVMTaintConfig(HA.getProjectIRDB());
+                                return LLVMTaintConfig(
+                                    Helpers.getProjectIRDB());
                               },
                               [&](json *JS) {
-                                auto Ret =
-                                    LLVMTaintConfig(HA.getProjectIRDB(), *JS);
+                                auto Ret = LLVMTaintConfig(
+                                    Helpers.getProjectIRDB(), *JS);
                                 return Ret;
                               },
                               [&](CallBackPairTy &&CB) {
@@ -84,11 +84,11 @@ protected:
                               }},
                    std::move(Config));
 
-    auto TaintProblem =
-        createAnalysisProblem<IDEExtendedTaintAnalysis<>>(HA, TC, EntryPoints);
+    auto TaintProblem = createAnalysisProblem<IDEExtendedTaintAnalysis<>>(
+        Helpers, TConfig, EntryPoints);
 
     TaintProblem.setAnalysisPrinter(&GTPrinter);
-    IDESolver Solver(TaintProblem, &HA.getICFG());
+    IDESolver Solver(TaintProblem, &Helpers.getICFG());
     Solver.solve();
 
     TaintProblem.emitTextReport(Solver.getSolverResults());
@@ -98,7 +98,7 @@ protected:
 /* ============== BASIC TESTS ============== */
 
 TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
-  llvm::DenseMap<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, std::set<std::string>> GroundTruth;
   GroundTruth[7] = {"0"};
 
   json Config = R"!({
@@ -131,7 +131,7 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
 }
 
 TEST_F(AnalysisPrinterTest, XTaint01) {
-  llvm::DenseMap<int, set<string>> GroundTruth;
+  llvm::DenseMap<int, std::set<std::string>> GroundTruth;
 
   GroundTruth[15] = {"8"};
   GroundTruthCollector GroundTruthPrinter = {GroundTruth};
