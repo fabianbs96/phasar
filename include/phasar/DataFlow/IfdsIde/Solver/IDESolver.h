@@ -32,6 +32,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/DOTGraph.h"
 #include "phasar/Utils/IO.h"
@@ -261,128 +262,118 @@ public:
                                               std::move(ZeroValue));
   }
 
-  // TODO: check if path is valid / folder exists before usage
-  std::string TestPathJumpFn = "PathToJSON";
-
   // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
   // Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
   //    NonEmptyReverseLookup;
-  void
-  saveDataInJSON(std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
-                     JumpFnToSave) {
-
-    std::vector<std::string> n_t_s;
-    std::vector<std::string> d_t_s;
-    std::vector<std::string> EdgeFn_MDID;
-
-    const Table<n_t, d_t,
-                llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
-        &JumpFnTable = JumpFnToSave->getNonEmptyReverseLookup();
-
-    JumpFnTable.foreachCell(
-        [this, &n_t_s, &d_t_s, &EdgeFn_MDID](const auto &Row, const auto &Col,
-                                             const auto &Val) {
-          n_t_s.insert(IDEProblem.NtoString(Row));
-          d_t_s.insert(IDEProblem.DtoString(Col));
-          EdgeFn_MDID.insert(getMetaDataID(Val));
-        });
+  void saveDataInJSON(
+      std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFnToSave,
+      const std::string &Path) {
 
     nlohmann::json JSON;
+    size_t Index = 0;
+    const auto &JumpFnTable = JumpFnToSave->getNonEmptyReverseLookup();
 
-    // TODO: check that n_t_s d_t_s and EdgeFn_MDID have the same size
-    // TODO: do checks before using [Index] operator, so that segfaults are
-    // caught
-    // IDEA: maybe use another loop structure
-    for (size_t Index = 0; Index < n_t_s.size(); Index++) {
-      std::string CurrentName = "Function" + std::to_string(Index);
-      JSON[CurrentName]["d_t"] = d_t_s[Index];
-      JSON[CurrentName]["n_t"] = n_t_s[Index];
-      JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
-    }
+    JumpFnTable.foreachCell([this, &JSON, &Index](const auto &Row,
+                                                  const auto &Col,
+                                                  const auto &Val) {
+      std::string CurrentName = "Function" + std::to_string(Index++);
+      JSON[CurrentName]["d_t"] = getMetaDataID(Row);
+      JSON[CurrentName]["n_t"] = getMetaDataID(Col);
+
+      // EdgeFunction serialization
+      if (llvm::isa<AllBottom<l_t>>(Val)) {
+        JSON[CurrentName]["EdgeFn"] = "AllBottom";
+      } else if (llvm::isa<EdgeIdentity<l_t>>(Val)) {
+        JSON[CurrentName]["EdgeFn"] = "EdgeIdentity";
+      } else {
+        llvm::errs() << "ERROR: unknown case\n";
+        abort();
+      }
+    });
 
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TestPathJumpFn, EC);
+    llvm::raw_fd_ostream FileStream(Path, EC);
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }
     FileStream << JSON;
   }
-
-  // TODO: check if path is valid / folder exists before usage
-  std::string TestPathWorkList = "PathToJSON";
 
   // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
   void
   saveDataInJSON(std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
-                     WorkListToSave) {
-
-    std::vector<std::string> PathEdge_MDID;
-    std::vector<std::string> EdgeFn_MDID;
-
-    for (const auto &Curr : WorkListToSave) {
-      PathEdge_MDID.insert(getMetaDataID(Curr.at(0)));
-      EdgeFn_MDID.insert(getMetaDataID(Curr.at(1)));
-    }
+                     WorkListToSave,
+                 const std::string &Path) {
 
     nlohmann::json JSON;
+    size_t Index = 0;
 
-    // TODO: check that PathEdge and EdgeFn_MDID have the same size
-    // TODO: do checks before using [Index] operator, so that segfaults are
-    // caught
-    for (size_t Index = 0; Index < PathEdge_MDID.size(); Index++) {
-      std::string CurrentName = "Entry" + std::to_string(Index);
-      JSON[CurrentName]["PathEdge"] = PathEdge_MDID[Index];
-      JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
+    for (const auto &Curr : WorkListToSave) {
+      std::string CurrentName = "Entry" + std::to_string(Index++);
+
+      // PathEdge serialization
+      auto PathEdgeParams = Curr.first.get();
+      auto PathEdgeFirst = getMetaDataID(PathEdgeParams.first);
+      auto PathEdgeSecond = getMetaDataID(PathEdgeParams.second);
+      auto PathEdgeThird = getMetaDataID(PathEdgeParams.third);
+
+      JSON[CurrentName]["PathEdge"]["DSource"] = PathEdgeFirst;
+      JSON[CurrentName]["PathEdge"]["Target"] = PathEdgeSecond;
+      JSON[CurrentName]["PathEdge"]["DTarget"] = PathEdgeThird;
+
+      // EdgeFunction serialization
+      if (llvm::isa<AllBottom<l_t>>(Curr.second)) {
+        JSON[CurrentName]["EdgeFn"] = "AllBottom";
+        continue;
+      }
+
+      if (llvm::isa<EdgeIdentity<l_t>>(Curr.second)) {
+        JSON[CurrentName]["EdgeFn"] = "EdgeIdentity";
+        continue;
+      }
+
+      llvm::errs() << "ERROR: unknown case\n";
+      abort();
     }
 
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TestPathWorkList, EC);
+    llvm::raw_fd_ostream FileStream(Path, EC);
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }
     FileStream << JSON;
   }
-
-  // TODO: check if path is valid / folder exists before usage
-  std::string TestPathEndsummary = "PathToJSON";
 
   // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
   void saveDataInJSON(
-      Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToSave) {
-
-    std::vector<std::string> n_t_s;
-    std::vector<std::string> d_t_s;
-    std::vector<std::string> EdgeFn_MDID;
-
-    const Table<n_t, d_t,
-                llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
-        &EndsummaryTable = EndsummaryToSave->getNonEmptyReverseLookup();
-
-    EndsummaryTable.foreachCell(
-        [this, &n_t_s, &d_t_s, &EdgeFn_MDID](const auto &Row, const auto &Col,
-                                             const auto &Val) {
-          n_t_s.insert(IDEProblem.NtoString(Row));
-          d_t_s.insert(IDEProblem.DtoString(Col));
-          EdgeFn_MDID.insert(getMetaDataID(Val));
-        });
-
+      Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToSave,
+      const std::string &Path) {
     nlohmann::json JSON;
+    size_t Index = 0;
+    const auto &EndsummaryTable = EndsummaryToSave->getNonEmptyReverseLookup();
 
-    // TODO: check that n_t_s d_t_s and EdgeFn_MDID have the same size
-    // TODO: do checks before using [Index] operator, so that segfaults are
-    // caught
-    // IDEA: maybe use another loop structure
-    for (size_t Index = 0; Index < n_t_s.size(); Index++) {
-      std::string CurrentName = "Entry" + std::to_string(Index);
-      JSON[CurrentName]["d_t"] = d_t_s[Index];
-      JSON[CurrentName]["n_t"] = n_t_s[Index];
-      JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
-    }
+    EndsummaryTable.foreachCell([this, &JSON, &Index](const auto &Row,
+                                                      const auto &Col,
+                                                      const auto &Val) {
+      std::string CurrentName = "Entry" + std::to_string(Index++);
+      JSON[CurrentName]["d_t"] = getMetaDataID(Row);
+      JSON[CurrentName]["n_t"] = getMetaDataID(Col);
+
+      // EdgeFunction serialization
+      if (llvm::isa<AllBottom<l_t>>(Val)) {
+        JSON[CurrentName]["EdgeFn"] = "AllBottom";
+      } else if (llvm::isa<EdgeIdentity<l_t>>(Val)) {
+        JSON[CurrentName]["EdgeFn"] = "EdgeIdentity";
+      } else {
+        llvm::errs() << "ERROR: unknown case\n";
+        abort();
+      }
+    });
 
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TestPathEndsummary, EC);
+    llvm::raw_fd_ostream FileStream(Path, EC);
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
@@ -390,45 +381,36 @@ public:
     FileStream << JSON;
   }
 
-  // TODO: check if path is valid / folder exists before usage
-  std::string TestPathIncomingTab = "PathToJSON";
-
   // Table<n_t, d_t, std::map<n_t, Container>>
   void
-  saveDataInJSON(Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToSave) {
+  saveDataInJSON(Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToSave,
+                 const std::string &Path) {
+    nlohmann::json JSON;
+    size_t Index = 0;
+    const auto &IncomingTabTable =
+        IncomingTabToSave->getNonEmptyReverseLookup();
 
-    std::vector<std::string> n_t_s;
-    std::vector<std::string> d_t_s;
-    std::vector<std::pair<std::string, std::string>> mapEntries;
+    IncomingTabTable.foreachCell([this, &JSON, &Index](const auto &Row,
+                                                       const auto &Col,
+                                                       const auto &Val) {
+      std::string CurrentName = "Entry" + std::to_string(Index++);
+      JSON[CurrentName]["n_t"] = getMetaDataID(Row);
+      JSON[CurrentName]["d_t"] = getMetaDataID(Col);
 
-    const Table<n_t, d_t,
-                llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
-        &IncomingTabTable = IncomingTabToSave->getNonEmptyReverseLookup();
+      size_t MapIndex = 0;
+      for (const auto &Curr : Val) {
+        std::string MapEntryName = "map" + std::to_string(MapIndex++);
+        JSON[CurrentName][MapEntryName]["n_t"] = getMetaDataID(Curr.first);
 
-    IncomingTabTable.foreachCell([this, &n_t_s, &d_t_s,
-                                  &mapEntries](const auto &Row, const auto &Col,
-                                               const auto &Val) {
-      n_t_s.insert(IDEProblem.NtoString(Row));
-      d_t_s.insert(IDEProblem.DtoString(Col));
-      mapEntries.insert({IDEProblem.NtoString(Val[0]), getMetaDataID(Val[1])});
+        for (const auto &ContainerElement : Curr.second) {
+          JSON[CurrentName][MapEntryName]["d_t"].push_back(
+              getMetaDataID(ContainerElement));
+        }
+      }
     });
 
-    nlohmann::json JSON;
-
-    // TODO: check that n_t_s d_t_s and EdgeFn_MDID have the same size
-    // TODO: do checks before using [Index] operator, so that segfaults are
-    // caught
-    // IDEA: maybe use another loop structure
-    for (size_t Index = 0; Index < n_t_s.size(); Index++) {
-      std::string CurrentName = "Entry" + std::to_string(Index);
-      JSON[CurrentName]["d_t"] = d_t_s[Index];
-      JSON[CurrentName]["n_t"] = n_t_s[Index];
-      JSON[CurrentName]["map1"] = mapEntries[Index].first;
-      JSON[CurrentName]["map2"] = mapEntries[Index].second;
-    }
-
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TestPathIncomingTab, EC);
+    llvm::raw_fd_ostream FileStream(Path, EC);
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
@@ -437,9 +419,9 @@ public:
   }
 
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
-  getJumpFunctions() {
+  getJumpFunctions(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFnToReturn;
-    nlohmann::json JSON = readJsonFile(TestPathJumpFn);
+    nlohmann::json JSON = readJsonFile(Path);
 
     for (int Index = 0; JSON.contains("Function" + std::to_string(Index));
          Index++) {
@@ -455,7 +437,8 @@ public:
     return JumpFnToReturn;
   }
 
-  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> getWorkList() {
+  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+  getWorkList(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
         WorkListToReturn;
     nlohmann::json JSON = readJsonFile(TestPathWorkList);
@@ -477,7 +460,8 @@ public:
     return std::move(WorkListToReturn);
   }
 
-  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> getEndsummary() {
+  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
+  getEndsummary(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToReturn;
     nlohmann::json JSON = readJsonFile(TestPathEndsummary);
 
@@ -502,7 +486,8 @@ public:
     return std::move(EndsummaryToReturn);
   }
 
-  Table<n_t, d_t, std::map<n_t, Container>> getIncomingTab() {
+  Table<n_t, d_t, std::map<n_t, Container>>
+  getIncomingTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToReturn;
     nlohmann::json JSON = readJsonFile(TestPathIncomingTab);
 
