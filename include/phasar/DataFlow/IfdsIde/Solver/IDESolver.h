@@ -441,7 +441,7 @@ public:
   getWorkList(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
         WorkListToReturn;
-    nlohmann::json JSON = readJsonFile(TestPathWorkList);
+    nlohmann::json JSON = readJsonFile(Path);
 
     // for (size_t Index = 0; Index < PathEdge_MDID.size(); Index++) {
     //   std::string CurrentName = "Entry" + std::to_string(Index);
@@ -463,7 +463,7 @@ public:
   Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
   getEndsummary(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToReturn;
-    nlohmann::json JSON = readJsonFile(TestPathEndsummary);
+    nlohmann::json JSON = readJsonFile(Path);
 
     // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
     //   std::string CurrentName = "Entry" + std::to_string(Index);
@@ -489,7 +489,7 @@ public:
   Table<n_t, d_t, std::map<n_t, Container>>
   getIncomingTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToReturn;
-    nlohmann::json JSON = readJsonFile(TestPathIncomingTab);
+    nlohmann::json JSON = readJsonFile(Path);
 
     // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
     //   std::string CurrentName = "Entry" + std::to_string(Index);
