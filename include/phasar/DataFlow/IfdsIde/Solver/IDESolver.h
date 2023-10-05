@@ -277,13 +277,14 @@ public:
                                                   const auto &Col,
                                                   const auto &Val) {
       std::string CurrentName = "Function" + std::to_string(Index++);
-      JSON[CurrentName]["d_t"] = getMetaDataID(Row);
-      JSON[CurrentName]["n_t"] = getMetaDataID(Col);
+      JSON[CurrentName]["SourceVal"] = getMetaDataID(Row);
+      JSON[CurrentName]["Target"] = getMetaDataID(Col);
+      JSON[CurrentName]["TargetVal"] = getMetaDataID(Val.first);
 
       // EdgeFunction serialization
-      if (llvm::isa<AllBottom<l_t>>(Val)) {
+      if (llvm::isa<AllBottom<l_t>>(Val.second)) {
         JSON[CurrentName]["EdgeFn"] = "AllBottom";
-      } else if (llvm::isa<EdgeIdentity<l_t>>(Val)) {
+      } else if (llvm::isa<EdgeIdentity<l_t>>(Val.second)) {
         JSON[CurrentName]["EdgeFn"] = "EdgeIdentity";
       } else {
         llvm::errs() << "ERROR: unknown case\n";
@@ -358,18 +359,26 @@ public:
                                                       const auto &Col,
                                                       const auto &Val) {
       std::string CurrentName = "Entry" + std::to_string(Index++);
-      JSON[CurrentName]["d_t"] = getMetaDataID(Row);
       JSON[CurrentName]["n_t"] = getMetaDataID(Col);
+      JSON[CurrentName]["d_t"] = getMetaDataID(Row);
 
-      // EdgeFunction serialization
-      if (llvm::isa<AllBottom<l_t>>(Val)) {
-        JSON[CurrentName]["EdgeFn"] = "AllBottom";
-      } else if (llvm::isa<EdgeIdentity<l_t>>(Val)) {
-        JSON[CurrentName]["EdgeFn"] = "EdgeIdentity";
-      } else {
-        llvm::errs() << "ERROR: unknown case\n";
-        abort();
-      }
+      size_t InnerIndex = 0;
+      Val.foreachCell([this, &JSON, &CurrentName, &InnerIndex](
+                          const auto &Row, const auto &Col, const auto &Val) {
+        std::string InnerName = "InnerEntry" + std::to_string(InnerIndex++);
+        JSON[CurrentName]["InnerTable"][InnerName]["n_t"] = getMetaDataID(Col);
+        JSON[CurrentName]["InnerTable"][InnerName]["d_t"] = getMetaDataID(Row);
+
+        // EdgeFunction serialization
+        if (llvm::isa<AllBottom<l_t>>(Val.second)) {
+          JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"] = "AllBottom";
+        } else if (llvm::isa<EdgeIdentity<l_t>>(Val.second)) {
+          JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"] = "EdgeIdentity";
+        } else {
+          llvm::errs() << "ERROR: unknown case\n";
+          abort();
+        }
+      });
     });
 
     std::error_code EC;
@@ -418,20 +427,36 @@ public:
     FileStream << JSON;
   }
 
+  EdgeFunction<l_t> stringToEdgeFunction(const std::string &EdgeFnAsStr) {
+    if (EdgeFnAsStr == "AllBottom") {
+      return AllBottom<l_t>();
+    }
+
+    if (EdgeFnAsStr == "EdgeIdentity") {
+      return EdgeIdentity<l_t>();
+    }
+
+    llvm::errs() << "ERROR: unknown case\n";
+    abort();
+  }
+
   std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>>
   getJumpFunctions(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFnToReturn;
     nlohmann::json JSON = readJsonFile(Path);
 
-    for (int Index = 0; JSON.contains("Function" + std::to_string(Index));
+    for (size_t Index = 0; JSON.contains("Function" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Function" + std::to_string(Index);
-      auto n_t_val = JSON[CurrentName]["n_t"];
-      auto d_t_val = JSON[CurrentName]["d_t"];
-      auto EdgeFn_val = JSON[CurrentName]["EdgeFn"];
+      std::string SourceVal = JSON[CurrentName]["SourceVal"];
+      std::string Target = JSON[CurrentName]["Target"];
+      std::string TargetVal = JSON[CurrentName]["TargetVal"];
+      std::string EdgeFnStr = JSON[CurrentName]["EdgeFn"];
 
       // TODO: check if addFunction parameters are correct!
-      JumpFnToReturn->addFunction(d_t_val, n_t_val, d_t_val, EdgeFn_val);
+      JumpFnToReturn->addFunction(
+          fromMetaDataId(IRDB, SourceVal), fromMetaDataId(IRDB, Target),
+          fromMetaDataId(IRDB, TargetVal), stringToEdgeFunction(EdgeFnStr));
     }
 
     return JumpFnToReturn;
@@ -443,17 +468,20 @@ public:
         WorkListToReturn;
     nlohmann::json JSON = readJsonFile(Path);
 
-    // for (size_t Index = 0; Index < PathEdge_MDID.size(); Index++) {
-    //   std::string CurrentName = "Entry" + std::to_string(Index);
-    //   JSON[CurrentName]["PathEdge"] = PathEdge_MDID[Index];
-    //   JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
-    // }
-
-    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Entry" + std::to_string(Index);
-      auto CurrPathEdge = JSON[CurrentName]["PathEdge"];
-      auto CurrEdgeFn = JSON[CurrentName]["EdgeFn"];
+
+      std::string DSource = JSON[CurrentName]["PathEdge"]["DSource"];
+      std::string Target = JSON[CurrentName]["PathEdge"]["Target"];
+      std::string DTarget = JSON[CurrentName]["PathEdge"]["DTarget"];
+      std::string EdgeFunctionStr = JSON[CurrentName]["EdgeFn"];
+
+      PathEdge<n_t, d_t> CurrPathEdge = PathEdge<n_t, d_t>(
+          fromMetaDataId(IRDB, DSource), fromMetaDataId(IRDB, Target),
+          fromMetaDataId(IRDB, DTarget));
+      EdgeFunction<l_t> CurrEdgeFn = stringToEdgeFunction(EdgeFunctionStr);
+
       WorkListToReturn.insert(CurrPathEdge, CurrEdgeFn);
     }
 
@@ -465,22 +493,28 @@ public:
     Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> EndsummaryToReturn;
     nlohmann::json JSON = readJsonFile(Path);
 
-    // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
-    //   std::string CurrentName = "Entry" + std::to_string(Index);
-    //   JSON[CurrentName]["d_t"] = d_t_s[Index];
-    //   JSON[CurrentName]["n_t"] = n_t_s[Index];
-    //   JSON[CurrentName]["EdgeFn"] = EdgeFn_MDID[Index];
-    // }
-
-    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Entry" + std::to_string(Index);
-      auto n_t_val = JSON[CurrentName]["n_t"];
-      auto d_t_val = JSON[CurrentName]["d_t"];
-      auto EdgeFn_val = JSON[CurrentName]["EdgeFn"];
+      auto NTVal = JSON[CurrentName]["n_t"];
+      auto DTVal = JSON[CurrentName]["d_t"];
+      Table<n_t, d_t, EdgeFunction<l_t>> InnerTable;
 
-      // TODO: check if this works
-      EndsummaryToReturn->insert(d_t_val, n_t_val, EdgeFn_val);
+      for (size_t InnerIndex = 0; JSON[CurrentName]["InnerTable"].contains(
+               "InnerEntry" + std::to_string(InnerIndex));
+           InnerIndex++) {
+        std::string InnerName = "InnerEntry" + std::to_string(InnerIndex);
+
+        std::string NTId = JSON[CurrentName]["InnerTable"][InnerName]["n_t"];
+        std::string DTId = JSON[CurrentName]["InnerTable"][InnerName]["d_t"];
+
+        InnerTable.insert(
+            fromMetaDataId(IRDB, NTId), fromMetaDataId(IRDB, DTId),
+            stringToEdgeFunction(
+                JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"]));
+      }
+
+      EndsummaryToReturn->insert(DTVal, NTVal, InnerTable);
     }
 
     return std::move(EndsummaryToReturn);
@@ -491,24 +525,44 @@ public:
     Table<n_t, d_t, std::map<n_t, Container>> IncomingTabToReturn;
     nlohmann::json JSON = readJsonFile(Path);
 
-    // for (size_t Index = 0; Index < n_t_s.size(); Index++) {
-    //   std::string CurrentName = "Entry" + std::to_string(Index);
-    //   JSON[CurrentName]["d_t"] = d_t_s[Index];
-    //   JSON[CurrentName]["n_t"] = n_t_s[Index];
-    //   JSON[CurrentName]["map1"] = mapEntries[Index].first;
-    //   JSON[CurrentName]["map2"] = mapEntries[Index].second;
-    // }
+    /*
 
-    for (int Index = 0; JSON.contains("Entry" + std::to_string(Index));
+    size_t MapIndex = 0;
+      for (const auto &Curr : Val) {
+        std::string MapEntryName = "map" + std::to_string(MapIndex++);
+        JSON[CurrentName][MapEntryName]["n_t"] = getMetaDataID(Curr.first);
+
+        for (const auto &ContainerElement : Curr.second) {
+          JSON[CurrentName][MapEntryName]["d_t"].push_back(
+              getMetaDataID(ContainerElement));
+        }
+      }
+
+    */
+
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Entry" + std::to_string(Index);
-      auto n_t_val = JSON[CurrentName]["n_t"];
-      auto d_t_val = JSON[CurrentName]["d_t"];
-      auto map1_val = JSON[CurrentName]["map1"];
-      auto map2_val = JSON[CurrentName]["map2"];
+      std::string NTId = JSON[CurrentName]["n_t"];
+      std::string DTId = JSON[CurrentName]["d_t"];
 
-      // TODO: check if this works!
-      IncomingTabToReturn->insert(d_t_val, n_t_val, {map1_val, map2_val});
+      std::map<n_t, Container> MapValues;
+      for (size_t InnerIndex = 0;
+           JSON[CurrentName].contains("map" + std::to_string(InnerIndex));
+           InnerIndex++) {
+
+        std::string MapEntryName = "map" + std::to_string(InnerIndex);
+        std::string MapNT = JSON[CurrentName][MapEntryName]["n_t"];
+        Container ContainerValues;
+        for (const std::string Curr : JSON[CurrentName][MapEntryName]["d_t"]) {
+          ContainerValues.insert(fromMetaDataId(IRDB, Curr));
+        }
+
+        MapValues.insert(MapNT, ContainerValues);
+      }
+
+      IncomingTabToReturn->insert(fromMetaDataId(IRDB, NTId),
+                                  fromMetaDataId(IRDB, DTId), MapValues);
     }
 
     return std::move(IncomingTabToReturn);
