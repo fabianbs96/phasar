@@ -529,7 +529,7 @@ public:
               if (const auto *Alloca =
                       llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
                 if (Res.second == TSD->error()) {
-                  Warnings<IDETypeStateAnalysisDomain<TypeStateDescriptionTy>>
+                  Warning<IDETypeStateAnalysisDomain<TypeStateDescriptionTy>>
                       War(&I, Res.first, TSD->error());
                   // ERROR STATE DETECTED
                   this->Printer->onResult(War);
@@ -541,7 +541,7 @@ public:
               if (const auto *Alloca =
                       llvm::dyn_cast<llvm::AllocaInst>(Res.first)) {
                 if (Res.second == TSD->error()) {
-                  Warnings<IDETypeStateAnalysisDomain<TypeStateDescriptionTy>>
+                  Warning<IDETypeStateAnalysisDomain<TypeStateDescriptionTy>>
                       War(&I, Res.first, TSD->error());
                   // ERROR STATE DETECTED
                   this->Printer->onResult(War);
@@ -549,11 +549,11 @@ public:
               }
             }
           }
-
-          this->Printer->onFinalize(OS);
         }
       }
     }
+
+    this->Printer->onFinalize(OS);
   }
 
 private:

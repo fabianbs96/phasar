@@ -98,24 +98,6 @@ std::string llvmIRToShortString(const llvm::Value *V);
 [[nodiscard]] std::string llvmTypeToString(const llvm::Type *Ty,
                                            bool Shorten = false);
 
-/**
- * @brief Returns a string representation of a data-flow Value.
- */
-
-template <typename D> std::string dToString(D V);
-
-/**
- * @brief Returns a string representation of a the instruction.
- */
-
-template <typename N> std::string nToString(N V);
-
-/**
- * @brief Returns a string representation of a lattice element.
- */
-
-template <typename L> std::string lToString(L V);
-
 LLVM_DUMP_METHOD void dumpIRValue(const llvm::Value *V);
 LLVM_DUMP_METHOD void dumpIRValue(const llvm::Instruction *V);
 

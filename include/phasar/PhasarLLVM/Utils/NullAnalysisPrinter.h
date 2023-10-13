@@ -14,7 +14,7 @@ public:
   }
 
   void onInitialize() override{};
-  void onResult(Warnings<AnalysisDomainTy> /*War*/) override{};
+  void onResult(Warning<AnalysisDomainTy> /*War*/) override{};
   void onFinalize(llvm::raw_ostream & /*OS*/) const override{};
 
 private:

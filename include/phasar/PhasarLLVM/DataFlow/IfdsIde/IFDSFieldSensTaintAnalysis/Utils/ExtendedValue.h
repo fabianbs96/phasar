@@ -164,10 +164,6 @@ private:
   long CurrentVarArgIndex = -1L;
 };
 
-template <> inline std::string dToString<ExtendedValue>(ExtendedValue V) {
-  return llvmIRToString(V.getValue());
-}
-
 } // namespace psr
 
 namespace std {

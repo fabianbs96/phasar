@@ -32,7 +32,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
-#include <string>
 #include <utility>
 
 namespace psr::detail {

@@ -19,7 +19,6 @@
 #include "phasar/DataFlow/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
-#include "phasar/PhasarLLVM/Utils/DefaultAnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/NullAnalysisPrinter.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Printer.h"
@@ -85,8 +84,12 @@ public:
     assert(IRDB != nullptr);
   }
 
-  void setAnalysisPrinter(DefaultAnalysisPrinter<AnalysisDomainTy> *P) {
-    Printer = P;
+  void setAnalysisPrinter(AnalysisPrinterBase<AnalysisDomainTy> *P) {
+    if (P) {
+      Printer = P;
+    } else {
+      Printer = NullAnalysisPrinter<AnalysisDomainTy>::getInstance();
+    }
   }
 
   ~IDETabulationProblem() override = default;
@@ -123,8 +126,6 @@ public:
   [[nodiscard]] IFDSIDESolverConfig &getIFDSIDESolverConfig() noexcept {
     return SolverConfig;
   }
-
-  // TODO: Add a Printer object with default NullAnalysisPrinter and a setter
 
   /// Generates a text report of the results that is written to the specified
   /// output stream.

@@ -131,7 +131,3 @@ bool IDEIIAFlowFact::operator<(const IDEIIAFlowFact &Other) const {
 bool IDEIIAFlowFact::operator==(const llvm::Value *V) const {
   return BaseVal == V && FieldDesc.empty();
 }
-
-template <> std::string psr::dToString<IDEIIAFlowFact>(IDEIIAFlowFact /*V*/) {
-  return "";
-}

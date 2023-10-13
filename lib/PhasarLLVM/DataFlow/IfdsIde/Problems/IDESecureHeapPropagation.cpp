@@ -188,18 +188,6 @@ void IDESecureHeapPropagation::emitTextReport(
   }
 }
 
-template <> std::string dToString<SecureHeapFact>(SecureHeapFact V) {
-  switch (V) {
-  case SecureHeapFact::ZERO:
-    return "ZERO";
-  case SecureHeapFact::INITIALIZED:
-    return "INITIALIZED";
-  default:
-    assert(false && "Invalid dataflow-fact");
-    break;
-  }
-}
-
 } // namespace psr
 
 llvm::StringRef psr::DToString(SecureHeapFact Fact) noexcept {

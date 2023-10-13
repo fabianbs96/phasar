@@ -6,19 +6,16 @@
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfigData.h"
 #include "phasar/PhasarLLVM/Utils/DefaultAnalysisPrinter.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
+#include "llvm/ADT/DenseMap.h"
+
 #include "TestConfig.h"
 #include "gtest/gtest.h"
-
-#include <llvm/ADT/DenseMap.h>
-#include <nlohmann/json.hpp>
-
 using namespace psr;
-using json = nlohmann::json;
-
 using CallBackPairTy = std::pair<IDEExtendedTaintAnalysis<>::config_callback_t,
                                  IDEExtendedTaintAnalysis<>::config_callback_t>;
 
@@ -41,7 +38,7 @@ public:
     }
   }
 
-  void onResult(Warnings<IDEExtendedTaintAnalysisDomain> War) override {
+  void onResult(Warning<IDEExtendedTaintAnalysisDomain> War) override {
     llvm::DenseMap<int, std::set<std::string>> FoundLeak;
     int SinkId = stoi(getMetaDataID(War.Instr));
     std::set<std::string> LeakedValueIds;
@@ -63,16 +60,16 @@ protected:
   static constexpr auto PathToLlFiles = PHASAR_BUILD_SUBFOLDER("xtaint/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  void
-  doAnalysisTest(llvm::StringRef IRFile, GroundTruthCollector &GTPrinter,
-                 std::variant<std::monostate, json *, CallBackPairTy> Config) {
+  void doAnalysisTest(
+      llvm::StringRef IRFile, GroundTruthCollector &GTPrinter,
+      std::variant<std::monostate, TaintConfigData *, CallBackPairTy> Config) {
     HelperAnalyses Helpers(PathToLlFiles + IRFile, EntryPoints);
 
     auto TConfig = std::visit(
         Overloaded{[&](std::monostate) {
                      return LLVMTaintConfig(Helpers.getProjectIRDB());
                    },
-                   [&](json *JS) {
+                   [&](TaintConfigData *JS) {
                      auto Ret = LLVMTaintConfig(Helpers.getProjectIRDB(), *JS);
                      return Ret;
                    },
@@ -99,30 +96,18 @@ TEST_F(AnalysisPrinterTest, HandleBasicTest_01) {
   llvm::DenseMap<int, std::set<std::string>> GroundTruth;
   GroundTruth[7] = {"0"};
 
-  json Config = R"!({
-    "name": "XTaintTest",
-    "version": 1.0,
-    "functions": [
-      {
-        "file": "xtaint01.cpp",
-        "name": "main",
-        "params": {
-          "source": [
-            0
-          ]
-        }
-      },
-      {
-        "file": "xtaint01.cpp",
-        "name": "_Z5printi",
-        "params": {
-          "sink": [
-            0
-          ]
-        }
-      }
-    ]
-    })!"_json;
+  TaintConfigData Config;
+
+  FunctionData FuncDataMain;
+  FuncDataMain.Name = "main";
+  FuncDataMain.SourceValues.push_back(0);
+
+  FunctionData FuncDataPrint;
+  FuncDataPrint.Name = "_Z5printi";
+  FuncDataPrint.SinkValues.push_back(0);
+
+  Config.Functions.push_back(std::move(FuncDataMain));
+  Config.Functions.push_back(std::move(FuncDataPrint));
 
   GroundTruthCollector GroundTruthPrinter = {GroundTruth};
   doAnalysisTest("xtaint01_json_cpp_dbg.ll", GroundTruthPrinter, &Config);

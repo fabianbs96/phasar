@@ -240,15 +240,6 @@ std::string llvmTypeToString(const llvm::Type *Ty, bool Shorten) {
   return IRBuffer;
 }
 
-template <> std::string dToString<const llvm::Value *>(const llvm::Value *V) {
-  return llvmIRToString(V);
-}
-
-template <>
-std::string nToString<const llvm::Instruction *>(const llvm::Instruction *V) {
-  return llvmIRToString(V);
-}
-
 void dumpIRValue(const llvm::Value *V) {
   llvm::outs() << llvmIRToString(V) << '\n';
 }

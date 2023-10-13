@@ -4,6 +4,7 @@
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/PhasarLLVM/Utils/AnalysisPrinterBase.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Printer.h"
 
 #include <optional>
 #include <type_traits>
@@ -16,7 +17,7 @@ class DefaultAnalysisPrinter : public AnalysisPrinterBase<AnalysisDomainTy> {
   using l_t = typename AnalysisDomainTy::l_t;
 
 public:
-  virtual ~DefaultAnalysisPrinter() = default;
+  ~DefaultAnalysisPrinter() override = default;
   DefaultAnalysisPrinter() = default;
 
   DefaultAnalysisPrinter(const DefaultAnalysisPrinter &) = delete;
@@ -25,20 +26,20 @@ public:
   DefaultAnalysisPrinter(DefaultAnalysisPrinter &&) = delete;
   DefaultAnalysisPrinter &operator=(DefaultAnalysisPrinter &&) = delete;
 
-  void onResult(Warnings<AnalysisDomainTy> War) override {
+  void onResult(Warning<AnalysisDomainTy> War) override {
     AnalysisResults.War.emplace_back(std::move(War));
   }
 
   void onInitialize() override{};
   void onFinalize(llvm::raw_ostream &OS = llvm::outs()) const override {
-    for (auto Iter : AnalysisResults.War) {
+    for (const auto &Iter : AnalysisResults.War) {
 
-      OS << "\nAt IR statement: " << psr::nToString(Iter.Instr) << "\n";
+      OS << "\nAt IR statement: " << NToString(Iter.Instr) << "\n";
 
-      OS << "\tFact: " << psr::dToString(Iter.Fact) << "\n";
+      OS << "\tFact: " << DToString(Iter.Fact) << "\n";
 
       if constexpr (std::is_same_v<l_t, BinaryDomain>) {
-        OS << "Value: " << psr::lToString(Iter.LatticeElement) << "\n";
+        OS << "Value: " << LToString(Iter.LatticeElement) << "\n";
       }
     }
   }
