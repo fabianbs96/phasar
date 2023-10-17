@@ -20,12 +20,6 @@ public:
   ~DefaultAnalysisPrinter() override = default;
   DefaultAnalysisPrinter() = default;
 
-  DefaultAnalysisPrinter(const DefaultAnalysisPrinter &) = delete;
-  DefaultAnalysisPrinter &operator=(const DefaultAnalysisPrinter &) = delete;
-
-  DefaultAnalysisPrinter(DefaultAnalysisPrinter &&) = delete;
-  DefaultAnalysisPrinter &operator=(DefaultAnalysisPrinter &&) = delete;
-
   void onResult(Warning<AnalysisDomainTy> War) override {
     AnalysisResults.War.emplace_back(std::move(War));
   }

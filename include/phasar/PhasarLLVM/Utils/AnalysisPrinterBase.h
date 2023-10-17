@@ -32,6 +32,11 @@ public:
 
   AnalysisPrinterBase() = default;
   virtual ~AnalysisPrinterBase() = default;
+  AnalysisPrinterBase(const AnalysisPrinterBase &) = delete;
+  AnalysisPrinterBase &operator=(const AnalysisPrinterBase &) = delete;
+
+  AnalysisPrinterBase(AnalysisPrinterBase &&) = delete;
+  AnalysisPrinterBase &operator=(AnalysisPrinterBase &&) = delete;
 };
 
 } // namespace psr
