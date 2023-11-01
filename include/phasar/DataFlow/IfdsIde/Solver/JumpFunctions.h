@@ -91,36 +91,63 @@ public:
       return;
     }
 
+    llvm::outs() << "\n\n Before auto &SourceValToFunc =  \n\n";
+    llvm::outs().flush();
     auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
+    llvm::outs() << "\n\n Before if(auto Find = ...) \n\n";
+    llvm::outs().flush();
     if (auto Find = std::find_if(
             SourceValToFunc.begin(), SourceValToFunc.end(),
             [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+              llvm::outs() << "\n\n Before Entry.first \n\n";
+              llvm::outs().flush();
               return SourceVal == Entry.first;
             });
         Find != SourceValToFunc.end()) {
       // it is important that existing values in JumpFunctions
       // are overwritten
+
+      llvm::outs() << "\n\n Before Find->second = EdgeFunc; \n\n";
+      llvm::outs().flush();
       Find->second = EdgeFunc;
     } else {
+      llvm::outs() << "\n\n Before  SourceValToFunc.emplace_back(SourceVal, "
+                      "EdgeFunc); \n\n";
+      llvm::outs().flush();
       SourceValToFunc.emplace_back(SourceVal, EdgeFunc);
     }
 
+    llvm::outs() << "\n\n Before TargetVakToFunc \n\n";
+    llvm::outs().flush();
     auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
+    llvm::outs() << "\n\n Before TargetVakToFunc if statement \n\n";
+    llvm::outs().flush();
     if (auto Find = std::find_if(
             TargetValToFunc.begin(), TargetValToFunc.end(),
             [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+              llvm::outs() << "\n\n Before TargetVal == Entry.first \n\n";
+              llvm::outs().flush();
               return TargetVal == Entry.first;
             });
         Find != TargetValToFunc.end()) {
       // it is important that existing values in JumpFunctions
       // are overwritten
+      llvm::outs() << "\n\n Before Find->second = EdgeFunc\n\n";
+      llvm::outs().flush();
       Find->second = EdgeFunc;
     } else {
+      llvm::outs() << "\n\n Before TargetValToFunc.emplace_back(TargetVal, "
+                      "EdgeFunc)\n\n";
+      llvm::outs().flush();
       TargetValToFunc.emplace_back(TargetVal, EdgeFunc);
     }
 
     // V Table::insert(R r, C c, V v) always overrides (see
     // comments above)
+    llvm::outs()
+        << "\n\n before NonEmptyLookupByTargetNode[Target].insert(SourceVal, "
+           "TargetVal, EdgeFunc);\n\n";
+    llvm::outs().flush();
     NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
     PHASAR_LOG_LEVEL(DEBUG, "End adding new jump function");
   }

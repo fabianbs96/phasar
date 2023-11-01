@@ -156,9 +156,42 @@ public:
     return Tab.count(RowKey);
   }
 
+  V DefaultV = V();
+
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
     // Returns the value corresponding to the given row and column keys, or V()
     // if no such mapping exists.
+
+    // TODO: ask fabian about this function. The comment above suggests that if
+    // no mapping exists, that case is being caught. However, it isn't, which
+    // leads to a seg fault
+    // The code below that catches that case was written by me. Also, the
+    // comment suggests that in that case, a V() will be returned, which makes
+    // no sense since the return type is of V&
+    // UPDATE: okay since a V& is expected to be returned, I created a variable
+    // for this, so an address exists that can be referenced. Technically we
+    // could also set the return type to just V, but that would probably be a
+    // lot slower.
+    // UPDATE: wait, if I create a V() and return the reference to this, that
+    // could actually be a problem. If this is returned at least twice and
+    // someone treats them as seperate objects, they might get annoying bugs.
+    // But maybe they are in the fault then, given that they didn't check the
+    // return value correctly?
+
+    llvm::outs() << "\n\n Tab.find(RowKey) ==  \n\n";
+    llvm::outs().flush();
+    if (Tab.find(RowKey) == Tab.end()) {
+      return DefaultV;
+    }
+
+    llvm::outs() << "\n\n Tab[RowKey].find(ColumnKey) ==  \n\n";
+    llvm::outs().flush();
+    if (Tab[RowKey].find(ColumnKey) == Tab[RowKey].end()) {
+      return DefaultV;
+    }
+
+    llvm::outs() << "\n\n Tab[std::move(RowKey)][std::move(ColumnKey)] =  \n\n";
+    llvm::outs().flush();
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
