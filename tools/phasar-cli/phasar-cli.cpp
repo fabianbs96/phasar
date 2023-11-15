@@ -260,7 +260,8 @@ void validateParamModule() {
   if (!(std::filesystem::exists(ModulePath) &&
         !std::filesystem::is_directory(ModulePath) &&
         (ModulePath.extension() == ".ll" || ModulePath.extension() == ".bc"))) {
-    llvm::errs() << "LLVM module '" << std::filesystem::absolute(ModulePath)
+    llvm::errs() << "LLVM module '"
+                 << (std::filesystem::absolute(ModulePath)).string()
                  << "' does not exist!\n";
     exit(1);
   }

@@ -424,7 +424,7 @@ public:
   }
 
 private:
-  [[nodiscard]] Derived &self() &noexcept {
+  [[nodiscard]] Derived &self() & noexcept {
     static_assert(std::is_base_of_v<IDESolverAPIMixin, Derived>,
                   "Invalid CRTP instantiation");
     return static_cast<Derived &>(*this);
@@ -460,7 +460,7 @@ private:
 
     // Some initial number of propagations to get an idea, how long a
     // propagation takes. This may be adjusted in the future
-    size_t NumIterations = Interval.count() * 500;
+    size_t NumIterations = Interval.count() * 500 + 1;
 
     auto Start = std::chrono::steady_clock::now();
 
@@ -479,7 +479,7 @@ private:
       auto IterationsPerMilli = double(NumIterations) / DeltaTime.count();
       auto NewNumIterations =
           size_t(IterationsPerMilli * double(Interval.count()));
-      NumIterations = (NumIterations + 2 * NewNumIterations) / 3;
+      NumIterations = ((NumIterations + 2 * NewNumIterations) / 3) | 1;
     }
     auto End = std::chrono::steady_clock::now();
     return !IsCancellationRequested(End);

@@ -39,7 +39,7 @@ public:
                           std::vector<std::string> EntryPoints,
                           std::optional<nlohmann::json> PrecomputedCG,
                           CallGraphAnalysisType CGTy, Soundness SoundnessLevel,
-                          bool AutoGlobalSupport) noexcept;
+                          bool AutoGlobalSupport = false) noexcept;
 
   explicit HelperAnalyses(std::string IRFile,
                           std::vector<std::string> EntryPoints,

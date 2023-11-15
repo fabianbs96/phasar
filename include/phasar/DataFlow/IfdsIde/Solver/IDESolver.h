@@ -32,18 +32,32 @@
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
+#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/DOTGraph.h"
+#include "phasar/Utils/IO.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Logger.h"
+#include "phasar/Utils/NlohmannLogging.h"
 #include "phasar/Utils/PAMMMacros.h"
+#include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/IR/Value.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Format.h"
+#include "llvm/Support/FormatVariadic.h"
 
-#include "nlohmann/json.hpp"
-
+#include <cassert>
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -253,6 +267,376 @@ public:
   consumeSolverResults() noexcept(std::is_nothrow_move_constructible_v<d_t>) {
     return OwningSolverResults<n_t, d_t, l_t>(std::move(this->ValTab),
                                               std::move(ZeroValue));
+  }
+
+  EdgeFunction<l_t> stringToEdgeFunction(const std::string &EdgeFnAsStr) {
+    if (EdgeFnAsStr == "AllBottom") {
+      return AllBottom<l_t>();
+    }
+
+    if (EdgeFnAsStr == "EdgeIdentity") {
+      return EdgeIdentity<l_t>();
+    }
+
+    llvm::errs() << "ERROR: unknown case\n";
+    abort();
+  }
+
+  std::string edgeFunctionToString(EdgeFunction<l_t> EdgeFnVal) {
+
+    // EdgeFunction serialization
+    if (llvm::isa<AllBottom<l_t>>(EdgeFnVal)) {
+      return "AllBottom";
+    }
+
+    if (llvm::isa<EdgeIdentity<l_t>>(EdgeFnVal)) {
+      return "EdgeIdentity";
+    }
+
+    llvm::report_fatal_error("ERROR: unknown case");
+  }
+
+  std::array<std::string, 4> saveDataInJSONs() {
+    std::array<std::string, 4> PathsOfJSONs;
+
+    PathsOfJSONs[0] = saveJumpFunctions();
+    PathsOfJSONs[1] = saveWorkList();
+    PathsOfJSONs[2] = saveEndsummaryTab();
+    PathsOfJSONs[3] = saveIncomingTab();
+
+    return PathsOfJSONs;
+  }
+
+  const llvm::Value *fromMetaDataIdOrZeroValue(const LLVMProjectIRDB &IRDB,
+                                               llvm::StringRef Id) {
+    if (Id == "zero_value") {
+      return ZeroValue;
+    }
+
+    return fromMetaDataId(IRDB, Id);
+  }
+
+  // for d_t's
+  const llvm::Value *getValueFromMetaDataId(const LLVMProjectIRDB &IRDB,
+                                            llvm::StringRef Id) {
+    const auto *Value = fromMetaDataIdOrZeroValue(IRDB, Id);
+
+    if (!Value) {
+      llvm::errs() << "Value is null\n";
+      abort();
+    }
+
+    if (IDEProblem.isZeroValue(Value)) {
+      llvm::outs() << "was zero value\n";
+      llvm::outs().flush();
+      return IDEProblem.getZeroValue();
+    }
+
+    return Value;
+  }
+
+  d_t getDTFromMetaDataId(const LLVMProjectIRDB &IRDB, llvm::StringRef Id) {
+    const auto *Value = fromMetaDataIdOrZeroValue(IRDB, Id);
+
+    if (!Value) {
+      llvm::errs() << "Value is null\n";
+      abort();
+    }
+
+    if (IDEProblem.isZeroValue(Value)) {
+      llvm::outs() << "was zero value\n";
+      llvm::outs().flush();
+      return IDEProblem.getZeroValue();
+    }
+
+    return Value;
+  }
+
+  n_t getNTFromMetaDataId(const LLVMProjectIRDB &IRDB, llvm::StringRef Id) {
+    const auto *Value = fromMetaDataId(IRDB, Id);
+
+    if (!Value) {
+      llvm::errs() << "Value is null\n";
+      abort();
+    }
+
+    if (const auto *Instr = llvm::dyn_cast_or_null<llvm::Instruction>(Value)) {
+      return Instr;
+    }
+
+    llvm::errs() << "NTValue is null\n";
+    abort();
+  }
+
+  // for n_t's
+  const llvm::Instruction *
+  getInstructionFromMetaDataId(const LLVMProjectIRDB &IRDB,
+                               llvm::StringRef Id) {
+    const auto *Value = fromMetaDataIdOrZeroValue(IRDB, Id);
+
+    if (IDEProblem.isZeroValue(Value)) {
+      llvm::errs()
+          << "Instruction is ZeroValue, which should not be possible\n";
+      abort();
+    }
+
+    if (const auto *Instr = llvm::dyn_cast_or_null<llvm::Instruction>(Value)) {
+      return Instr;
+    }
+
+    llvm::errs() << "Instruction is null\n";
+    abort();
+  }
+
+  void loadJumpFunctions(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+    nlohmann::json JSON = readJsonFile(Path);
+
+    llvm::outs() << "Before getJF loop \n";
+    llvm::outs().flush();
+
+    for (size_t Index = 0; JSON.contains("Function" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Function" + std::to_string(Index);
+
+      llvm::outs() << CurrentName << "\n";
+      llvm::outs().flush();
+
+      std::string SourceValStr = JSON[CurrentName]["SourceVal"];
+      std::string TargetStr = JSON[CurrentName]["Target"];
+      std::string TargetValStr = JSON[CurrentName]["TargetVal"];
+      std::string EdgeFnStr = JSON[CurrentName]["EdgeFn"];
+
+      llvm::outs() << "SourceValStr: " << SourceValStr << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "TargetStr: " << TargetStr << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "TargetValStr: " << TargetValStr << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "EdgeFnStr: " << EdgeFnStr << "\n";
+      llvm::outs().flush();
+
+      // d_t
+      d_t SourceVal = getDTFromMetaDataId(
+          IRDB, std::string(JSON[CurrentName]["SourceVal"]));
+      // n_t
+      n_t Target =
+          getNTFromMetaDataId(IRDB, std::string(JSON[CurrentName]["Target"]));
+      // d_t
+      d_t TargetVal = getDTFromMetaDataId(
+          IRDB, std::string(JSON[CurrentName]["TargetVal"]));
+      EdgeFunction<l_t> EdgeFunc =
+          stringToEdgeFunction(JSON[CurrentName]["EdgeFn"]);
+
+      llvm::outs() << "SourceVal: " << SourceVal << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "Target: " << Target << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "TargetVal: " << TargetVal << "\n";
+      llvm::outs().flush();
+      llvm::outs() << "EdgeFn: " << EdgeFunc << "\n";
+      llvm::outs().flush();
+
+      llvm::outs() << "before addFunction()\n";
+      llvm::outs().flush();
+
+      JumpFn->addFunction(SourceVal, Target, TargetVal, EdgeFunc);
+
+      llvm::outs() << "After addFunction()\n";
+      llvm::outs().flush();
+    }
+
+    llvm::outs() << "Before return:\n";
+    llvm::outs().flush();
+  }
+
+  void loadWorkList(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+    nlohmann::json JSON = readJsonFile(Path);
+
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+
+      std::string DSourceStr = JSON[CurrentName]["PathEdge"]["DSource"];
+      std::string TargetStr = JSON[CurrentName]["PathEdge"]["Target"];
+      std::string DTargetStr = JSON[CurrentName]["PathEdge"]["DTarget"];
+      std::string EdgeFunctionStr = JSON[CurrentName]["EdgeFn"];
+
+      const auto *DSource =
+          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(DSourceStr));
+
+      if (!DSource) {
+        // TODO:
+      }
+
+      const auto *Target = llvm::dyn_cast_or_null<llvm::Instruction>(
+          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(TargetStr)));
+
+      if (!Target) {
+        // TODO:
+      }
+
+      const auto *DTarget =
+          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(DTargetStr));
+
+      if (!DTarget) {
+        // TODO:
+      }
+
+      PathEdge CurrPathEdge(DSource, Target, DTarget);
+      EdgeFunction CurrEdgeFn = stringToEdgeFunction(EdgeFunctionStr);
+
+      WorkList.push_back({CurrPathEdge, CurrEdgeFn});
+    }
+
+    llvm::outs() << "WorkListToReturn.size(): " << WorkList.size() << "\n";
+    llvm::outs().flush();
+  }
+
+  void loadEndsummaryTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+    nlohmann::json JSON = readJsonFile(Path);
+
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      const auto *NTVal =
+          fromMetaDataId(IRDB, llvm::StringRef(JSON[CurrentName]["n_t"]));
+      const auto *DTVal =
+          fromMetaDataId(IRDB, llvm::StringRef(JSON[CurrentName]["d_t"]));
+
+      Table<n_t, d_t, EdgeFunction<l_t>> InnerTable{};
+
+      for (size_t InnerIndex = 0; JSON[CurrentName]["InnerTable"].contains(
+               "InnerEntry" + std::to_string(InnerIndex));
+           InnerIndex++) {
+        std::string InnerName = "InnerEntry" + std::to_string(InnerIndex);
+
+        const auto *InnerNTVal = fromMetaDataIdOrZeroValue(
+            IRDB,
+            llvm::StringRef(JSON[CurrentName]["InnerTable"][InnerName]["n_t"]));
+        const auto *InnerDTVal = fromMetaDataIdOrZeroValue(
+            IRDB,
+            llvm::StringRef(JSON[CurrentName]["InnerTable"][InnerName]["d_t"]));
+
+        if (const auto *InnerNTCasted =
+                llvm::dyn_cast_or_null<llvm::Instruction>(InnerNTVal)) {
+          if (const auto *InnerDTCasted = InnerDTVal) {
+            InnerTable.insert(
+                InnerNTCasted, InnerDTCasted,
+                stringToEdgeFunction(std::string(
+                    JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"])));
+          } else {
+            llvm::errs() << "DTCasted was null";
+            abort();
+          }
+        } else {
+          llvm::errs() << "NTCasted was null";
+          abort();
+        }
+      }
+
+      if (const auto *NTCasted =
+              llvm::dyn_cast_or_null<llvm::Instruction>(NTVal)) {
+        if (const auto *DTCasted = DTVal) {
+          EndsummaryTab.insert(NTCasted, DTCasted, std::move(InnerTable));
+        } else {
+
+          llvm::errs() << "DTCasted was null";
+          abort();
+        }
+      } else {
+        llvm::errs() << "NTCasted was null";
+        abort();
+      }
+    }
+  }
+
+  void loadIncomingTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+    nlohmann::json JSON = readJsonFile(Path);
+
+    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
+         Index++) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      const auto *NTVal = fromMetaDataIdOrZeroValue(
+          IRDB, llvm::StringRef(JSON[CurrentName]["n_t"]));
+      const auto *DTVal = fromMetaDataIdOrZeroValue(
+          IRDB, llvm::StringRef(JSON[CurrentName]["d_t"]));
+      std::map<n_t, Container> MapData;
+
+      for (size_t InnerIndex = 0;
+           JSON[CurrentName].contains("map" + std::to_string(InnerIndex));
+           InnerIndex++) {
+        std::string InnerName = "map" + std::to_string(InnerIndex);
+
+        const auto *InnerNTVal = fromMetaDataIdOrZeroValue(
+            IRDB, llvm::StringRef(JSON[CurrentName][InnerName]["n_t"]));
+
+        std::set<const llvm::Value *> ContainerVals;
+        for (size_t Index = 0; JSON[CurrentName][InnerName].contains(
+                 "Container" + std::to_string(Index));
+             Index++) {
+          std::string ContainerName = "Container" + std::to_string(InnerIndex);
+          const auto *InnerDTVal = fromMetaDataIdOrZeroValue(
+              IRDB,
+              llvm::StringRef(JSON[CurrentName][InnerName][ContainerName]));
+
+          if (const auto *DTCasted =
+                  llvm::dyn_cast_or_null<llvm::Instruction>(InnerDTVal)) {
+            ContainerVals.insert(DTCasted);
+          }
+        }
+
+        if (const auto *NTCasted =
+                llvm::dyn_cast_or_null<llvm::Instruction>(InnerNTVal)) {
+          MapData.insert(std::make_pair(NTCasted, ContainerVals));
+        } else {
+          llvm::errs() << "NTCasted was null";
+          abort();
+        }
+      }
+
+      if (const auto *NTCasted =
+              llvm::dyn_cast_or_null<llvm::Instruction>(NTVal)) {
+        if (const auto *DTCasted = DTVal) {
+          IncomingTab.insert(NTCasted, DTCasted, std::move(MapData));
+        } else {
+          llvm::errs() << "DTCasted was null";
+          abort();
+        }
+      } else {
+        llvm::errs() << "NTCasted was null";
+        abort();
+      }
+    }
+  }
+
+  void loadDataFromJSONs(const LLVMProjectIRDB &IRDB,
+                         std::array<std::string, 4> &Paths) {
+    llvm::outs() << "loadDataFromJSONs Paths: "
+                 << "\n";
+    llvm::outs().flush();
+    for (const auto &Curr : Paths) {
+      llvm::outs() << Curr << "\n";
+      llvm::outs().flush();
+    }
+    llvm::outs() << "Before getJumpFunctions(): "
+                 << "\n";
+    llvm::outs().flush();
+    loadJumpFunctions(IRDB, Paths[0]);
+    llvm::outs() << "Before loadWorkList(): "
+                 << "\n";
+    llvm::outs().flush();
+    loadWorkList(IRDB, Paths[1]);
+    llvm::outs() << "Before loadEndsummary(): "
+                 << "\n";
+    llvm::outs().flush();
+    loadEndsummaryTab(IRDB, Paths[2]);
+    llvm::outs() << "Before loadIncomingTab(): "
+                 << "\n";
+    llvm::outs().flush();
+    loadIncomingTab(IRDB, Paths[3]);
+    llvm::outs() << "After loadIncomingTab(): "
+                 << "\n";
+    llvm::outs().flush();
   }
 
 protected:
@@ -1621,6 +2005,291 @@ private:
       return StrIDLess(ICF->getStatementId(Lhs), ICF->getStatementId(Rhs));
     }
   };
+
+  // useful for n_t values
+  std::string getMetaDataIDOrZeroValue(const llvm::Value *V) {
+    if (LLVMZeroValue::isLLVMZeroValue(V)) {
+      return "zero_value";
+    }
+
+    return getMetaDataID(V);
+  }
+
+  // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
+  // Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  //    NonEmptyReverseLookup;
+  std::string saveJumpFunctions() {
+    const auto &JumpFnTable = JumpFn->getNonEmptyReverseLookup();
+    std::vector<n_t> Targets;
+    std::vector<d_t> SourceVals;
+    // TODO: check how exactly 'llvm::SmallVector<std::pair<d_t,
+    // EdgeFunction<l_t>>, 1>>' works and if the serialization below is correct
+    // std::vector<d_t> TargetVals;
+    // std::vector<EdgeFunction<l_t>> EdgeFns;
+    std::vector<llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+        SmallVectors;
+
+    JumpFnTable->foreachCell(
+        [&SourceVals, &Targets, &SmallVectors](const auto &Row, const auto &Col,
+                                               const auto &Val) {
+          Targets.push_back(Row);
+          SourceVals.push_back(Col);
+          SmallVectors.push_back(Val);
+        });
+
+    for (const auto &Curr : Targets) {
+      llvm::outs() << "NToString(): " << NToString(Curr) << "\n";
+      llvm::outs() << "DToString(): " << DToString(Curr) << "\n";
+      llvm::outs().flush();
+    }
+
+    llvm::outs() << "SourceVals.size() in saveJF: " << SourceVals.size()
+                 << "\n";
+    llvm::outs().flush();
+    // assert(SourceVals.size() == Targets.size());
+
+    nlohmann::json JSON;
+    size_t Index = 0;
+    for (const auto &Curr : SourceVals) {
+      std::string CurrentName = "Function" + std::to_string(Index);
+
+      JSON[CurrentName]["SourceVal"] = getMetaDataIDOrZeroValue(Curr);
+
+      JSON[CurrentName]["Target"] = getMetaDataIDOrZeroValue(Targets[Index]);
+
+      for (size_t SmallVecIndex = 0; SmallVecIndex < SmallVectors[Index].size();
+           SmallVecIndex++) {
+        JSON[CurrentName]["TargetVal"] =
+            getMetaDataIDOrZeroValue(SmallVectors[Index][SmallVecIndex].first);
+        JSON[CurrentName]["EdgeFn"] =
+            edgeFunctionToString(SmallVectors[Index][SmallVecIndex].second);
+      }
+
+      Index++;
+    }
+
+    // create temporary file
+    std::error_code ErrCode;
+    llvm::SmallString<128> TempPathSmallString;
+    llvm::sys::fs::createTemporaryFile("phasar_temp_IDESolver_JumpFunctions",
+                                       "json", TempPathSmallString);
+
+    std::string TempPath = TempPathSmallString.str().str();
+
+    if (ErrCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to open a temporary file: " + ErrCode.message()));
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TempPath, EC);
+
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return EC.message();
+    }
+
+    FileStream << JSON;
+
+    return TempPath;
+
+    // llvm::outs() << "\nJumpFunctions\n" << JSON << "\n\n";
+    // llvm::outs().flush();
+  }
+
+  // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
+  std::string saveWorkList() {
+    if (WorkList.empty()) {
+      llvm::report_fatal_error("Worklist empty");
+    }
+
+    nlohmann::json JSON;
+    size_t Index = 0;
+
+    for (const auto &Curr : WorkList) {
+      std::string CurrentName = "Entry" + std::to_string(Index++);
+
+      // PathEdge serialization
+      auto [PathEdgeFirst, PathEdgeSecond, PathEdgeThird] = Curr.first.get();
+
+      JSON[CurrentName]["PathEdge"]["DSource"] =
+          getMetaDataIDOrZeroValue(PathEdgeFirst);
+      JSON[CurrentName]["PathEdge"]["Target"] =
+          getMetaDataIDOrZeroValue(PathEdgeSecond);
+      JSON[CurrentName]["PathEdge"]["DTarget"] =
+          getMetaDataIDOrZeroValue(PathEdgeThird);
+      JSON[CurrentName]["EdgeFn"] = edgeFunctionToString(Curr.second);
+    }
+
+    // create temporary file
+    std::error_code ErrCode;
+    llvm::SmallString<128> TempPathSmallString;
+    llvm::sys::fs::createTemporaryFile("phasar_temp_IDESolver_WorkList", "json",
+                                       TempPathSmallString);
+
+    std::string TempPath = TempPathSmallString.str().str();
+
+    if (ErrCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to open a temporary file: " + ErrCode.message()));
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TempPath, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return EC.message();
+    }
+
+    FileStream << JSON;
+
+    return TempPath;
+  }
+
+  // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
+  std::string saveEndsummaryTab() {
+    std::vector<n_t> NTVals;
+    std::vector<d_t> DTVals;
+    std::vector<std::vector<n_t>> InnerNTs;
+    std::vector<std::vector<d_t>> InnerDTs;
+    std::vector<std::vector<EdgeFunction<l_t>>> InnerEdgeFns;
+
+    size_t Index = 0;
+    EndsummaryTab.foreachCell([&NTVals, &DTVals, &Index, &InnerNTs, &InnerDTs,
+                               &InnerEdgeFns](const auto &Row, const auto &Col,
+                                              const auto &Val) {
+      NTVals.push_back(Row);
+      DTVals.push_back(Col);
+
+      Val.foreachCell([&Index, &InnerNTs, &InnerDTs, &InnerEdgeFns](
+                          const auto &Row, const auto &Col, const auto &Val) {
+        InnerNTs[Index].push_back(Row);
+        InnerDTs[Index].push_back(Col);
+        InnerEdgeFns[Index].push_back(Val);
+      });
+      Index++;
+    });
+
+    // assert(NTVals.size() == DTVals.size());
+    // assert(DTVals.size() == InnerTables.size());
+
+    nlohmann::json JSON;
+    Index = 0;
+    for (const auto &CurrNTVal : NTVals) {
+      std::string CurrentName = "Entry" + std::to_string(Index);
+      JSON[CurrentName]["n_t"] = getMetaDataIDOrZeroValue(NTVals[Index]);
+      JSON[CurrentName]["d_t"] = getMetaDataIDOrZeroValue(DTVals[Index]);
+
+      size_t InnerIndex = 0;
+      for (const auto &CurrTable : InnerNTs[Index]) {
+        std::string InnerName = "InnerEntry" + std::to_string(InnerIndex);
+        JSON[CurrentName]["InnerTable"][InnerName] =
+            getMetaDataIDOrZeroValue(InnerNTs[Index][InnerIndex]);
+        JSON[CurrentName]["InnerTable"][InnerName] =
+            getMetaDataIDOrZeroValue(InnerDTs[Index][InnerIndex]);
+        JSON[CurrentName]["InnerTable"][InnerName] =
+            edgeFunctionToString(InnerEdgeFns[Index][InnerIndex]);
+        InnerIndex++;
+      }
+
+      Index++;
+    }
+
+    // create temporary file
+    std::error_code ErrCode;
+    llvm::SmallString<128> TempPathSmallString;
+    llvm::sys::fs::createTemporaryFile("phasar_temp_IDESolver_EndsummaryTab",
+                                       "json", TempPathSmallString);
+
+    std::string TempPath = TempPathSmallString.str().str();
+
+    if (ErrCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to open a temporary file: " + ErrCode.message()));
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TempPath, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return EC.message();
+    }
+
+    FileStream << JSON;
+
+    if (EndsummaryTab.empty()) {
+      llvm::outs() << "EndsummaryTab is empty\n";
+      llvm::outs().flush();
+    }
+
+    return TempPath;
+  }
+
+  // Table<n_t, d_t, std::map<n_t, Container>>
+  std::string saveIncomingTab() {
+    std::vector<n_t> Targets;
+    std::vector<d_t> SourceVals;
+    std::vector<std::map<n_t, Container>> InnerMaps;
+
+    IncomingTab.foreachCell(
+        [&Targets, &SourceVals, &InnerMaps](const auto &Row, const auto &Col,
+                                            const auto &Val) {
+          Targets.push_back(Row);
+          SourceVals.push_back(Col);
+          InnerMaps.push_back(Val);
+        });
+
+    nlohmann::json JSON;
+    size_t Index = 0;
+
+    // Code below doesn't work yet!!!
+    for (const auto &Curr : SourceVals) {
+      std::string CurrentName = "Entry" + std::to_string(Index++);
+      JSON[CurrentName]["n_t"] = getMetaDataIDOrZeroValue(Targets[Index]);
+      JSON[CurrentName]["d_t"] = getMetaDataIDOrZeroValue(SourceVals[Index]);
+
+      size_t MapIndex = 0;
+      for (const auto &Curr : InnerMaps[Index]) {
+        std::string MapEntryName = "map" + std::to_string(MapIndex++);
+        JSON[CurrentName][MapEntryName]["n_t"] =
+            getMetaDataIDOrZeroValue(Curr.first);
+
+        for (const auto &ContainerElement : Curr.second) {
+          JSON[CurrentName][MapEntryName]["d_t"].push_back(
+              getMetaDataIDOrZeroValue(ContainerElement));
+        }
+      }
+    }
+
+    // create temporary file
+    std::error_code ErrCode;
+    llvm::SmallString<128> TempPathSmallString;
+    llvm::sys::fs::createTemporaryFile("phasar_temp_IDESolver_IncomingTab",
+                                       "json", TempPathSmallString);
+
+    std::string TempPath = TempPathSmallString.str().str();
+
+    if (ErrCode) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to open a temporary file: " + ErrCode.message()));
+    }
+
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(TempPath, EC);
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return EC.message();
+    }
+
+    if (IncomingTab.empty()) {
+      llvm::outs() << "IncomingTab is empty\n";
+      llvm::outs().flush();
+    }
+
+    FileStream << JSON;
+
+    return TempPath;
+  }
 
   /// -- InteractiveIDESolverMixin implementation
 
