@@ -100,18 +100,9 @@ protected:
       }
 
       IDESolver Solver(TaintProblem2, &HA.getICFG());
-      llvm::outs() << "Before loadDataFromJSON()"
-                   << "\n";
-      llvm::outs().flush();
 
       Solver.loadDataFromJSONs(HA.getProjectIRDB(), TempPaths);
-      // llvm::outs() << "Before getEndsummary()"
-      //              << "\n";
-      // llvm::outs().flush();
-      // Solver.getEndsummary(HA.getProjectIRDB(), TempPath.c_str());
-      llvm::outs() << "Before return std::move(Solver).continueSolving()"
-                   << "\n";
-      llvm::outs().flush();
+
       return std::move(Solver).continueSolving();
     }();
 
@@ -129,57 +120,57 @@ static constexpr std::string_view ISSTestFiles[] = {
     "dummy_source_sink/taint_03_cpp_dbg.ll",
     "dummy_source_sink/taint_04_cpp_dbg.ll",
     "dummy_source_sink/taint_05_cpp_dbg.ll",
-    //"taint_1_cpp.ll",
-    //"taint_2_cpp.ll",
-    //"taint_3_cpp.ll",
-    //"taint_4_cpp.ll",
-    //"taint_5_cpp.ll",
-    //"taint_6_cpp.ll",
-    //"taint_7_cpp.ll",
-    //"taint_8_cpp.ll",
-    //"taint_14_cpp.ll",
-    //"taint_15_cpp.ll",
-    //"../xtaint/xtaint01_cpp.ll",
-    //"../xtaint/xtaint02_cpp.ll",
-    //"../xtaint/xtaint03_cpp.ll",
-    //"../xtaint/xtaint04_cpp.ll",
-    //"../xtaint/xtaint05_cpp.ll",
-    //"../linear_constant/basic_01_cpp_dbg.ll",
-    //"../linear_constant/basic_02_cpp_dbg.ll",
-    //"../linear_constant/basic_03_cpp_dbg.ll",
-    //"../linear_constant/basic_04_cpp_dbg.ll",
-    //"../linear_constant/basic_05_cpp_dbg.ll",
+    "taint_1_cpp.ll",
+    "taint_2_cpp.ll",
+    "taint_3_cpp.ll",
+    "taint_4_cpp.ll",
+    "taint_5_cpp.ll",
+    "taint_6_cpp.ll",
+    "taint_7_cpp.ll",
+    "taint_8_cpp.ll",
+    "taint_14_cpp.ll",
+    "taint_15_cpp.ll",
+    "../xtaint/xtaint01_cpp.ll",
+    "../xtaint/xtaint02_cpp.ll",
+    "../xtaint/xtaint03_cpp.ll",
+    "../xtaint/xtaint04_cpp.ll",
+    "../xtaint/xtaint05_cpp.ll",
+    "../linear_constant/basic_01_cpp_dbg.ll",
+    "../linear_constant/basic_02_cpp_dbg.ll",
+    "../linear_constant/basic_03_cpp_dbg.ll",
+    "../linear_constant/basic_04_cpp_dbg.ll",
+    "../linear_constant/basic_05_cpp_dbg.ll",
 
-    //"../linear_constant/branch_01_cpp_dbg.ll",
-    //"../linear_constant/branch_02_cpp_dbg.ll",
-    //"../linear_constant/branch_03_cpp_dbg.ll",
-    //"../linear_constant/branch_04_cpp_dbg.ll",
-    //"../linear_constant/branch_05_cpp_dbg.ll",
-    //"../linear_constant/branch_06_cpp_dbg.ll",
-    //"../linear_constant/branch_07_cpp_dbg.ll",
+    "../linear_constant/branch_01_cpp_dbg.ll",
+    "../linear_constant/branch_02_cpp_dbg.ll",
+    "../linear_constant/branch_03_cpp_dbg.ll",
+    "../linear_constant/branch_04_cpp_dbg.ll",
+    "../linear_constant/branch_05_cpp_dbg.ll",
+    "../linear_constant/branch_06_cpp_dbg.ll",
+    "../linear_constant/branch_07_cpp_dbg.ll",
 
-    //"../linear_constant/while_01_cpp_dbg.ll",
-    //"../linear_constant/while_02_cpp_dbg.ll",
-    //"../linear_constant/while_03_cpp_dbg.ll",
-    //"../linear_constant/while_04_cpp_dbg.ll",
-    //"../linear_constant/while_05_cpp_dbg.ll",
-    //"../linear_constant/for_01_cpp_dbg.ll",
+    "../linear_constant/while_01_cpp_dbg.ll",
+    "../linear_constant/while_02_cpp_dbg.ll",
+    "../linear_constant/while_03_cpp_dbg.ll",
+    "../linear_constant/while_04_cpp_dbg.ll",
+    "../linear_constant/while_05_cpp_dbg.ll",
+    "../linear_constant/for_01_cpp_dbg.ll",
 
-    //"../linear_constant/call_01_cpp_dbg.ll",
-    //"../linear_constant/call_02_cpp_dbg.ll",
-    //"../linear_constant/call_03_cpp_dbg.ll",
-    //"../linear_constant/call_04_cpp_dbg.ll",
-    //"../linear_constant/call_05_cpp_dbg.ll",
-    //"../linear_constant/call_06_cpp_dbg.ll",
-    //"../linear_constant/call_07_cpp_dbg.ll",
-    //"../linear_constant/call_08_cpp_dbg.ll",
-    //"../linear_constant/call_09_cpp_dbg.ll",
-    //"../linear_constant/call_10_cpp_dbg.ll",
-    //"../linear_constant/call_11_cpp_dbg.ll",
+    "../linear_constant/call_01_cpp_dbg.ll",
+    "../linear_constant/call_02_cpp_dbg.ll",
+    "../linear_constant/call_03_cpp_dbg.ll",
+    "../linear_constant/call_04_cpp_dbg.ll",
+    "../linear_constant/call_05_cpp_dbg.ll",
+    "../linear_constant/call_06_cpp_dbg.ll",
+    "../linear_constant/call_07_cpp_dbg.ll",
+    "../linear_constant/call_08_cpp_dbg.ll",
+    "../linear_constant/call_09_cpp_dbg.ll",
+    "../linear_constant/call_10_cpp_dbg.ll",
+    "../linear_constant/call_11_cpp_dbg.ll",
 
-    //"../linear_constant/recursion_01_cpp_dbg.ll",
-    //"../linear_constant/recursion_02_cpp_dbg.ll",
-    //"../linear_constant/recursion_03_cpp_dbg.ll",
+    "../linear_constant/recursion_01_cpp_dbg.ll",
+    "../linear_constant/recursion_02_cpp_dbg.ll",
+    "../linear_constant/recursion_03_cpp_dbg.ll",
 };
 
 static LLVMTaintConfig getDefaultConfig() {

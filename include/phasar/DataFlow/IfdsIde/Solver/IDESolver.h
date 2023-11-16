@@ -327,8 +327,6 @@ public:
     }
 
     if (IDEProblem.isZeroValue(Value)) {
-      llvm::outs() << "was zero value\n";
-      llvm::outs().flush();
       return IDEProblem.getZeroValue();
     }
 
@@ -391,29 +389,14 @@ public:
   void loadJumpFunctions(const LLVMProjectIRDB &IRDB, const std::string &Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
-    llvm::outs() << "Before getJF loop \n";
-    llvm::outs().flush();
-
     for (size_t Index = 0; JSON.contains("Function" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Function" + std::to_string(Index);
-
-      llvm::outs() << CurrentName << "\n";
-      llvm::outs().flush();
 
       std::string SourceValStr = JSON[CurrentName]["SourceVal"];
       std::string TargetStr = JSON[CurrentName]["Target"];
       std::string TargetValStr = JSON[CurrentName]["TargetVal"];
       std::string EdgeFnStr = JSON[CurrentName]["EdgeFn"];
-
-      llvm::outs() << "SourceValStr: " << SourceValStr << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "TargetStr: " << TargetStr << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "TargetValStr: " << TargetValStr << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "EdgeFnStr: " << EdgeFnStr << "\n";
-      llvm::outs().flush();
 
       // d_t
       d_t SourceVal = getDTFromMetaDataId(
@@ -427,26 +410,8 @@ public:
       EdgeFunction<l_t> EdgeFunc =
           stringToEdgeFunction(JSON[CurrentName]["EdgeFn"]);
 
-      llvm::outs() << "SourceVal: " << SourceVal << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "Target: " << Target << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "TargetVal: " << TargetVal << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "EdgeFn: " << EdgeFunc << "\n";
-      llvm::outs().flush();
-
-      llvm::outs() << "before addFunction()\n";
-      llvm::outs().flush();
-
       JumpFn->addFunction(SourceVal, Target, TargetVal, EdgeFunc);
-
-      llvm::outs() << "After addFunction()\n";
-      llvm::outs().flush();
     }
-
-    llvm::outs() << "Before return:\n";
-    llvm::outs().flush();
   }
 
   void loadWorkList(const LLVMProjectIRDB &IRDB, const std::string &Path) {
@@ -469,9 +434,6 @@ public:
 
       WorkList.push_back({CurrPathEdge, CurrEdgeFn});
     }
-
-    llvm::outs() << "WorkListToReturn.size(): " << WorkList.size() << "\n";
-    llvm::outs().flush();
   }
 
   void loadEndsummaryTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
@@ -555,32 +517,10 @@ public:
 
   void loadDataFromJSONs(const LLVMProjectIRDB &IRDB,
                          std::array<std::string, 4> &Paths) {
-    llvm::outs() << "loadDataFromJSONs Paths: "
-                 << "\n";
-    llvm::outs().flush();
-    for (const auto &Curr : Paths) {
-      llvm::outs() << Curr << "\n";
-      llvm::outs().flush();
-    }
-    llvm::outs() << "Before getJumpFunctions(): "
-                 << "\n";
-    llvm::outs().flush();
     loadJumpFunctions(IRDB, Paths[0]);
-    llvm::outs() << "Before loadWorkList(): "
-                 << "\n";
-    llvm::outs().flush();
     loadWorkList(IRDB, Paths[1]);
-    llvm::outs() << "Before loadEndsummary(): "
-                 << "\n";
-    llvm::outs().flush();
     loadEndsummaryTab(IRDB, Paths[2]);
-    llvm::outs() << "Before loadIncomingTab(): "
-                 << "\n";
-    llvm::outs().flush();
     loadIncomingTab(IRDB, Paths[3]);
-    llvm::outs() << "After loadIncomingTab(): "
-                 << "\n";
-    llvm::outs().flush();
   }
 
 protected:
