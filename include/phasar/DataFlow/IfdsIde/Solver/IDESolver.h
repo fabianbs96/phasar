@@ -461,27 +461,9 @@ public:
       std::string DTargetStr = JSON[CurrentName]["PathEdge"]["DTarget"];
       std::string EdgeFunctionStr = JSON[CurrentName]["EdgeFn"];
 
-      const auto *DSource =
-          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(DSourceStr));
-
-      if (!DSource) {
-        // TODO:
-      }
-
-      const auto *Target = llvm::dyn_cast_or_null<llvm::Instruction>(
-          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(TargetStr)));
-
-      if (!Target) {
-        // TODO:
-      }
-
-      const auto *DTarget =
-          fromMetaDataIdOrZeroValue(IRDB, llvm::StringRef(DTargetStr));
-
-      if (!DTarget) {
-        // TODO:
-      }
-
+      d_t DSource = getDTFromMetaDataId(IRDB, llvm::StringRef(DSourceStr));
+      n_t Target = getNTFromMetaDataId(IRDB, llvm::StringRef(TargetStr));
+      d_t DTarget = getDTFromMetaDataId(IRDB, llvm::StringRef(DTargetStr));
       PathEdge CurrPathEdge(DSource, Target, DTarget);
       EdgeFunction CurrEdgeFn = stringToEdgeFunction(EdgeFunctionStr);
 
@@ -498,10 +480,12 @@ public:
     for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Entry" + std::to_string(Index);
-      const auto *NTVal =
-          fromMetaDataId(IRDB, llvm::StringRef(JSON[CurrentName]["n_t"]));
-      const auto *DTVal =
-          fromMetaDataId(IRDB, llvm::StringRef(JSON[CurrentName]["d_t"]));
+
+      std::string NTString = JSON[CurrentName]["n_t"];
+      std::string DTString = JSON[CurrentName]["d_t"];
+
+      n_t NTVal = getNTFromMetaDataId(IRDB, NTString);
+      d_t DTVal = getDTFromMetaDataId(IRDB, DTString);
 
       Table<n_t, d_t, EdgeFunction<l_t>> InnerTable{};
 
@@ -510,43 +494,20 @@ public:
            InnerIndex++) {
         std::string InnerName = "InnerEntry" + std::to_string(InnerIndex);
 
-        const auto *InnerNTVal = fromMetaDataIdOrZeroValue(
-            IRDB,
-            llvm::StringRef(JSON[CurrentName]["InnerTable"][InnerName]["n_t"]));
-        const auto *InnerDTVal = fromMetaDataIdOrZeroValue(
-            IRDB,
-            llvm::StringRef(JSON[CurrentName]["InnerTable"][InnerName]["d_t"]));
+        std::string InnerNTString =
+            JSON[CurrentName]["InnerTable"][InnerName]["n_t"];
+        std::string InnerDTString =
+            JSON[CurrentName]["InnerTable"][InnerName]["d_t"];
 
-        if (const auto *InnerNTCasted =
-                llvm::dyn_cast_or_null<llvm::Instruction>(InnerNTVal)) {
-          if (const auto *InnerDTCasted = InnerDTVal) {
-            InnerTable.insert(
-                InnerNTCasted, InnerDTCasted,
-                stringToEdgeFunction(std::string(
-                    JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"])));
-          } else {
-            llvm::errs() << "DTCasted was null";
-            abort();
-          }
-        } else {
-          llvm::errs() << "NTCasted was null";
-          abort();
-        }
+        n_t InnerNTVal = getNTFromMetaDataId(IRDB, InnerNTString);
+        d_t InnerDTVal = getDTFromMetaDataId(IRDB, InnerDTString);
+        EdgeFunction<l_t> InnerEdgeFn = stringToEdgeFunction(
+            std::string(JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"]));
+
+        InnerTable.insert(InnerNTVal, InnerDTVal, InnerEdgeFn);
       }
 
-      if (const auto *NTCasted =
-              llvm::dyn_cast_or_null<llvm::Instruction>(NTVal)) {
-        if (const auto *DTCasted = DTVal) {
-          EndsummaryTab.insert(NTCasted, DTCasted, std::move(InnerTable));
-        } else {
-
-          llvm::errs() << "DTCasted was null";
-          abort();
-        }
-      } else {
-        llvm::errs() << "NTCasted was null";
-        abort();
-      }
+      EndsummaryTab.insert(NTVal, DTVal, std::move(InnerTable));
     }
   }
 
@@ -556,10 +517,13 @@ public:
     for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
          Index++) {
       std::string CurrentName = "Entry" + std::to_string(Index);
-      const auto *NTVal = fromMetaDataIdOrZeroValue(
-          IRDB, llvm::StringRef(JSON[CurrentName]["n_t"]));
-      const auto *DTVal = fromMetaDataIdOrZeroValue(
-          IRDB, llvm::StringRef(JSON[CurrentName]["d_t"]));
+
+      std::string NTString = JSON[CurrentName]["n_t"];
+      std::string DTString = JSON[CurrentName]["d_t"];
+
+      n_t NTVal = getNTFromMetaDataId(IRDB, NTString);
+      d_t DTVal = getDTFromMetaDataId(IRDB, DTString);
+
       std::map<n_t, Container> MapData;
 
       for (size_t InnerIndex = 0;
@@ -567,45 +531,25 @@ public:
            InnerIndex++) {
         std::string InnerName = "map" + std::to_string(InnerIndex);
 
-        const auto *InnerNTVal = fromMetaDataIdOrZeroValue(
-            IRDB, llvm::StringRef(JSON[CurrentName][InnerName]["n_t"]));
+        std::string InnerNTStr = JSON[CurrentName][InnerName]["n_t"];
+        n_t InnerNTVal = getNTFromMetaDataId(IRDB, InnerNTStr);
 
         std::set<const llvm::Value *> ContainerVals;
         for (size_t Index = 0; JSON[CurrentName][InnerName].contains(
                  "Container" + std::to_string(Index));
              Index++) {
           std::string ContainerName = "Container" + std::to_string(InnerIndex);
-          const auto *InnerDTVal = fromMetaDataIdOrZeroValue(
-              IRDB,
-              llvm::StringRef(JSON[CurrentName][InnerName][ContainerName]));
 
-          if (const auto *DTCasted =
-                  llvm::dyn_cast_or_null<llvm::Instruction>(InnerDTVal)) {
-            ContainerVals.insert(DTCasted);
-          }
+          std::string InnerDTStr = JSON[CurrentName][InnerName][ContainerName];
+          d_t InnerDTVal = getDTFromMetaDataId(IRDB, InnerDTStr);
+
+          ContainerVals.insert(InnerDTVal);
         }
 
-        if (const auto *NTCasted =
-                llvm::dyn_cast_or_null<llvm::Instruction>(InnerNTVal)) {
-          MapData.insert(std::make_pair(NTCasted, ContainerVals));
-        } else {
-          llvm::errs() << "NTCasted was null";
-          abort();
-        }
+        MapData.insert(std::make_pair(InnerNTVal, ContainerVals));
       }
 
-      if (const auto *NTCasted =
-              llvm::dyn_cast_or_null<llvm::Instruction>(NTVal)) {
-        if (const auto *DTCasted = DTVal) {
-          IncomingTab.insert(NTCasted, DTCasted, std::move(MapData));
-        } else {
-          llvm::errs() << "DTCasted was null";
-          abort();
-        }
-      } else {
-        llvm::errs() << "NTCasted was null";
-        abort();
-      }
+      IncomingTab.insert(NTVal, DTVal, std::move(MapData));
     }
   }
 
