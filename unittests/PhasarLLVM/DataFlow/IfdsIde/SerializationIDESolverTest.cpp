@@ -51,28 +51,15 @@ protected:
     auto TaintProblem =
         createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
 
-    llvm::outs() << "TaintProblem.getZeroValue() << "
-                 << TaintProblem.getZeroValue() << "\n";
-    llvm::outs().flush();
-    // if (TaintProblem.getZeroValue() == nullptr) {
-    //   llvm::outs() << "TaintProblem.getZeroValue() == nullptr\n";
-    //   llvm::outs().flush();
-    //   return;
-    // }
-
     auto TaintProblem2 =
         createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
-
-    llvm::outs() << "TaintProblem2.getZeroValue() << "
-                 << TaintProblem2.getZeroValue() << "\n";
-    llvm::outs().flush();
 
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
     // run with interruption
     size_t Counter = 0;
-    size_t InterruptionValue = 1;
+    size_t InterruptionValue = 3;
     std::array<std::string, 4> TempPaths;
     // results with interruption(s)
     auto InterruptedResults = [&] {
@@ -90,13 +77,12 @@ protected:
         EXPECT_EQ(std::nullopt, Result);
         TempPaths = Solver.saveDataInJSONs();
 
-        llvm::outs() << "TempPaths: "
-                     << "\n";
+        llvm::outs() << "TempPaths:\n";
+        llvm::outs() << "[0]: " << TempPaths[0] << "\n";
+        llvm::outs() << "[1]: " << TempPaths[1] << "\n";
+        llvm::outs() << "[2]: " << TempPaths[2] << "\n";
+        llvm::outs() << "[3]: " << TempPaths[3] << "\n";
         llvm::outs().flush();
-        for (const auto &Curr : TempPaths) {
-          llvm::outs() << Curr << "\n";
-          llvm::outs().flush();
-        }
       }
 
       IDESolver Solver(TaintProblem2, &HA.getICFG());
@@ -170,8 +156,7 @@ static constexpr std::string_view ISSTestFiles[] = {
 
     "../linear_constant/recursion_01_cpp_dbg.ll",
     "../linear_constant/recursion_02_cpp_dbg.ll",
-    "../linear_constant/recursion_03_cpp_dbg.ll",
-};
+    "../linear_constant/recursion_03_cpp_dbg.ll"};
 
 static LLVMTaintConfig getDefaultConfig() {
   auto SourceCB = [](const llvm::Instruction *Inst) {
