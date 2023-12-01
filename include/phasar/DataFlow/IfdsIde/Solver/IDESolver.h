@@ -67,6 +67,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include <llvm-14/llvm/ADT/StringRef.h>
 #include <llvm-14/llvm/IR/Instruction.h>
 #include <llvm-14/llvm/Support/ErrorHandling.h>
 
@@ -317,7 +318,7 @@ public:
     }
 
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(TempPath, EC);
+    llvm::raw_fd_ostream FileStream(TempPathSmallString, EC);
 
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
@@ -550,7 +551,7 @@ public:
   // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
   // Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
   //    NonEmptyReverseLookup;
-  void loadJumpFunctions(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+  void loadJumpFunctions(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
     std::vector<std::string> SourceValStrs;
@@ -587,15 +588,7 @@ public:
       EdgeFnsIndex++;
     }
 
-    llvm::outs() << "TargetStrs.size(): " << TargetStrs.size()
-                 << " EdgeFnStrs.size(): " << EdgeFnStrs.size() << "\n";
-    llvm::outs().flush();
-
     for (size_t Index = 0; Index < TargetStrs.size(); Index++) {
-      llvm::outs() << "Index: " << Index << "\n";
-      llvm::outs().flush();
-      llvm::outs() << "TargetStrs[Index]: " << TargetStrs[Index] << "\n";
-      llvm::outs().flush();
       d_t SourceVal = getDTFromMetaDataId(IRDB, SourceValStrs[Index]);
       n_t Target = getNTFromMetaDataId(IRDB, TargetStrs[Index]);
 
@@ -611,7 +604,7 @@ public:
     }
   }
 
-  void loadWorkList(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+  void loadWorkList(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
     for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
@@ -633,7 +626,7 @@ public:
     }
   }
 
-  void loadEndsummaryTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+  void loadEndsummaryTab(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
     for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
@@ -670,7 +663,7 @@ public:
     }
   }
 
-  void loadIncomingTab(const LLVMProjectIRDB &IRDB, const std::string &Path) {
+  void loadIncomingTab(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
     for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
@@ -718,6 +711,11 @@ public:
     loadWorkList(IRDB, Paths[1]);
     loadEndsummaryTab(IRDB, Paths[2]);
     loadIncomingTab(IRDB, Paths[3]);
+
+    llvm::sys::fs::remove(Paths[0]);
+    llvm::sys::fs::remove(Paths[1]);
+    llvm::sys::fs::remove(Paths[2]);
+    llvm::sys::fs::remove(Paths[3]);
   }
 
 protected:

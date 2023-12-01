@@ -87,7 +87,9 @@ protected:
 
       IDESolver Solver(TaintProblem2, &HA.getICFG());
 
-      Solver.loadDataFromJSONs(HA.getProjectIRDB(), TempPaths);
+      Solver.loadDataFromJSONs(
+          HA.getProjectIRDB(),
+          {TempPaths[0], TempPaths[1], TempPaths[2], TempPaths[3]});
 
       return std::move(Solver).continueSolving();
     }();
