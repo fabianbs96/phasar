@@ -53,6 +53,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Signals.h"
 
 #include <cassert>
 #include <cmath>
@@ -70,6 +71,7 @@
 #include <llvm-14/llvm/ADT/StringRef.h>
 #include <llvm-14/llvm/IR/Instruction.h>
 #include <llvm-14/llvm/Support/ErrorHandling.h>
+#include <llvm-14/llvm/Support/Signals.h>
 
 namespace psr {
 
@@ -328,9 +330,6 @@ public:
     FileStream << JSON;
 
     return TempPath;
-
-    // llvm::outs() << "\nJumpFunctions\n" << JSON << "\n\n";
-    // llvm::outs().flush();
   }
 
   // std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>>
@@ -340,21 +339,19 @@ public:
     }
 
     nlohmann::json JSON;
-    size_t Index = 0;
 
     for (const auto &Curr : WorkList) {
-      std::string CurrentName = "Entry" + std::to_string(Index++);
 
       // PathEdge serialization
       auto [PathEdgeFirst, PathEdgeSecond, PathEdgeThird] = Curr.first.get();
 
-      JSON[CurrentName]["PathEdge"]["DSource"] =
-          getMetaDataIDOrZeroValue(PathEdgeFirst);
-      JSON[CurrentName]["PathEdge"]["Target"] =
-          getMetaDataIDOrZeroValue(PathEdgeSecond);
-      JSON[CurrentName]["PathEdge"]["DTarget"] =
-          getMetaDataIDOrZeroValue(PathEdgeThird);
-      JSON[CurrentName]["EdgeFn"] = edgeFunctionToString(Curr.second);
+      JSON["PathEdge"]["DSource"].push_back(
+          getMetaDataIDOrZeroValue(PathEdgeFirst));
+      JSON["PathEdge"]["Target"].push_back(
+          getMetaDataIDOrZeroValue(PathEdgeSecond));
+      JSON["PathEdge"]["DTarget"].push_back(
+          getMetaDataIDOrZeroValue(PathEdgeThird));
+      JSON["EdgeFn"].push_back(edgeFunctionToString(Curr.second));
     }
 
     // create temporary file
@@ -394,12 +391,13 @@ public:
 
       Val.foreachCell([this, &JSON, &Index](const auto &Row, const auto &Col,
                                             const auto &Val) {
-        JSON[std::to_string(Index)]["n_t"].push_back(getMetaDataID(Row));
-        JSON[std::to_string(Index)]["d_t"].push_back(
-            getMetaDataIDOrZeroValue(Col));
-        JSON[std::to_string(Index)]["EdgeFn"].push_back(
-            edgeFunctionToString(Val));
+        std::string InnerTableName = "InnerTable_" + std::to_string(Index);
+
+        JSON[InnerTableName]["n_t"].push_back(getMetaDataID(Row));
+        JSON[InnerTableName]["d_t"].push_back(getMetaDataIDOrZeroValue(Col));
+        JSON[InnerTableName]["EdgeFn"].push_back(edgeFunctionToString(Val));
       });
+
       Index++;
     });
 
@@ -431,25 +429,23 @@ public:
   // Table<n_t, d_t, std::map<n_t, Container>>
   std::string saveIncomingTab() {
     nlohmann::json JSON;
-    size_t Index = 0;
 
-    IncomingTab.foreachCell([this, &JSON, &Index](const auto &Row,
-                                                  const auto &Col,
-                                                  const auto &Val) {
-      JSON["n_t"].push_back(getMetaDataID(Row));
-      JSON["d_t"].push_back(getMetaDataIDOrZeroValue(Col));
+    IncomingTab.foreachCell(
+        [this, &JSON](const auto &Row, const auto &Col, const auto &Val) {
+          JSON["n_t"].push_back(getMetaDataID(Row));
+          JSON["d_t"].push_back(getMetaDataIDOrZeroValue(Col));
 
-      size_t MapIndex = 0;
-      for (const auto &Curr : Val) {
-        std::string MapEntryName = "map" + std::to_string(MapIndex++);
-        JSON[MapEntryName]["n_t"] = getMetaDataID(Curr.first);
+          size_t MapIndex = 0;
+          for (const auto &Curr : Val) {
+            std::string MapEntryName = "map" + std::to_string(MapIndex++);
+            JSON[MapEntryName]["n_t"] = getMetaDataID(Curr.first);
 
-        for (const auto &ContainerElement : Curr.second) {
-          JSON[MapEntryName]["d_t"].push_back(
-              getMetaDataIDOrZeroValue(ContainerElement));
-        }
-      }
-    });
+            for (const auto &ContainerElement : Curr.second) {
+              JSON[MapEntryName]["d_t"].push_back(
+                  getMetaDataIDOrZeroValue(ContainerElement));
+            }
+          }
+        });
 
     // create temporary file
     std::error_code ErrCode;
@@ -489,8 +485,6 @@ public:
   }
 
   std::string edgeFunctionToString(EdgeFunction<l_t> EdgeFnVal) {
-
-    // EdgeFunction serialization
     if (llvm::isa<AllBottom<l_t>>(EdgeFnVal)) {
       return "AllBottom";
     }
@@ -607,59 +601,70 @@ public:
   void loadWorkList(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
-    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
-         Index++) {
-      std::string CurrentName = "Entry" + std::to_string(Index);
+    std::vector<PathEdge<n_t, d_t>> WorkListPathEdges;
+    std::vector<EdgeFunction<l_t>> WorkListEdgeFunctions;
 
-      std::string DSourceStr = JSON[CurrentName]["PathEdge"]["DSource"];
-      std::string TargetStr = JSON[CurrentName]["PathEdge"]["Target"];
-      std::string DTargetStr = JSON[CurrentName]["PathEdge"]["DTarget"];
-      std::string EdgeFunctionStr = JSON[CurrentName]["EdgeFn"];
+    size_t Index = 0;
+    for (const auto &PathEdgeJSON : JSON["PathEdge"]["DSource"]) {
+      std::string DSourceTest = JSON["PathEdge"]["DSource"][Index];
+      std::string TargetTest = JSON["PathEdge"]["Target"][Index];
+      std::string DTargetTest = JSON["PathEdge"]["DTarget"][Index];
 
-      d_t DSource = getDTFromMetaDataId(IRDB, llvm::StringRef(DSourceStr));
-      n_t Target = getNTFromMetaDataId(IRDB, llvm::StringRef(TargetStr));
-      d_t DTarget = getDTFromMetaDataId(IRDB, llvm::StringRef(DTargetStr));
-      PathEdge CurrPathEdge(DSource, Target, DTarget);
-      EdgeFunction CurrEdgeFn = stringToEdgeFunction(EdgeFunctionStr);
+      d_t DSource = getDTFromMetaDataId(IRDB, DSourceTest);
+      n_t Target = getNTFromMetaDataId(IRDB, TargetTest);
+      d_t DTarget = getDTFromMetaDataId(IRDB, DTargetTest);
 
-      WorkList.push_back({CurrPathEdge, CurrEdgeFn});
+      PathEdge PathEdgeToEmplace(DSource, Target, DTarget);
+
+      WorkListPathEdges.push_back(PathEdgeToEmplace);
+      Index++;
+    }
+
+    for (const auto &EdgeFnJSON : JSON["EdgeFn"]) {
+      EdgeFunction EdgeFunctionToEmplace = (stringToEdgeFunction(EdgeFnJSON));
+      WorkListEdgeFunctions.push_back(std::move(EdgeFunctionToEmplace));
+    }
+
+    assert(WorkListPathEdges.size() == WorkListEdgeFunctions.size());
+
+    for (size_t Index = 0; Index < WorkListPathEdges.size(); Index++) {
+      WorkList.push_back(
+          {WorkListPathEdges[Index], WorkListEdgeFunctions[Index]});
     }
   }
 
+  // Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>>
   void loadEndsummaryTab(const LLVMProjectIRDB &IRDB, llvm::StringRef Path) {
     nlohmann::json JSON = readJsonFile(Path);
 
-    for (size_t Index = 0; JSON.contains("Entry" + std::to_string(Index));
-         Index++) {
-      std::string CurrentName = "Entry" + std::to_string(Index);
+    std::vector<n_t> NTValues;
+    std::vector<d_t> DTValues;
+    std::vector<Table<n_t, d_t, EdgeFunction<l_t>>> InnerTables{};
 
-      std::string NTString = JSON[CurrentName]["n_t"];
-      std::string DTString = JSON[CurrentName]["d_t"];
+    for (const auto &CurrentNTVal : JSON["n_t"]) {
+      NTValues.push_back(getNTFromMetaDataId(IRDB, std::string(CurrentNTVal)));
+    }
 
-      n_t NTVal = getNTFromMetaDataId(IRDB, NTString);
-      d_t DTVal = getDTFromMetaDataId(IRDB, DTString);
+    for (const auto &CurrentDTVal : JSON["d_t"]) {
+      DTValues.push_back(getDTFromMetaDataId(IRDB, std::string(CurrentDTVal)));
+    }
 
-      Table<n_t, d_t, EdgeFunction<l_t>> InnerTable{};
+    for (size_t Index = 0; Index < JSON["n_t"].size(); Index++) {
+      Table<n_t, d_t, EdgeFunction<l_t>> CurrentInnerTable;
 
-      for (size_t InnerIndex = 0; JSON[CurrentName]["InnerTable"].contains(
-               "InnerEntry" + std::to_string(InnerIndex));
-           InnerIndex++) {
-        std::string InnerName = "InnerEntry" + std::to_string(InnerIndex);
+      for (const auto &CurrenInnerTable : JSON[std::to_string(Index)]) {
+        n_t InnerNTVal =
+            getNTFromMetaDataId(IRDB, std::string(CurrenInnerTable["n_t"]));
+        d_t InnerDTVal =
+            getDTFromMetaDataId(IRDB, std::string(CurrenInnerTable["d_t"]));
+        EdgeFunction<l_t> InnerEdgeFn =
+            stringToEdgeFunction(std::string(CurrenInnerTable["EdgeFn"]));
 
-        std::string InnerNTString =
-            JSON[CurrentName]["InnerTable"][InnerName]["n_t"];
-        std::string InnerDTString =
-            JSON[CurrentName]["InnerTable"][InnerName]["d_t"];
-
-        n_t InnerNTVal = getNTFromMetaDataId(IRDB, InnerNTString);
-        d_t InnerDTVal = getDTFromMetaDataId(IRDB, InnerDTString);
-        EdgeFunction<l_t> InnerEdgeFn = stringToEdgeFunction(
-            std::string(JSON[CurrentName]["InnerTable"][InnerName]["EdgeFn"]));
-
-        InnerTable.insert(InnerNTVal, InnerDTVal, InnerEdgeFn);
+        CurrentInnerTable.insert(InnerNTVal, InnerDTVal, InnerEdgeFn);
       }
 
-      EndsummaryTab.insert(NTVal, DTVal, std::move(InnerTable));
+      EndsummaryTab.insert(NTValues[Index], DTValues[Index],
+                           std::move(CurrentInnerTable));
     }
   }
 
@@ -711,11 +716,6 @@ public:
     loadWorkList(IRDB, Paths[1]);
     loadEndsummaryTab(IRDB, Paths[2]);
     loadIncomingTab(IRDB, Paths[3]);
-
-    llvm::sys::fs::remove(Paths[0]);
-    llvm::sys::fs::remove(Paths[1]);
-    llvm::sys::fs::remove(Paths[2]);
-    llvm::sys::fs::remove(Paths[3]);
   }
 
 protected:

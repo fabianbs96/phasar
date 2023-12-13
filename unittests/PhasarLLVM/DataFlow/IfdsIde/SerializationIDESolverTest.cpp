@@ -45,13 +45,10 @@ protected:
   const std::vector<std::string> EntryPoints = {"main"};
 
   void doAnalysis(const llvm::Twine &IRFile, LLVMTaintConfig &Config,
-                  bool DumpResults = false) {
+                  bool KeepJSONsAndPrintPaths = false) {
     HelperAnalyses HA(PathToLlFiles + IRFile, EntryPoints);
 
     auto TaintProblem =
-        createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
-
-    auto TaintProblem2 =
         createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
 
     IDESolver Solver(TaintProblem, &HA.getICFG());
@@ -76,7 +73,11 @@ protected:
             std::chrono::milliseconds{0});
         EXPECT_EQ(std::nullopt, Result);
         TempPaths = Solver.saveDataInJSONs();
+      }
 
+      IDESolver Solver(TaintProblem, &HA.getICFG());
+
+      if (KeepJSONsAndPrintPaths) {
         llvm::outs() << "TempPaths:\n";
         llvm::outs() << "[0]: " << TempPaths[0] << "\n";
         llvm::outs() << "[1]: " << TempPaths[1] << "\n";
@@ -84,8 +85,6 @@ protected:
         llvm::outs() << "[3]: " << TempPaths[3] << "\n";
         llvm::outs().flush();
       }
-
-      IDESolver Solver(TaintProblem2, &HA.getICFG());
 
       Solver.loadDataFromJSONs(
           HA.getProjectIRDB(),
@@ -98,6 +97,13 @@ protected:
       auto InteractiveRes =
           InterruptedResults.resultAt(Cell.getRowKey(), Cell.getColumnKey());
       EXPECT_EQ(InteractiveRes, Cell.getValue());
+    }
+
+    if (!KeepJSONsAndPrintPaths) {
+      llvm::sys::fs::remove(TempPaths[0]);
+      llvm::sys::fs::remove(TempPaths[1]);
+      llvm::sys::fs::remove(TempPaths[2]);
+      llvm::sys::fs::remove(TempPaths[3]);
     }
   }
 }; // Test Fixture
