@@ -157,9 +157,8 @@ public:
     return NonEmptyLookupByTargetNode[Target];
   }
 
-  const Table<n_t, d_t,
-              llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>> *
-  getNonEmptyReverseLookup() {
+  const Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+      *getNonEmptyReverseLookup() {
     return &NonEmptyReverseLookup;
   }
 

@@ -424,7 +424,7 @@ public:
   }
 
 private:
-  [[nodiscard]] Derived &self() & noexcept {
+  [[nodiscard]] Derived &self() &noexcept {
     static_assert(std::is_base_of_v<IDESolverAPIMixin, Derived>,
                   "Invalid CRTP instantiation");
     return static_cast<Derived &>(*this);
