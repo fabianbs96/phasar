@@ -1,5 +1,6 @@
 
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolverSerializer.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
@@ -72,7 +73,10 @@ protected:
             },
             std::chrono::milliseconds{0});
         EXPECT_EQ(std::nullopt, Result);
-        TempPaths = Solver.saveDataInJSONs();
+
+        llvm::StringRef PathForJSONs = "~/Desktop/";
+        TempPaths =
+            psr::IDESolverSerializer::saveDataInJSONs(PathForJSONs, Solver);
       }
 
       IDESolver Solver(TaintProblem, &HA.getICFG());
