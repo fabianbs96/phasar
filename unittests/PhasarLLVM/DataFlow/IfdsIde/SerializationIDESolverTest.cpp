@@ -55,10 +55,12 @@ protected:
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
+    llvm::StringRef PathToJSONs = "~/Desktop/";
+
     // run with interruption
     size_t Counter = 0;
     size_t InterruptionValue = 3;
-    std::array<std::string, 4> TempPaths;
+
     // results with interruption(s)
     auto InterruptedResults = [&] {
       {
@@ -74,25 +76,12 @@ protected:
             std::chrono::milliseconds{0});
         EXPECT_EQ(std::nullopt, Result);
 
-        llvm::StringRef PathForJSONs = "~/Desktop/";
-        TempPaths =
-            psr::IDESolverSerializer::saveDataInJSONs(PathForJSONs, Solver);
+        IDESolverSerializer::saveDataInJSONs(PathToJSONs, Solver);
       }
 
       IDESolver Solver(TaintProblem, &HA.getICFG());
 
-      if (KeepJSONsAndPrintPaths) {
-        llvm::outs() << "TempPaths:\n";
-        llvm::outs() << "[0]: " << TempPaths[0] << "\n";
-        llvm::outs() << "[1]: " << TempPaths[1] << "\n";
-        llvm::outs() << "[2]: " << TempPaths[2] << "\n";
-        llvm::outs() << "[3]: " << TempPaths[3] << "\n";
-        llvm::outs().flush();
-      }
-
-      Solver.loadDataFromJSONs(
-          HA.getProjectIRDB(),
-          {TempPaths[0], TempPaths[1], TempPaths[2], TempPaths[3]});
+      IDESolverSerializer::loadDataFromJSONs(HA.getProjectIRDB(), PathToJSONs);
 
       return std::move(Solver).continueSolving();
     }();
@@ -104,10 +93,10 @@ protected:
     }
 
     if (!KeepJSONsAndPrintPaths) {
-      llvm::sys::fs::remove(TempPaths[0]);
-      llvm::sys::fs::remove(TempPaths[1]);
-      llvm::sys::fs::remove(TempPaths[2]);
-      llvm::sys::fs::remove(TempPaths[3]);
+      llvm::sys::fs::remove(PathToJSONs + "JumpFunctions.json");
+      llvm::sys::fs::remove(PathToJSONs + "WorkList.json");
+      llvm::sys::fs::remove(PathToJSONs + "EndsummaryTab.json");
+      llvm::sys::fs::remove(PathToJSONs + "IncomingTab.json");
     }
   }
 }; // Test Fixture
