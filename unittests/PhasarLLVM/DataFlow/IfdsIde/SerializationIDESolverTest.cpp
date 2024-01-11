@@ -1,5 +1,6 @@
 
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolverDeserializer.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverSerializer.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
@@ -81,7 +82,8 @@ protected:
 
       IDESolver Solver(TaintProblem, &HA.getICFG());
 
-      IDESolverSerializer::loadDataFromJSONs(HA.getProjectIRDB(), PathToJSONs);
+      IDESolverDeserializer::loadDataFromJSONs(HA.getProjectIRDB(), PathToJSONs,
+                                               Solver);
 
       return std::move(Solver).continueSolving();
     }();

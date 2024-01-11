@@ -78,6 +78,7 @@ template <typename AnalysisDomainTy,
 class IDESolver
     : public IDESolverAPIMixin<IDESolver<AnalysisDomainTy, Container>> {
   friend IDESolverAPIMixin<IDESolver<AnalysisDomainTy, Container>>;
+  friend class IDESolverSerializer;
 
 public:
   using ProblemTy = IDETabulationProblem<AnalysisDomainTy, Container>;
@@ -268,61 +269,6 @@ public:
   consumeSolverResults() noexcept(std::is_nothrow_move_constructible_v<d_t>) {
     return OwningSolverResults<n_t, d_t, l_t>(std::move(this->ValTab),
                                               std::move(ZeroValue));
-  }
-
-  std::string getMetaDataIDOrZeroValue(const llvm::Value *V) {
-    if (LLVMZeroValue::isLLVMZeroValue(V)) {
-      return "zero_value";
-    }
-
-    return getMetaDataID(V);
-  }
-
-  EdgeFunction<l_t> stringToEdgeFunction(const std::string &EdgeFnAsStr) {
-    if (EdgeFnAsStr == "AllBottom") {
-      return AllBottom<l_t>();
-    }
-
-    if (EdgeFnAsStr == "EdgeIdentity") {
-      return EdgeIdentity<l_t>();
-    }
-
-    llvm::report_fatal_error(llvm::Twine("unknown case"));
-  }
-
-  const llvm::Value *fromMetaDataIdOrZeroValue(const LLVMProjectIRDB &IRDB,
-                                               llvm::StringRef Id) {
-    if (Id == "zero_value") {
-      return ZeroValue;
-    }
-
-    return fromMetaDataId(IRDB, Id);
-  }
-
-  d_t getDTFromMetaDataId(const LLVMProjectIRDB &IRDB, llvm::StringRef Id) {
-    const auto *Value = fromMetaDataIdOrZeroValue(IRDB, Id);
-
-    if (!Value) {
-      llvm::report_fatal_error(
-          llvm::Twine("[getDTFromMetaDataId()]: Value is null"));
-    }
-
-    return Value;
-  }
-
-  n_t getNTFromMetaDataId(const LLVMProjectIRDB &IRDB, llvm::StringRef Id) {
-    const auto *Value = fromMetaDataId(IRDB, Id);
-
-    if (!Value) {
-      llvm::report_fatal_error(
-          llvm::Twine("[getNTFromMetaDataId()]: Value is null"));
-    }
-
-    if (const auto *Instr = llvm::dyn_cast_or_null<llvm::Instruction>(Value)) {
-      return Instr;
-    }
-
-    llvm::report_fatal_error("Value could not be casted to llvm::Instruction");
   }
 
 protected:
