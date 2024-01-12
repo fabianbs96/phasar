@@ -87,7 +87,7 @@ public:
                          const nlohmann::json &SerializedCG,
                          LLVMTypeHierarchy *TH = nullptr);
 
-  ~LLVMBasedICFG();
+  ~LLVMBasedICFG() = default;
 
   LLVMBasedICFG(const LLVMBasedICFG &) = delete;
   LLVMBasedICFG &operator=(const LLVMBasedICFG &) = delete;

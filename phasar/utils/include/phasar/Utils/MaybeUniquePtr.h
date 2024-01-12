@@ -11,6 +11,7 @@
 #define PHASAR_UTILS_MAYBEUNIQUEPTR_H_
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 
 #include <memory>
 #include <type_traits>
@@ -40,8 +41,12 @@ protected:
 };
 
 template <typename T> class MaybeUniquePtrBase<T, true> {
+  struct PointerTraits : llvm::PointerLikeTypeTraits<T *> {
+    static constexpr int NumLowBitsAvailable = 1;
+  };
+
 protected:
-  llvm::PointerIntPair<T *, 1, bool> Data{};
+  llvm::PointerIntPair<T *, 1, bool, PointerTraits> Data{};
 
   MaybeUniquePtrBase(T *Ptr, bool Owns) noexcept : Data{Ptr, Owns} {
     static_assert(alignof(T) > 1,

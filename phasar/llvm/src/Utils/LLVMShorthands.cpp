@@ -18,6 +18,7 @@
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Utilities.h"
 

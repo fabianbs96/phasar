@@ -167,7 +167,7 @@ LLVMTaintConfig::LLVMTaintConfig(const psr::LLVMProjectIRDB &Code,
     // add corresponding Allocas or getElementPtr instructions to the taint
     // category
     for (const auto &VarDesc : Config["variables"]) {
-      for (const auto *I : Code.instructions()) {
+      for (const auto *I : Code.getAllInstructions()) {
         if (const auto *DbgDeclare = llvm::dyn_cast<llvm::DbgDeclareInst>(I)) {
           const llvm::DILocalVariable *LocalVar = DbgDeclare->getVariable();
           // matching line number with for Allocas
@@ -330,7 +330,8 @@ bool LLVMTaintConfig::isSanitizerImpl(const llvm::Value *V) const {
 }
 
 void LLVMTaintConfig::forAllGeneratedValuesAtImpl(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst, const llvm::Instruction * /*Succ*/,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);
@@ -365,7 +366,8 @@ void LLVMTaintConfig::forAllGeneratedValuesAtImpl(
 }
 
 void LLVMTaintConfig::forAllLeakCandidatesAtImpl(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst, const llvm::Instruction * /*Succ*/,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);
@@ -391,7 +393,8 @@ void LLVMTaintConfig::forAllLeakCandidatesAtImpl(
 }
 
 void LLVMTaintConfig::forAllSanitizedValuesAtImpl(
-    const llvm::Instruction *Inst, const llvm::Function *Callee,
+    const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+    const llvm::Function *Callee,
     llvm::function_ref<void(const llvm::Value *)> Handler) const {
   assert(Inst != nullptr);
   assert(Handler);

@@ -54,7 +54,8 @@ private:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllGeneratedValuesAtImpl(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   /// \brief Calls Handler for all operands of Inst that may generate a leak
@@ -63,7 +64,8 @@ private:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllLeakCandidatesAtImpl(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   /// \brief Calls Handler for all operands of Inst that become sanitized after
@@ -72,7 +74,8 @@ private:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   void forAllSanitizedValuesAtImpl(
-      const llvm::Instruction *Inst, const llvm::Function *Callee,
+      const llvm::Instruction *Inst, const llvm::Instruction *Succ,
+      const llvm::Function *Callee,
       llvm::function_ref<void(const llvm::Value *)> Handler) const;
 
   [[nodiscard]] bool generatesValuesAtImpl(const llvm::Instruction *Inst,

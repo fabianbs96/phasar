@@ -3,8 +3,9 @@
 #include "phasar/Config/Configuration.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/Passes/FunctionAnnotationPass.h"
+#include "phasar/PhasarLLVM/Passes/ValueAnnotationPass.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
@@ -16,8 +17,6 @@
 
 #include <string>
 #include <vector>
-
-#include <boost/container/flat_set.hpp>
 
 using namespace std;
 using namespace psr;
@@ -388,10 +387,9 @@ TEST(LLVMBasedICFGTest, GlobalCtorDtor_4) {
 TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
   psr::ValueAnnotationPass::resetValueID();
   psr::FunctionAnnotationPass::resetFunctionID();
-  ProjectIRDB IRDB({"llvm_test_code/call_graphs/runtime_edges_1.ll"},
-                   IRDBOptions::WPA);
+  LLVMProjectIRDB IRDB("llvm_test_code/call_graphs/runtime_edges_1.ll");
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::NORESOLVE, {"main"}, &TH,
                      &PT, Soundness::Unsound, true);
 
@@ -425,10 +423,9 @@ TEST(LLVMBasedICFGTest, RuntimeEdges_1) {
 TEST(LLVMBasedICFGTest, RuntimeEdges_2) {
   psr::ValueAnnotationPass::resetValueID();
   psr::FunctionAnnotationPass::resetFunctionID();
-  ProjectIRDB IRDB({"llvm_test_code/call_graphs/runtime_edges_1.ll"},
-                   IRDBOptions::WPA);
+  LLVMProjectIRDB IRDB("llvm_test_code/call_graphs/runtime_edges_1.ll");
   LLVMTypeHierarchy TH(IRDB);
-  LLVMPointsToSet PT(IRDB);
+  LLVMAliasSet PT(&IRDB);
   LLVMBasedICFG ICFG(&IRDB, CallGraphAnalysisType::OTF, {"main"}, &TH, &PT,
                      Soundness::Unsound, true);
   const llvm::Function *Main = IRDB.getFunctionDefinition("main");

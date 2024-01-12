@@ -78,6 +78,8 @@ public:
   [[nodiscard]] llvm::Function *
   getFunctionDefinition(llvm::StringRef FunctionName);
 
+  [[nodiscard]] const llvm::Function *getFunctionById(unsigned Id) const;
+
   /// Also use the const overload
   using ProjectIRDBBase::getModule;
   /// Non-const overload

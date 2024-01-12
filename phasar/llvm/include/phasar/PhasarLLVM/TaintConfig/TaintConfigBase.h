@@ -41,6 +41,8 @@ public:
 
   using TaintDescriptionCallBackTy =
       llvm::unique_function<std::set<v_t>(n_t) const>;
+  using TaintDescriptionEdgeCallBackTy =
+      llvm::unique_function<std::set<v_t>(n_t, n_t) const>;
 
   void registerSourceCallBack(TaintDescriptionCallBackTy CB) noexcept {
     SourceCallBack = std::move(CB);
@@ -50,6 +52,10 @@ public:
   }
   void registerSanitizerCallBack(TaintDescriptionCallBackTy CB) noexcept {
     SanitizerCallBack = std::move(CB);
+  }
+  void
+  registerSanitizerEdgeCallBack(TaintDescriptionEdgeCallBackTy CB) noexcept {
+    SanitizerEdgeCallBack = std::move(CB);
   }
 
   [[nodiscard]] const TaintDescriptionCallBackTy &
@@ -63,6 +69,10 @@ public:
   [[nodiscard]] const TaintDescriptionCallBackTy &
   getRegisteredSanitizerCallBack() const noexcept {
     return SanitizerCallBack;
+  }
+  [[nodiscard]] const TaintDescriptionEdgeCallBackTy &
+  getRegisteredSanitizerEdgeCallBack() const noexcept {
+    return SanitizerEdgeCallBack;
   }
 
   [[nodiscard]] bool isSource(v_t Val) const {
@@ -81,9 +91,10 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   template <typename HandlerFn>
-  void forAllGeneratedValuesAt(n_t Inst, Nullable<f_t> Callee,
+  void forAllGeneratedValuesAt(n_t Inst, n_t Succ, Nullable<f_t> Callee,
                                HandlerFn &&Handler) const {
-    self().forAllGeneratedValuesAtImpl(std::move(Inst), std::move(Callee),
+    self().forAllGeneratedValuesAtImpl(std::move(Inst), std::move(Succ),
+                                       std::move(Callee),
                                        std::forward<HandlerFn>(Handler));
   }
 
@@ -93,9 +104,10 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   template <typename HandlerFn>
-  void forAllLeakCandidatesAt(n_t Inst, Nullable<f_t> Callee,
+  void forAllLeakCandidatesAt(n_t Inst, n_t Succ, Nullable<f_t> Callee,
                               HandlerFn &&Handler) const {
-    self().forAllLeakCandidatesAtImpl(std::move(Inst), std::move(Callee),
+    self().forAllLeakCandidatesAtImpl(std::move(Inst), std::move(Succ),
+                                      std::move(Callee),
                                       std::forward<HandlerFn>(Handler));
   }
 
@@ -105,9 +117,10 @@ public:
   /// If Inst is a function-call, the Callee function should be specified
   /// explicitly.
   template <typename HandlerFn>
-  void forAllSanitizedValuesAt(n_t Inst, Nullable<f_t> Callee,
+  void forAllSanitizedValuesAt(n_t Inst, n_t Succ, Nullable<f_t> Callee,
                                HandlerFn &&Handler) const {
-    self().forAllSanitizedValuesAtImpl(std::move(Inst), std::move(Callee),
+    self().forAllSanitizedValuesAtImpl(std::move(Inst), std::move(Succ),
+                                       std::move(Callee),
                                        std::forward<HandlerFn>(Handler));
   }
 
@@ -154,6 +167,8 @@ protected:
   TaintDescriptionCallBackTy SourceCallBack{};
   TaintDescriptionCallBackTy SinkCallBack{};
   TaintDescriptionCallBackTy SanitizerCallBack{};
+
+  TaintDescriptionEdgeCallBackTy SanitizerEdgeCallBack{};
 };
 
 //===----------------------------------------------------------------------===//

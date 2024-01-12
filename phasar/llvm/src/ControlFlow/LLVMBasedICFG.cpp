@@ -398,8 +398,6 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
   }
 }
 
-LLVMBasedICFG::~LLVMBasedICFG() = default;
-
 [[nodiscard]] FunctionRange LLVMBasedICFG::getAllFunctionsImpl() const {
   return IRDB->getAllFunctions();
 }

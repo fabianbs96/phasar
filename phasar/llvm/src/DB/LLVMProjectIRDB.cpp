@@ -185,6 +185,19 @@ LLVMProjectIRDB::getFunctionDefinitionImpl(llvm::StringRef FunctionName) const {
   return internalGetFunctionDefinition(*Mod, FunctionName);
 }
 
+const llvm::Function *LLVMProjectIRDB::getFunctionById(unsigned Id) const {
+  /// Maybe cache this mapping later on
+
+  for (const auto &F : *Mod) {
+    auto FId = getFunctionId(&F);
+    if (FId && *FId == Id) {
+      return &F;
+    }
+  }
+
+  return nullptr;
+}
+
 [[nodiscard]] const llvm::GlobalVariable *
 LLVMProjectIRDB::getGlobalVariableDefinitionImpl(
     llvm::StringRef GlobalVariableName) const {
