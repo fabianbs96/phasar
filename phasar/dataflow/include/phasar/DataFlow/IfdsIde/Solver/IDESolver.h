@@ -261,6 +261,11 @@ public:
                                               std::move(ZeroValue));
   }
 
+  [[nodiscard]] const JumpFunctions<AnalysisDomainTy, Container> &
+  getJumpFunctions() const noexcept {
+    return *JumpFn;
+  }
+
 protected:
   /// Lines 13-20 of the algorithm; processing a call site in the caller's
   /// context.

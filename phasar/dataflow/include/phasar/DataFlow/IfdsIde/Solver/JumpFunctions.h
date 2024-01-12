@@ -43,37 +43,9 @@ public:
   using d_t = typename AnalysisDomainTy::d_t;
   using n_t = typename AnalysisDomainTy::n_t;
 
-private:
-  const IDETabulationProblem<AnalysisDomainTy, Container> &Problem;
-
-protected:
-  // mapping from target node and value to a list of all source values and
-  // associated functions where the list is implemented as a mapping from
-  // the source value to the function we exclude empty default functions
-  Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
-      NonEmptyReverseLookup;
-  // mapping from source value and target node to a list of all target values
-  // and associated functions where the list is implemented as a mapping from
-  // the source value to the function we exclude empty default functions
-  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
-      NonEmptyForwardLookup;
-  // a mapping from target node to a list of triples consisting of source value,
-  // target value and associated function; the triple is implemented by a table
-  // we exclude empty default functions
-  std::unordered_map<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
-      NonEmptyLookupByTargetNode;
-
-public:
-  JumpFunctions(
-      const IDETabulationProblem<AnalysisDomainTy, Container> &Problem)
+  explicit JumpFunctions(
+      const IDETabulationProblem<AnalysisDomainTy, Container> &Problem) noexcept
       : Problem(Problem) {}
-
-  ~JumpFunctions() = default;
-
-  JumpFunctions(const JumpFunctions &JFs) = default;
-  JumpFunctions &operator=(const JumpFunctions &JFs) = default;
-  JumpFunctions(JumpFunctions &&JFs) noexcept = default;
-  JumpFunctions &operator=(JumpFunctions &&JFs) noexcept = default;
 
   /**
    * Records a jump function. The source statement is implicit.
@@ -142,6 +114,19 @@ public:
   }
 
   /**
+   * Returns, for a given target statement and value all associated
+   * source values, and for each the associated edge function.
+   * The return value is a mapping from source value to function.
+   */
+  const llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>> *
+  reverseLookup(n_t Target, d_t TargetVal) const {
+    if (!NonEmptyReverseLookup.contains(Target, TargetVal)) {
+      return nullptr;
+    }
+    return &NonEmptyReverseLookup.get(Target, TargetVal);
+  }
+
+  /**
    * Returns, for a given source value and target statement all
    * associated target values, and for each the associated edge function.
    * The return value is a mapping from target value to function.
@@ -156,6 +141,19 @@ public:
   }
 
   /**
+   * Returns, for a given source value and target statement all
+   * associated target values, and for each the associated edge function.
+   * The return value is a mapping from target value to function.
+   */
+  const llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>> *
+  forwardLookup(d_t SourceVal, n_t Target) const {
+    if (!NonEmptyForwardLookup.contains(SourceVal, Target)) {
+      return nullptr;
+    }
+    return &NonEmptyForwardLookup.get(SourceVal, Target);
+  }
+
+  /**
    * Returns for a given target statement all jump function records with this
    * target.
    * The return value is a set of records of the form
@@ -163,6 +161,20 @@ public:
    */
   Table<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
     return NonEmptyLookupByTargetNode[Target];
+  }
+
+  /**
+   * Returns for a given target statement all jump function records with this
+   * target.
+   * The return value is a set of records of the form
+   * (sourceVal,targetVal,edgeFunction).
+   */
+  const Table<d_t, d_t, EdgeFunctionPtrType> &lookupByTarget(n_t Target) const {
+    auto It = NonEmptyLookupByTargetNode.find(Target);
+    if (It == NonEmptyLookupByTargetNode.end()) {
+      return getDefaultValue<Table<d_t, d_t, EdgeFunctionPtrType>>();
+    }
+    return It->second;
   }
 
   /**
@@ -196,13 +208,13 @@ public:
   /**
    * Removes all jump functions
    */
-  void clear() {
+  void clear() noexcept {
     NonEmptyReverseLookup.clear();
     NonEmptyForwardLookup.clear();
     NonEmptyLookupByTargetNode.clear();
   }
 
-  void printJumpFunctions(llvm::raw_ostream &OS) {
+  void printJumpFunctions(llvm::raw_ostream &OS) const {
     OS << "\n******************************************************";
     OS << "\n*              Print all Jump Functions              *";
     OS << "\n******************************************************\n";
@@ -218,7 +230,7 @@ public:
     }
   }
 
-  void printNonEmptyReverseLookup(llvm::raw_ostream &OS) {
+  void printNonEmptyReverseLookup(llvm::raw_ostream &OS) const {
     OS << "DUMP nonEmptyReverseLookup\nTable<N, D, std::unordered_map<D, "
           "EdgeFunctionPtrType>>\n";
     auto CellVec = NonEmptyReverseLookup.cellVec();
@@ -233,7 +245,7 @@ public:
     }
   }
 
-  void printNonEmptyForwardLookup(llvm::raw_ostream &OS) {
+  void printNonEmptyForwardLookup(llvm::raw_ostream &OS) const {
     OS << "DUMP nonEmptyForwardLookup\nTable<D, N, std::unordered_map<D, "
           "EdgeFunctionPtrType>>\n";
     auto CellVec = NonEmptyForwardLookup.cellVec();
@@ -248,7 +260,7 @@ public:
     }
   }
 
-  void printNonEmptyLookupByTargetNode(llvm::raw_ostream &OS) {
+  void printNonEmptyLookupByTargetNode(llvm::raw_ostream &OS) const {
     OS << "DUMP nonEmptyLookupByTargetNode\nstd::unordered_map<N, Table<D, D, "
           "EdgeFunctionPtrType>>\n";
     for (auto Node : NonEmptyLookupByTargetNode) {
@@ -263,6 +275,26 @@ public:
       OS << '\n';
     }
   }
+
+private:
+  const IDETabulationProblem<AnalysisDomainTy, Container> &Problem;
+
+  // mapping from target node and value to a list of all source values and
+  // associated functions where the list is implemented as a mapping from
+  // the source value to the function we exclude empty default functions
+  Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+      NonEmptyReverseLookup;
+  // mapping from source value and target node to a list of all target values
+  // and associated functions where the list is implemented as a mapping from
+  // the source value to the function we exclude empty default functions
+  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+      NonEmptyForwardLookup;
+  // a mapping from target node to a list of triples consisting of source value,
+  // target value and associated function; the triple is implemented by a table
+  // we exclude empty default functions
+  std::unordered_map<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
+      NonEmptyLookupByTargetNode;
+
 }; // namespace psr
 
 } // namespace psr
