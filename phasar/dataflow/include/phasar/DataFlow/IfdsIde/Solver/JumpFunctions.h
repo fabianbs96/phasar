@@ -18,6 +18,7 @@
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_JUMPFUNCTIONS_H
 
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
+#include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Table.h"
 
@@ -169,10 +170,10 @@ public:
    * The return value is a set of records of the form
    * (sourceVal,targetVal,edgeFunction).
    */
-  const Table<d_t, d_t, EdgeFunctionPtrType> &lookupByTarget(n_t Target) const {
+  const Table<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) const {
     auto It = NonEmptyLookupByTargetNode.find(Target);
     if (It == NonEmptyLookupByTargetNode.end()) {
-      return getDefaultValue<Table<d_t, d_t, EdgeFunctionPtrType>>();
+      return getDefaultValue<Table<d_t, d_t, EdgeFunction<l_t>>>();
     }
     return It->second;
   }
