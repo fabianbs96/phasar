@@ -17,6 +17,8 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_IDESOLVERSERIALIZER_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_IDESOLVERSERIALIZER_H
 
+#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
+
 #include "IDESolver.h"
 
 namespace psr {
@@ -55,7 +57,9 @@ public:
         JSON["TargetVal"][std::to_string(Index)].push_back(
             Serializer.getMetaDataIDOrZeroValue(CurrentVal.first));
         JSON["EdgeFn"][std::to_string(Index)].push_back(
-            Serializer.edgeFunctionToString(CurrentVal.second));
+            Serializer.edgeFunctionToString<
+                EdgeFunction<typename AnalysisDomainTy::l_t>>(
+                CurrentVal.second));
       }
       Index++;
     });
@@ -93,7 +97,9 @@ public:
           Serializer.getMetaDataIDOrZeroValue(PathEdgeSecond));
       JSON["PathEdge"]["DTarget"].push_back(
           Serializer.getMetaDataIDOrZeroValue(PathEdgeThird));
-      JSON["EdgeFn"].push_back(Serializer.edgeFunctionToString(Curr.second));
+      JSON["EdgeFn"].push_back(
+          Serializer.edgeFunctionToString<
+              EdgeFunction<typename AnalysisDomainTy::l_t>>(Curr.second));
     }
 
     std::error_code EC;
@@ -130,7 +136,8 @@ public:
         JSON[InnerTableName]["d_t"].push_back(
             Serializer.getMetaDataIDOrZeroValue(Col));
         JSON[InnerTableName]["EdgeFn"].push_back(
-            Serializer.edgeFunctionToString(Val));
+            Serializer.edgeFunctionToString<
+                EdgeFunction<typename AnalysisDomainTy::l_t>>((Val)));
       });
 
       Index++;
@@ -182,7 +189,7 @@ public:
     FileStream << JSON;
   }
 
-private:
+  // private:
   IDESolverSerializer() = default;
 
   std::string getMetaDataIDOrZeroValue(const llvm::Value *V) {
@@ -193,15 +200,16 @@ private:
     return getMetaDataID(V);
   }
 
-  template <typename AnalysisDomainTy,
-            typename Container = std::set<typename AnalysisDomainTy::d_t>>
+  template <typename AnalysisDomainTy>
   std::string
   edgeFunctionToString(EdgeFunction<typename AnalysisDomainTy::l_t> EdgeFnVal) {
-    if (llvm::isa<AllBottom<typename AnalysisDomainTy::l_t>>(EdgeFnVal)) {
+    using l_t = typename AnalysisDomainTy::l_t;
+
+    if (llvm::isa<AllBottom<l_t>>(EdgeFnVal)) {
       return "AllBottom";
     }
 
-    if (llvm::isa<EdgeIdentity<typename AnalysisDomainTy::l_t>>(EdgeFnVal)) {
+    if (llvm::isa<EdgeIdentity<l_t>>(EdgeFnVal)) {
       return "EdgeIdentity";
     }
 

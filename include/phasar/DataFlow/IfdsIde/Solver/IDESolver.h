@@ -79,6 +79,7 @@ class IDESolver
     : public IDESolverAPIMixin<IDESolver<AnalysisDomainTy, Container>> {
   friend IDESolverAPIMixin<IDESolver<AnalysisDomainTy, Container>>;
   friend class IDESolverSerializer;
+  friend class IDESolverDeserializer;
 
 public:
   using ProblemTy = IDETabulationProblem<AnalysisDomainTy, Container>;

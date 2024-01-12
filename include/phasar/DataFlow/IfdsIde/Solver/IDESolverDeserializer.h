@@ -28,7 +28,7 @@ public:
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
   static void
   loadDataFromJSONs(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToJSONs,
-                    const IDESolver<AnalysisDomainTy, Container> &Solver) {
+                    IDESolver<AnalysisDomainTy, Container> &Solver) {
     std::string PathToJumpFunctionJSON =
         PathToJSONs.str() + "JumpFunctions.json";
     loadJumpFunctions(IRDB, PathToJumpFunctionJSON, Solver);
@@ -52,7 +52,7 @@ public:
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
   static void
   loadJumpFunctions(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
-                    const IDESolver<AnalysisDomainTy, Container> &Solver) {
+                    IDESolver<AnalysisDomainTy, Container> &Solver) {
     nlohmann::json JSON = readJsonFile(PathToFile);
 
     std::vector<std::string> SourceValStrs;
@@ -103,8 +103,9 @@ public:
            InnerIndex++) {
         d_t TargetVal = Deserializer.getDTFromMetaDataId(
             IRDB, TargetValStrs[Index][InnerIndex], Solver);
-        EdgeFunction<l_t> EdgeFunc = Deserializer.stringToEdgeFunction(
-            EdgeFnStrs[Index][InnerIndex], Solver);
+        EdgeFunction<l_t> EdgeFunc =
+            Deserializer.stringToEdgeFunction<EdgeFunction<l_t>>(
+                EdgeFnStrs[Index][InnerIndex]);
 
         Solver.JumpFn->addFunction(SourceVal, Target, TargetVal, EdgeFunc);
       }
@@ -113,9 +114,9 @@ public:
 
   template <typename AnalysisDomainTy,
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
-  static void
-  loadWorkList(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
-               const IDESolver<AnalysisDomainTy, Container> &Solver) {
+  static void loadWorkList(const LLVMProjectIRDB &IRDB,
+                           const llvm::Twine &PathToFile,
+                           IDESolver<AnalysisDomainTy, Container> &Solver) {
     nlohmann::json JSON = readJsonFile(PathToFile);
     IDESolverDeserializer Deserializer;
 
@@ -144,7 +145,7 @@ public:
 
     for (const auto &EdgeFnJSON : JSON["EdgeFn"]) {
       EdgeFunction EdgeFunctionToEmplace =
-          (stringToEdgeFunction(EdgeFnJSON, Solver));
+          (Deserializer.stringToEdgeFunction<EdgeFunction<l_t>>(EdgeFnJSON));
       WorkListEdgeFunctions.push_back(std::move(EdgeFunctionToEmplace));
     }
 
@@ -162,7 +163,7 @@ public:
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
   static void
   loadEndsummaryTab(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
-                    const IDESolver<AnalysisDomainTy, Container> &Solver) {
+                    IDESolver<AnalysisDomainTy, Container> &Solver) {
     nlohmann::json JSON = readJsonFile(PathToFile);
     IDESolverDeserializer Deserializer;
 
@@ -192,8 +193,9 @@ public:
             IRDB, std::string(CurrenInnerTable["n_t"]));
         d_t InnerDTVal = Deserializer.getDTFromMetaDataId(
             IRDB, std::string(CurrenInnerTable["d_t"]), Solver);
-        EdgeFunction<l_t> InnerEdgeFn = Deserializer.stringToEdgeFunction(
-            std::string(CurrenInnerTable["EdgeFn"]), Solver);
+        EdgeFunction<l_t> InnerEdgeFn =
+            Deserializer.stringToEdgeFunction<EdgeFunction<l_t>>(
+                std::string(CurrenInnerTable["EdgeFn"]));
 
         CurrentInnerTable.insert(InnerNTVal, InnerDTVal, InnerEdgeFn);
       }
@@ -205,9 +207,9 @@ public:
 
   template <typename AnalysisDomainTy,
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
-  static void
-  loadIncomingTab(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
-                  const IDESolver<AnalysisDomainTy, Container> &Solver) {
+  static void loadIncomingTab(const LLVMProjectIRDB &IRDB,
+                              const llvm::Twine &PathToFile,
+                              IDESolver<AnalysisDomainTy, Container> &Solver) {
     nlohmann::json JSON = readJsonFile(PathToFile);
     IDESolverDeserializer Deserializer;
 
@@ -255,7 +257,7 @@ public:
     }
   }
 
-private:
+  // private:
   IDESolverDeserializer() = default;
 
   template <typename AnalysisDomainTy,
@@ -301,9 +303,8 @@ private:
     return fromMetaDataId(IRDB, Id);
   }
 
-  template <typename AnalysisDomainTy,
-            typename Container = std::set<typename AnalysisDomainTy::d_t>>
-  static EdgeFunction<typename AnalysisDomainTy::l_t>
+  template <typename AnalysisDomainTy>
+  EdgeFunction<typename AnalysisDomainTy::l_t>
   stringToEdgeFunction(const std::string &EdgeFnAsStr) {
     if (EdgeFnAsStr == "AllBottom") {
       return AllBottom<typename AnalysisDomainTy::l_t>();
