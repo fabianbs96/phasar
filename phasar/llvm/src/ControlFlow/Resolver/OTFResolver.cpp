@@ -127,10 +127,6 @@ auto OTFResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
     }
   }
 
-  if (PossibleCallTargets.empty() && S == Soundness::Soundy) {
-    return CHAResolver::resolveVirtualCall(CallSite);
-  }
-
   return PossibleCallTargets;
 }
 

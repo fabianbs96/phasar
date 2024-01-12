@@ -107,13 +107,13 @@ public:
   exportICFGAsJson(bool WithSourceCodeInfo = true) const;
 
   [[nodiscard]] size_t getNumVertexFunctions() const noexcept {
-    return CG.getNumVertexFunctions();
+    return CG.viewCallGraph().getNumVertexFunctions();
   }
 
   /// Returns all functions from the underlying IRDB that are part of the ICFG,
   /// i.e. that are reachable from the entry-points
   [[nodiscard]] auto getAllVertexFunctions() const noexcept {
-    return CG.getAllVertexFunctions();
+    return CG.viewCallGraph().getAllVertexFunctions();
   }
 
   /// Gets the underlying IRDB
@@ -154,7 +154,7 @@ private:
   void printImpl(llvm::raw_ostream &OS) const;
   [[nodiscard]] nlohmann::json getAsJsonImpl() const;
   [[nodiscard]] const CallGraph<n_t, f_t> &getCallGraphImpl() const noexcept {
-    return CG;
+    return CG.viewCallGraph();
   }
 
   [[nodiscard]] llvm::Function *buildCRuntimeGlobalCtorsDtorsModel(
@@ -162,7 +162,7 @@ private:
 
   // ---
 
-  CallGraph<const llvm::Instruction *, const llvm::Function *> CG;
+  CallGraphBuilder<const llvm::Instruction *, const llvm::Function *> CG;
   llvm::DenseSet<const llvm::Instruction *> UnsoundCallSites;
   LLVMProjectIRDB *IRDB = nullptr;
   MaybeUniquePtr<LLVMTypeHierarchy, true> TH;

@@ -168,6 +168,10 @@ public:
   using FunctionVertexTy = typename CallGraph<n_t, f_t>::FunctionVertexTy;
   using InstructionVertexTy = typename CallGraph<n_t, f_t>::InstructionVertexTy;
 
+  CallGraphBuilder() noexcept = default;
+  explicit CallGraphBuilder(CallGraph<N, F> &&CG) noexcept
+      : CG(std::move(CG)) {}
+
   void reserve(size_t MaxNumFunctions) {
     CG.FunVertexOwner.reserve(MaxNumFunctions);
     CG.CalleesAt.reserve(MaxNumFunctions);

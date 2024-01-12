@@ -41,6 +41,8 @@ struct LLVMBasedICFG::Builder {
   LLVMProjectIRDB *IRDB = nullptr;
   LLVMAliasInfoRef PT{};
   LLVMTypeHierarchy *TH{};
+  llvm::DenseSet<const llvm::Instruction *> &UnsoundCallSites;
+  std::vector<const llvm::Instruction *> UnsoundIndirectCalls{};
   CallGraphBuilder<const llvm::Instruction *, const llvm::Function *>
       CGBuilder{};
   std::unique_ptr<Resolver> Res = nullptr;
@@ -61,7 +63,8 @@ struct LLVMBasedICFG::Builder {
 
   void initEntryPoints(llvm::ArrayRef<std::string> EntryPoints);
   void initGlobalsAndWorkList(LLVMBasedICFG *ICFG, bool IncludeGlobals);
-  [[nodiscard]] CallGraph<const llvm::Instruction *, const llvm::Function *>
+  [[nodiscard]] CallGraphBuilder<const llvm::Instruction *,
+                                 const llvm::Function *>
   buildCallGraph(Soundness S);
 
   /// \returns FixPointReached
@@ -116,8 +119,8 @@ void LLVMBasedICFG::Builder::initGlobalsAndWorkList(LLVMBasedICFG *ICFG,
   CGBuilder.reserve(IRDB->getNumFunctions());
 }
 
-auto LLVMBasedICFG::Builder::buildCallGraph(Soundness /*S*/)
-    -> CallGraph<n_t, f_t> {
+auto LLVMBasedICFG::Builder::buildCallGraph(Soundness S)
+    -> CallGraphBuilder<n_t, f_t> {
   PHASAR_LOG_LEVEL_CAT(INFO, "LLVMBasedICFG",
                        "Starting CallGraphAnalysisType: " << Res->str());
   VisitedFunctions.reserve(IRDB->getNumFunctions());
@@ -163,7 +166,7 @@ auto LLVMBasedICFG::Builder::buildCallGraph(Soundness /*S*/)
   REG_COUNTER("CG Edges", boost::num_edges(ret), PAMM_SEVERITY_LEVEL::Full);
   PHASAR_LOG_LEVEL_CAT(INFO, "LLVMBasedICFG",
                        "Call graph has been constructed");
-  return CGBuilder.consumeCallGraph();
+  return std::move(CGBuilder);
 }
 
 bool LLVMBasedICFG::Builder::processFunction(const llvm::Function *F,
@@ -349,7 +352,7 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
     this->TH = std::make_unique<LLVMTypeHierarchy>(*IRDB);
   }
 
-  Builder B{IRDB, PT, this->TH.get()};
+  Builder B{IRDB, PT, this->TH.get(), UnsoundCallSites};
   LLVMAliasInfo PTOwn;
 
   if (!PT && CGType == CallGraphAnalysisType::OTF) {
@@ -448,26 +451,27 @@ LLVMBasedICFG::~LLVMBasedICFG() = default;
 }
 
 void LLVMBasedICFG::printImpl(llvm::raw_ostream &OS) const {
-  CG.printAsDot(
+  CG.viewCallGraph().printAsDot(
       OS, [](f_t Fun) { return Fun->getName(); },
       [](n_t CS) { return CS->getFunction(); },
       [](n_t CS) { return llvmIRToStableString(CS); });
 }
 
 [[nodiscard]] nlohmann::json LLVMBasedICFG::getAsJsonImpl() const {
-  return CG.getAsJson(
+  return CG.viewCallGraph().getAsJson(
       [](f_t F) { return F->getName().str(); },
       [this](n_t Inst) { return IRDB->getInstructionId(Inst); });
 }
 
 bool LLVMBasedICFG::addEdgeToICFG(const llvm::Instruction *CallSite,
                                   const llvm::Function *CallTarget) {
-  auto *InstVtx = addInstructionVertex(CallSite);
+
+  auto *InstVtx = CG.addInstructionVertex(CallSite);
   assert(InstVtx);
-  if (llvm::find(*InstVtx, CallTarget) != InstVtx->end()) {
+  if (llvm::is_contained(*InstVtx, CallTarget)) {
     return false;
   }
-  addCallEdge(CallSite, InstVtx, CallTarget);
+  CG.addCallEdge(CallSite, InstVtx, CallTarget);
   ++TotalRuntimeEdgesAdded;
   return true;
 }
