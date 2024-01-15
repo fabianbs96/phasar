@@ -21,6 +21,8 @@
 
 #include "IDESolver.h"
 
+#include <llvm-14/llvm/ADT/StringRef.h>
+
 namespace psr {
 
 class IDESolverSerializer {
@@ -64,8 +66,9 @@ public:
       Index++;
     });
 
+    std::string JumpFunctionsPath = Path.str() + "JumpFunctions.json";
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(Path.getSingleStringRef(), EC);
+    llvm::raw_fd_ostream FileStream(JumpFunctionsPath, EC);
 
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
@@ -102,8 +105,9 @@ public:
               EdgeFunction<typename AnalysisDomainTy::l_t>>(Curr.second));
     }
 
+    std::string WorkListPath = Path.str() + "WorkList.json";
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(Path.getSingleStringRef(), EC);
+    llvm::raw_fd_ostream FileStream(WorkListPath, EC);
 
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
@@ -143,8 +147,10 @@ public:
       Index++;
     });
 
+    std::string EndsummaryTabPath = Path.str() + "EndsummaryTab.json";
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(Path.getSingleStringRef(), EC);
+    llvm::raw_fd_ostream FileStream(EndsummaryTabPath, EC);
+
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
@@ -179,11 +185,13 @@ public:
       }
     });
 
+    std::string IncomingTabPath = Path.str() + "IncomingTab.json";
     std::error_code EC;
-    llvm::raw_fd_ostream FileStream(Path.getSingleStringRef(), EC);
+    llvm::raw_fd_ostream FileStream(IncomingTabPath, EC);
 
     if (EC) {
       PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
     }
 
     FileStream << JSON;

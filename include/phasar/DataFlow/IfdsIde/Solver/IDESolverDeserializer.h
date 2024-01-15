@@ -53,7 +53,7 @@ public:
   static void
   loadJumpFunctions(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
                     IDESolver<AnalysisDomainTy, Container> &Solver) {
-    nlohmann::json JSON = readJsonFile(PathToFile);
+    nlohmann::json JSON = readJsonFile(PathToFile + "JumpFunctions.json");
 
     std::vector<std::string> SourceValStrs;
     std::vector<std::string> TargetStrs;
@@ -117,7 +117,7 @@ public:
   static void loadWorkList(const LLVMProjectIRDB &IRDB,
                            const llvm::Twine &PathToFile,
                            IDESolver<AnalysisDomainTy, Container> &Solver) {
-    nlohmann::json JSON = readJsonFile(PathToFile);
+    nlohmann::json JSON = readJsonFile(PathToFile + "WorkList.json");
     IDESolverDeserializer Deserializer;
 
     using l_t = typename AnalysisDomainTy::l_t;
@@ -164,7 +164,7 @@ public:
   static void
   loadEndsummaryTab(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
                     IDESolver<AnalysisDomainTy, Container> &Solver) {
-    nlohmann::json JSON = readJsonFile(PathToFile);
+    nlohmann::json JSON = readJsonFile(PathToFile + "EndsummaryTab.json");
     IDESolverDeserializer Deserializer;
 
     using l_t = typename AnalysisDomainTy::l_t;
@@ -210,10 +210,9 @@ public:
   static void loadIncomingTab(const LLVMProjectIRDB &IRDB,
                               const llvm::Twine &PathToFile,
                               IDESolver<AnalysisDomainTy, Container> &Solver) {
-    nlohmann::json JSON = readJsonFile(PathToFile);
+    nlohmann::json JSON = readJsonFile(PathToFile + "IncomingTab.json");
     IDESolverDeserializer Deserializer;
 
-    using l_t = typename AnalysisDomainTy::l_t;
     using n_t = typename AnalysisDomainTy::n_t;
     using d_t = typename AnalysisDomainTy::d_t;
 
