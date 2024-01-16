@@ -39,6 +39,20 @@ public:
     saveIncomingTab(Path, Solver);
   }
 
+  static bool fileExists(const std::string &PathToFile) {
+    std::ifstream NewFile(PathToFile.c_str());
+    llvm::outs() << "fileExists(): " << NewFile.good() << "\n";
+    return NewFile.good();
+  }
+
+  static void createFile(const std::string &PathToFile) {
+    std::ofstream FileToWriteTo(PathToFile);
+    FileToWriteTo << std::endl;
+    FileToWriteTo.close();
+
+    llvm::outs() << "createFileWorked: " << fileExists(PathToFile) << "\n";
+  }
+
   template <typename AnalysisDomainTy,
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
   static void
@@ -67,10 +81,19 @@ public:
     });
 
     std::string JumpFunctionsPath = Path.str() + "JumpFunctions.json";
+
+    if (!fileExists(JumpFunctionsPath)) {
+      llvm::outs() << "JumpFunctionsPathFileDidn'tExist\n";
+      llvm::outs().flush();
+      createFile(JumpFunctionsPath);
+    }
+
     std::error_code EC;
     llvm::raw_fd_ostream FileStream(JumpFunctionsPath, EC);
 
     if (EC) {
+      llvm::outs() << "Errror?\n" << EC.message() << "\n";
+      llvm::outs().flush();
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }
@@ -106,10 +129,19 @@ public:
     }
 
     std::string WorkListPath = Path.str() + "WorkList.json";
+
+    if (!fileExists(WorkListPath)) {
+      llvm::outs() << "WorkListPathFileDidn'tExist\n";
+      llvm::outs().flush();
+      createFile(WorkListPath);
+    }
+
     std::error_code EC;
     llvm::raw_fd_ostream FileStream(WorkListPath, EC);
 
     if (EC) {
+      llvm::outs() << "Errror?\n" << EC.message() << "\n";
+      llvm::outs().flush();
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }
@@ -148,10 +180,19 @@ public:
     });
 
     std::string EndsummaryTabPath = Path.str() + "EndsummaryTab.json";
+
+    if (!fileExists(EndsummaryTabPath)) {
+      llvm::outs() << "EndsummaryTabPathFileDidn'tExist\n";
+      llvm::outs().flush();
+      createFile(EndsummaryTabPath);
+    }
+
     std::error_code EC;
     llvm::raw_fd_ostream FileStream(EndsummaryTabPath, EC);
 
     if (EC) {
+      llvm::outs() << "Errror?\n" << EC.message() << "\n";
+      llvm::outs().flush();
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }
@@ -186,10 +227,19 @@ public:
     });
 
     std::string IncomingTabPath = Path.str() + "IncomingTab.json";
+
+    if (!fileExists(IncomingTabPath)) {
+      llvm::outs() << "IncomingTabPathFileDidn'tExist\n";
+      llvm::outs().flush();
+      createFile(IncomingTabPath);
+    }
+
     std::error_code EC;
     llvm::raw_fd_ostream FileStream(IncomingTabPath, EC);
 
     if (EC) {
+      llvm::outs() << "Errror?\n" << EC.message() << "\n";
+      llvm::outs().flush();
       PHASAR_LOG_LEVEL(ERROR, EC.message());
       return;
     }

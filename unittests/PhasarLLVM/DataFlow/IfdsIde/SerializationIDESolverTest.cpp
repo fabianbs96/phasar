@@ -53,6 +53,9 @@ protected:
     auto TaintProblem =
         createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
 
+    llvm::outs() << "Before AtomicResults\n";
+    llvm::outs().flush();
+
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
@@ -61,6 +64,9 @@ protected:
     // run with interruption
     size_t Counter = 0;
     size_t InterruptionValue = 3;
+
+    llvm::outs() << "Before InterrupedResults\n";
+    llvm::outs().flush();
 
     // results with interruption(s)
     auto InterruptedResults = [&] {
@@ -77,16 +83,31 @@ protected:
             std::chrono::milliseconds{0});
         EXPECT_EQ(std::nullopt, Result);
 
+        llvm::outs() << "Before saveDataInJSONs()\n";
+        llvm::outs().flush();
+
         IDESolverSerializer::saveDataInJSONs(PathToJSONs, Solver);
+
+        llvm::outs() << "After saveDataInJSONs()\n";
+        llvm::outs().flush();
       }
 
       IDESolver Solver(TaintProblem, &HA.getICFG());
 
+      llvm::outs() << "Before load\n";
+      llvm::outs().flush();
+
       IDESolverDeserializer::loadDataFromJSONs(HA.getProjectIRDB(), PathToJSONs,
                                                Solver);
 
+      llvm::outs() << "After load\n";
+      llvm::outs().flush();
+
       return std::move(Solver).continueSolving();
     }();
+
+    llvm::outs() << "Before Check\n";
+    llvm::outs().flush();
 
     for (auto &&Cell : AtomicResults.getAllResultEntries()) {
       auto InteractiveRes =
@@ -99,7 +120,14 @@ protected:
       llvm::sys::fs::remove(PathToJSONs + "WorkList.json");
       llvm::sys::fs::remove(PathToJSONs + "EndsummaryTab.json");
       llvm::sys::fs::remove(PathToJSONs + "IncomingTab.json");
+      return;
     }
+
+    llvm::outs() << PathToJSONs + "JumpFunctions.json\n";
+    llvm::outs() << PathToJSONs + "WorkList.json\n";
+    llvm::outs() << PathToJSONs + "EndsummaryTab.json\n";
+    llvm::outs() << PathToJSONs + "IncomingTab.json\n";
+    llvm::outs().flush();
   }
 }; // Test Fixture
 
@@ -185,7 +213,7 @@ static LLVMTaintConfig getDefaultConfig() {
 }
 TEST_P(SerializationFixture, CompareFullRunVSReloadedRun) {
   auto TC = getDefaultConfig();
-  doAnalysis(GetParam(), TC);
+  doAnalysis(GetParam(), TC, true);
 }
 
 INSTANTIATE_TEST_SUITE_P(InteractiveIDESolverTest, SerializationFixture,
