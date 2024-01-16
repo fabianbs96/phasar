@@ -29,25 +29,10 @@ public:
   static void
   loadDataFromJSONs(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToJSONs,
                     IDESolver<AnalysisDomainTy, Container> &Solver) {
-
-    llvm::outs() << "1\n";
-    llvm::outs().flush();
     loadJumpFunctions(IRDB, PathToJSONs, Solver);
-
-    llvm::outs() << "2\n";
-    llvm::outs().flush();
     loadWorkList(IRDB, PathToJSONs, Solver);
-
-    llvm::outs() << "3\n";
-    llvm::outs().flush();
     loadEndsummaryTab(IRDB, PathToJSONs, Solver);
-
-    llvm::outs() << "4\n";
-    llvm::outs().flush();
     loadIncomingTab(IRDB, PathToJSONs, Solver);
-
-    llvm::outs() << "5\n";
-    llvm::outs().flush();
   }
 
   // std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container>> JumpFn;
@@ -59,9 +44,6 @@ public:
   static void
   loadJumpFunctions(const LLVMProjectIRDB &IRDB, const llvm::Twine &PathToFile,
                     IDESolver<AnalysisDomainTy, Container> &Solver) {
-
-    llvm::outs() << PathToFile + "JumpFunctions.json\n";
-    llvm::outs().flush();
     nlohmann::json JSON = readJsonFile(PathToFile + "JumpFunctions.json");
 
     std::vector<std::string> SourceValStrs;

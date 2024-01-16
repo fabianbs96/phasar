@@ -53,20 +53,14 @@ protected:
     auto TaintProblem =
         createAnalysisProblem<IFDSTaintAnalysis>(HA, &Config, EntryPoints);
 
-    llvm::outs() << "Before AtomicResults\n";
-    llvm::outs().flush();
-
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
-    llvm::StringRef PathToJSONs = "~/Desktop/";
+    llvm::StringRef PathToJSONs = "";
 
     // run with interruption
     size_t Counter = 0;
     size_t InterruptionValue = 3;
-
-    llvm::outs() << "Before InterrupedResults\n";
-    llvm::outs().flush();
 
     // results with interruption(s)
     auto InterruptedResults = [&] {
@@ -83,31 +77,16 @@ protected:
             std::chrono::milliseconds{0});
         EXPECT_EQ(std::nullopt, Result);
 
-        llvm::outs() << "Before saveDataInJSONs()\n";
-        llvm::outs().flush();
-
         IDESolverSerializer::saveDataInJSONs(PathToJSONs, Solver);
-
-        llvm::outs() << "After saveDataInJSONs()\n";
-        llvm::outs().flush();
       }
 
       IDESolver Solver(TaintProblem, &HA.getICFG());
 
-      llvm::outs() << "Before load\n";
-      llvm::outs().flush();
-
       IDESolverDeserializer::loadDataFromJSONs(HA.getProjectIRDB(), PathToJSONs,
                                                Solver);
 
-      llvm::outs() << "After load\n";
-      llvm::outs().flush();
-
       return std::move(Solver).continueSolving();
     }();
-
-    llvm::outs() << "Before Check\n";
-    llvm::outs().flush();
 
     for (auto &&Cell : AtomicResults.getAllResultEntries()) {
       auto InteractiveRes =
