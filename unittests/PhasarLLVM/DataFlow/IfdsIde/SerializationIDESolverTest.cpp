@@ -56,7 +56,7 @@ protected:
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
-    llvm::StringRef PathToJSONs = "";
+    llvm::StringRef PathToJSONs = "./Lorem/Ipsum/Foo/Bar/";
 
     // run with interruption
     size_t Counter = 0;
@@ -192,7 +192,7 @@ static LLVMTaintConfig getDefaultConfig() {
 }
 TEST_P(SerializationFixture, CompareFullRunVSReloadedRun) {
   auto TC = getDefaultConfig();
-  doAnalysis(GetParam(), TC, true);
+  doAnalysis(GetParam(), TC);
 }
 
 INSTANTIATE_TEST_SUITE_P(InteractiveIDESolverTest, SerializationFixture,

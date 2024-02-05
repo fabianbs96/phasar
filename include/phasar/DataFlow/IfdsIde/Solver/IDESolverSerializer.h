@@ -20,14 +20,26 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 
 #include "IDESolver.h"
-
-#include <llvm-14/llvm/ADT/StringRef.h>
+#include "nlohmann/json_fwd.hpp"
 
 namespace psr {
 
 class IDESolverSerializer {
 
 public:
+  static void writeToJSON(const llvm::Twine &Path, const nlohmann::json &JSON) {
+    llvm::SmallString<128> Buffer;
+    std::error_code EC;
+    llvm::raw_fd_ostream FileStream(Path.toStringRef(Buffer), EC);
+
+    if (EC) {
+      PHASAR_LOG_LEVEL(ERROR, EC.message());
+      return;
+    }
+
+    FileStream << JSON;
+  }
+
   template <typename AnalysisDomainTy,
             typename Container = std::set<typename AnalysisDomainTy::d_t>>
   static void
@@ -77,21 +89,8 @@ public:
       Index++;
     });
 
-    std::string JumpFunctionsPath = Path.str() + "JumpFunctions.json";
-
-    if (!fileExists(JumpFunctionsPath)) {
-      createFile(JumpFunctionsPath);
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(JumpFunctionsPath, EC);
-
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-
-    FileStream << JSON;
+    llvm::sys::fs::create_directories(Path);
+    writeToJSON(Path + "JumpFunctions.json", JSON);
   }
 
   template <typename AnalysisDomainTy,
@@ -121,21 +120,8 @@ public:
               EdgeFunction<typename AnalysisDomainTy::l_t>>(Curr.second));
     }
 
-    std::string WorkListPath = Path.str() + "WorkList.json";
-
-    if (!fileExists(WorkListPath)) {
-      createFile(WorkListPath);
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(WorkListPath, EC);
-
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-
-    FileStream << JSON;
+    llvm::sys::fs::create_directories(Path);
+    writeToJSON(Path + "WorkList.json", JSON);
   }
 
   template <typename AnalysisDomainTy,
@@ -168,21 +154,8 @@ public:
       Index++;
     });
 
-    std::string EndsummaryTabPath = Path.str() + "EndsummaryTab.json";
-
-    if (!fileExists(EndsummaryTabPath)) {
-      createFile(EndsummaryTabPath);
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(EndsummaryTabPath, EC);
-
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-
-    FileStream << JSON;
+    llvm::sys::fs::create_directories(Path);
+    writeToJSON(Path + "EndsummaryTab.json", JSON);
   }
 
   template <typename AnalysisDomainTy,
@@ -211,21 +184,8 @@ public:
       }
     });
 
-    std::string IncomingTabPath = Path.str() + "IncomingTab.json";
-
-    if (!fileExists(IncomingTabPath)) {
-      createFile(IncomingTabPath);
-    }
-
-    std::error_code EC;
-    llvm::raw_fd_ostream FileStream(IncomingTabPath, EC);
-
-    if (EC) {
-      PHASAR_LOG_LEVEL(ERROR, EC.message());
-      return;
-    }
-
-    FileStream << JSON;
+    llvm::sys::fs::create_directories(Path);
+    writeToJSON(Path + "IncomingTab.json", JSON);
   }
 
   // private:
