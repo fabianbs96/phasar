@@ -18,8 +18,8 @@
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_IDESOLVERSERIALIZER_H
 
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
 
-#include "IDESolver.h"
 #include "nlohmann/json_fwd.hpp"
 
 namespace psr {

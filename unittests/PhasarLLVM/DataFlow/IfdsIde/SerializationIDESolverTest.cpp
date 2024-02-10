@@ -39,6 +39,8 @@ using namespace psr;
 using CallBackPairTy = std::pair<IDEExtendedTaintAnalysis<>::config_callback_t,
                                  IDEExtendedTaintAnalysis<>::config_callback_t>;
 
+size_t TestNumber = 0;
+
 /* ============== TEST FIXTURE ============== */
 class SerializationFixture : public ::testing::TestWithParam<std::string_view> {
 protected:
@@ -56,7 +58,10 @@ protected:
     IDESolver Solver(TaintProblem, &HA.getICFG());
     auto AtomicResults = Solver.solve();
 
-    llvm::StringRef PathToJSONs = "./Lorem/Ipsum/Foo/Bar/";
+    std::string PathToJSONsString =
+        "./Unittest-JSONs/Test-" + std::to_string(TestNumber++) + "/";
+
+    auto PathToJSONs = llvm::StringRef(PathToJSONsString);
 
     // run with interruption
     size_t Counter = 0;

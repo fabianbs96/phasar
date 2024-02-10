@@ -17,7 +17,7 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_IDESOLVERDESERIALIZER_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_IDESOLVERDESERIALIZER_H
 
-#include "IDESolver.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolver.h"
 
 namespace psr {
 
