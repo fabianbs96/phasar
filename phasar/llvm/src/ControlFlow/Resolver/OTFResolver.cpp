@@ -42,33 +42,35 @@ void OTFResolver::preCall(const llvm::Instruction *Inst) {}
 
 void OTFResolver::handlePossibleTargets(const llvm::CallBase *CallSite,
                                         FunctionSetTy &CalleeTargets) {
-  // if we have no inter-procedural points-to information, use call-graph
-  // information to simulate inter-procedural points-to information
-  if (!PT.isInterProcedural()) {
-    for (const auto *CalleeTarget : CalleeTargets) {
-      PHASAR_LOG_LEVEL(DEBUG, "Target name: " << CalleeTarget->getName());
-      // do the merge of the points-to information for all possible targets, but
-      // only if they are available
-      if (CalleeTarget->isDeclaration()) {
-        continue;
-      }
-      // handle parameter pairs
-      for (auto &[Actual, Formal] :
-           getActualFormalPointerPairs(CallSite, CalleeTarget)) {
-        PT.introduceAlias(Actual, Formal, CallSite);
-      }
-      // handle return value
-      if (CalleeTarget->getReturnType()->isPointerTy()) {
-        for (const auto &ExitPoint : ICF.getExitPointsOf(CalleeTarget)) {
-          // get the function's return value
-          if (const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(ExitPoint)) {
-            // introduce alias to the returned value
-            PT.introduceAlias(CallSite, Ret->getReturnValue(), CallSite);
-          }
-        }
-      }
-    }
-  }
+  // // if we have no inter-procedural points-to information, use call-graph
+  // // information to simulate inter-procedural points-to information
+  // if (!PT.isInterProcedural()) {
+  //   for (const auto *CalleeTarget : CalleeTargets) {
+  //     PHASAR_LOG_LEVEL(DEBUG, "Target name: " << CalleeTarget->getName());
+  //     // do the merge of the points-to information for all possible targets,
+  //     but
+  //     // only if they are available
+  //     if (CalleeTarget->isDeclaration()) {
+  //       continue;
+  //     }
+  //     // handle parameter pairs
+  //     for (auto &[Actual, Formal] :
+  //          getActualFormalPointerPairs(CallSite, CalleeTarget)) {
+  //       PT.introduceAlias(Actual, Formal, CallSite);
+  //     }
+  //     // handle return value
+  //     if (CalleeTarget->getReturnType()->isPointerTy()) {
+  //       for (const auto &ExitPoint : ICF.getExitPointsOf(CalleeTarget)) {
+  //         // get the function's return value
+  //         if (const auto *Ret = llvm::dyn_cast<llvm::ReturnInst>(ExitPoint))
+  //         {
+  //           // introduce alias to the returned value
+  //           PT.introduceAlias(CallSite, Ret->getReturnValue(), CallSite);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 }
 
 void OTFResolver::postCall(const llvm::Instruction *Inst) {}
