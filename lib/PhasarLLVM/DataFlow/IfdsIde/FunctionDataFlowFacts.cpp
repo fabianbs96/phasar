@@ -1,6 +1,5 @@
-#include <iostream>
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
 
-using namespace psr;
+#include <iostream>
 
-FunctionDataFlowFacts::FunctionDataFlowFacts () {}//constructor definition
+using namespace psr;

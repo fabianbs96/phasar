@@ -1,703 +1,697 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LibCSummary.h"
 
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
-#include "clang/AST/Attrs.inc"
 
 using namespace psr;
 
 static FunctionDataFlowFacts createLibCSummary() {
   FunctionDataFlowFacts Sum;
 
-  // TODO: Use public API instead!
-  Sum.fdff["localtime_r"][1].emplace_back(ReturnValue{});
-
   // Sum.fdff["foo"][2].emplace_back(Parameter{1});
-  //abs
+
+  // abs
   Sum.addElement("abs", 0, ReturnValue{});
 
-  //acos
+  // acos
   Sum.addElement("acos", 0, ReturnValue{});
 
-  //acosf
+  // acosf
   Sum.addElement("acosf", 0, ReturnValue{});
 
-  //acosh
+  // acosh
   Sum.addElement("acosh", 0, ReturnValue{});
 
-  //acoshf
+  // acoshf
   Sum.addElement("acoshf", 0, ReturnValue{});
 
-  //acoshl
+  // acoshl
   Sum.addElement("acoshl", 0, ReturnValue{});
 
-  //acosl
+  // acosl
   Sum.addElement("acosl", 0, ReturnValue{});
 
-  //argz_add
+  // argz_add
   Sum.addElement("argz_add", 2, Parameter{0});
 
-  //argz_add_sep
+  // argz_add_sep
   Sum.addElement("argz_add_sep", 2, Parameter{0});
 
-  //argz_append
+  // argz_append
   Sum.addElement("argz_append", 2, Parameter{0});
   Sum.addElement("argz_append", 3, Parameter{1});
 
-  //agrz_create
+  // agrz_create
   Sum.addElement("argz_create", 0, Parameter{1});
 
-  //argz_create_sep
+  // argz_create_sep
   Sum.addElement("argz_create_sep", 0, Parameter{2});
 
-  //argz_extract
+  // argz_extract
   Sum.addElement("argz_extract", 0, Parameter{2});
 
-  //argz_insert
+  // argz_insert
   Sum.addElement("argz_insert", 3, Parameter{0});
 
-  //argz_next
+  // argz_next
   Sum.addElement("argz_next", 0, ReturnValue{});
 
-  //argz_replace
+  // argz_replace
   Sum.addElement("argz_replace", 0, Parameter{0});
 
-  //argz_stringify
+  // argz_stringify
   Sum.addElement("argz_stringify", 2, Parameter{0});
 
-  //asin
+  // asin
   Sum.addElement("asin", 0, ReturnValue{});
 
-  //asinf
+  // asinf
   Sum.addElement("asinf", 0, ReturnValue{});
 
-  //asinh
+  // asinh
   Sum.addElement("asinh", 0, ReturnValue{});
 
-  //asinhf
+  // asinhf
   Sum.addElement("asinhf", 0, ReturnValue{});
 
-  //asinhl
+  // asinhl
   Sum.addElement("asinhl", 0, ReturnValue{});
 
-  //asinl
+  // asinl
   Sum.addElement("asinl", 0, ReturnValue{});
 
-  //asprintf
+  // asprintf
   Sum.addElement("asprintf", 1, Parameter{0});
   Sum.addElement("asprintf", 2, Parameter{0});
   Sum.addElement("asprintf", 3, Parameter{0});
   Sum.addElement("asprintf", 4, Parameter{0});
   Sum.addElement("asprintf", 5, Parameter{0});
 
-  //atan
+  // atan
   Sum.addElement("atan", 0, ReturnValue{});
 
-  //atan2
+  // atan2
   Sum.addElement("atan2", 0, ReturnValue{});
   Sum.addElement("atan2", 1, ReturnValue{});
 
-  //atan2f
+  // atan2f
   Sum.addElement("atan2f", 0, ReturnValue{});
   Sum.addElement("atan2f", 1, ReturnValue{});
 
-  //atan2l
+  // atan2l
   Sum.addElement("atan2l", 0, ReturnValue{});
   Sum.addElement("atan2l", 1, ReturnValue{});
 
-  //atanf
+  // atanf
   Sum.addElement("atanf", 0, ReturnValue{});
 
-  //atanh
+  // atanh
   Sum.addElement("atanh", 0, ReturnValue{});
 
-  //atanhf
+  // atanhf
   Sum.addElement("atanhf", 0, ReturnValue{});
 
-  //atanhl
+  // atanhl
   Sum.addElement("atanhl", 0, ReturnValue{});
 
-  //atanl
+  // atanl
   Sum.addElement("atanl", 0, ReturnValue{});
 
-  //basename
+  // basename
   Sum.addElement("basename", 0, ReturnValue{});
 
-  //bcopy
+  // bcopy
   Sum.addElement("bcopy", 0, Parameter{1});
 
-  //bindtextdomain
+  // bindtextdomain
   Sum.addElement("bindtextdomain", 1, ReturnValue{});
 
-  //bind_textdomain_codeset
+  // bind_textdomain_codeset
   Sum.addElement("bind_textdomain_codeset", 1, ReturnValue{});
 
-  //bsearch
+  // bsearch
   Sum.addElement("bsearch", 1, ReturnValue{});
 
-  //btowc
+  // btowc
   Sum.addElement("btowc", 0, ReturnValue{});
 
-  //cabs
+  // cabs
   Sum.addElement("cabs", 0, ReturnValue{});
 
-  //cabsf
+  // cabsf
   Sum.addElement("cabsf", 0, ReturnValue{});
 
-  //cabsl
+  // cabsl
   Sum.addElement("cabsl", 0, ReturnValue{});
 
-  //cacos
+  // cacos
   Sum.addElement("cacos", 0, ReturnValue{});
 
-  //cacosf
+  // cacosf
   Sum.addElement("cacosf", 0, ReturnValue{});
 
-  //cacosl
+  // cacosl
   Sum.addElement("cacosl", 0, ReturnValue{});
 
-  //cacosh
+  // cacosh
   Sum.addElement("cacosh", 0, ReturnValue{});
 
-  //cacoshf
+  // cacoshf
   Sum.addElement("cacoshf", 0, ReturnValue{});
 
-  //cacoshl
+  // cacoshl
   Sum.addElement("cacoshl", 0, ReturnValue{});
 
-  //carg
+  // carg
   Sum.addElement("carg", 0, ReturnValue{});
 
-  //cargf
+  // cargf
   Sum.addElement("cargf", 0, ReturnValue{});
 
-  //cargl
+  // cargl
   Sum.addElement("cargl", 0, ReturnValue{});
 
-  //casin
+  // casin
   Sum.addElement("casin", 0, ReturnValue{});
 
-  //casinf
+  // casinf
   Sum.addElement("casinf", 0, ReturnValue{});
 
-  //casinh
+  // casinh
   Sum.addElement("casinh", 0, ReturnValue{});
 
-  //casinhf
+  // casinhf
   Sum.addElement("casinhf", 0, ReturnValue{});
 
-  //casinhl
+  // casinhl
   Sum.addElement("casinhl", 0, ReturnValue{});
 
-  //casinl
+  // casinl
   Sum.addElement("casinl", 0, ReturnValue{});
 
-  //catan
+  // catan
   Sum.addElement("catan", 0, ReturnValue{});
 
-  //catanf
+  // catanf
   Sum.addElement("catanf", 0, ReturnValue{});
 
-  //catanh
+  // catanh
   Sum.addElement("catanh", 0, ReturnValue{});
 
-  //catanhf
+  // catanhf
   Sum.addElement("catanhf", 0, ReturnValue{});
 
-  //catanhl
+  // catanhl
   Sum.addElement("catanhl", 0, ReturnValue{});
 
-  //catanl
+  // catanl
   Sum.addElement("catanl", 0, ReturnValue{});
 
-  //catgets
+  // catgets
   Sum.addElement("catgets", 3, ReturnValue{});
 
-  //cbrt
+  // cbrt
   Sum.addElement("cbrt", 0, ReturnValue{});
 
-  //cbrtf
+  // cbrtf
   Sum.addElement("cbrtf", 0, ReturnValue{});
 
-  //cbrtl
+  // cbrtl
   Sum.addElement("cbrtl", 0, ReturnValue{});
 
-  //ccos
+  // ccos
   Sum.addElement("ccos", 0, ReturnValue{});
 
-  //ccosf
+  // ccosf
   Sum.addElement("ccosf", 0, ReturnValue{});
 
-  //ccosh
+  // ccosh
   Sum.addElement("ccosh", 0, ReturnValue{});
 
-  //ccoshf
+  // ccoshf
   Sum.addElement("ccoshf", 0, ReturnValue{});
 
-  //ccoshl
+  // ccoshl
   Sum.addElement("ccoshl", 0, ReturnValue{});
 
-  //ccosl
+  // ccosl
   Sum.addElement("ccosl", 0, ReturnValue{});
 
-  //ceil
+  // ceil
   Sum.addElement("ceil", 0, ReturnValue{});
 
-  //ceilf
+  // ceilf
   Sum.addElement("ceilf", 0, ReturnValue{});
 
-  //ceill
+  // ceill
   Sum.addElement("ceill", 0, ReturnValue{});
 
-  //cexp
+  // cexp
   Sum.addElement("cexp", 0, ReturnValue{});
 
-  //cexpf
+  // cexpf
   Sum.addElement("cexpf", 0, ReturnValue{});
 
-  //cexpl
+  // cexpl
   Sum.addElement("cexpl", 0, ReturnValue{});
 
-  //cfgetispeed
+  // cfgetispeed
   Sum.addElement("cfgetispeed", 0, ReturnValue{});
 
-  //cfgetospeed
+  // cfgetospeed
   Sum.addElement("cfgetospeed", 0, ReturnValue{});
 
-  //cimag
+  // cimag
   Sum.addElement("cimag", 0, ReturnValue{});
 
-  //cimagf
+  // cimagf
   Sum.addElement("cimagf", 0, ReturnValue{});
 
-  //cimagl
+  // cimagl
   Sum.addElement("cimagl", 0, ReturnValue{});
 
-  //clog
+  // clog
   Sum.addElement("clog", 0, ReturnValue{});
 
-  //clog10
+  // clog10
   Sum.addElement("clog10", 0, ReturnValue{});
 
-  //clog10f
+  // clog10f
   Sum.addElement("clog10f", 0, ReturnValue{});
 
-  //clog10l
-  Sum.addElement("clog10l",0, ReturnValue{});
+  // clog10l
+  Sum.addElement("clog10l", 0, ReturnValue{});
 
-  //clogf
+  // clogf
   Sum.addElement("clogf", 0, ReturnValue{});
 
-  //clogl
+  // clogl
   Sum.addElement("clogl", 0, ReturnValue{});
 
-  //conj
+  // conj
   Sum.addElement("conj", 0, ReturnValue{});
 
-  //conjf
+  // conjf
   Sum.addElement("conjf", 0, ReturnValue{});
 
-  //conjl
+  // conjl
   Sum.addElement("conjl", 0, ReturnValue{});
 
-  //copysign
+  // copysign
   Sum.addElement("copysign", 0, ReturnValue{});
   Sum.addElement("copysign", 1, ReturnValue{});
 
-  //copysignf
+  // copysignf
   Sum.addElement("copysignf", 0, ReturnValue{});
   Sum.addElement("copysign", 1, ReturnValue{});
 
-  //copysignl
+  // copysignl
   Sum.addElement("copysignl", 0, ReturnValue{});
   Sum.addElement("copysignl", 1, ReturnValue{});
 
-  //cos
+  // cos
   Sum.addElement("cos", 0, ReturnValue{});
 
-  //cosf
+  // cosf
   Sum.addElement("cosf", 0, ReturnValue{});
 
-  //cosh
+  // cosh
   Sum.addElement("cosh", 0, ReturnValue{});
 
-  //coshf
+  // coshf
   Sum.addElement("coshf", 0, ReturnValue{});
 
-  //coshl
+  // coshl
   Sum.addElement("coshl", 0, ReturnValue{});
 
-  //cosl
+  // cosl
   Sum.addElement("cosl", 0, ReturnValue{});
 
-  //cpow
+  // cpow
   Sum.addElement("cpow", 0, ReturnValue{});
   Sum.addElement("cpow", 1, ReturnValue{});
 
-  //cpowf
+  // cpowf
   Sum.addElement("cpowf", 0, ReturnValue{});
   Sum.addElement("cpowf", 1, ReturnValue{});
 
-  //cpowl
+  // cpowl
   Sum.addElement("cpowl", 0, ReturnValue{});
   Sum.addElement("cpowl", 1, ReturnValue{});
 
-  //cproj
+  // cproj
   Sum.addElement("cproj", 0, ReturnValue{});
 
-  //cprojf
+  // cprojf
   Sum.addElement("cproj", 0, ReturnValue{});
 
-  //cprojl
+  // cprojl
   Sum.addElement("cprojl", 0, ReturnValue{});
 
-  //creal
+  // creal
   Sum.addElement("creal", 0, ReturnValue{});
 
-  //crealf
+  // crealf
   Sum.addElement("crealf", 0, ReturnValue{});
 
-  //creall
+  // creall
   Sum.addElement("creall", 0, ReturnValue{});
 
-  //crypt
+  // crypt
   Sum.addElement("crypt", 0, ReturnValue{});
-  //Sum.addElement("crypt", 1, ReturnValue{});
+  // Sum.addElement("crypt", 1, ReturnValue{});
 
-  //crypt_r
+  // crypt_r
   Sum.addElement("crypt_r", 0, ReturnValue{});
-  //Sum.addElement("crypt_r", 1, ReturnValue{});
+  // Sum.addElement("crypt_r", 1, ReturnValue{});
 
-  //csin
+  // csin
   Sum.addElement("csin", 0, ReturnValue{});
 
-  //csinf
+  // csinf
   Sum.addElement("csinf", 0, ReturnValue{});
 
-  //csinh
+  // csinh
   Sum.addElement("csinh", 0, ReturnValue{});
 
-  //csinhf
+  // csinhf
   Sum.addElement("csinhf", 0, ReturnValue{});
 
-  //csinhl
+  // csinhl
   Sum.addElement("csinhl", 0, ReturnValue{});
 
-  //csinl
+  // csinl
   Sum.addElement("csinl", 0, ReturnValue{});
 
-  //csprt
+  // csprt
   Sum.addElement("csqrt", 0, ReturnValue{});
 
-  //csqrtf
+  // csqrtf
   Sum.addElement("csqrtf", 0, ReturnValue{});
 
-  //csqrtl
+  // csqrtl
   Sum.addElement("csqrtl", 0, ReturnValue{});
 
-  //ctan
+  // ctan
   Sum.addElement("ctan", 0, ReturnValue{});
 
-  //ctanf
+  // ctanf
   Sum.addElement("ctanf", 0, ReturnValue{});
 
-  //ctanh
+  // ctanh
   Sum.addElement("ctanh", 0, ReturnValue{});
 
-  //ctanhf
+  // ctanhf
   Sum.addElement("ctanhf", 0, ReturnValue{});
 
-  //ctanhl
+  // ctanhl
   Sum.addElement("ctanhl", 0, ReturnValue{});
 
-  //ctanl
+  // ctanl
   Sum.addElement("ctanl", 0, ReturnValue{});
 
-  //ctermid
+  // ctermid
   Sum.addElement("ctermid", 0, ReturnValue{});
 
-  //ctime
-  Sum.addElement("ctime", 0, ReturnValue{});  //?
+  // ctime
+  Sum.addElement("ctime", 0, ReturnValue{}); //?
 
-  //ctime_r
+  // ctime_r
   Sum.addElement("ctime_r", 0, Parameter{1});
 
-  //cuserid
+  // cuserid
   Sum.addElement("cuserid", 0, ReturnValue{});
 
-  //dcgettext
+  // dcgettext
   Sum.addElement("dcgettext", 1, ReturnValue{});
 
-  //dcngettext
+  // dcngettext
   Sum.addElement("dcngettext", 1, ReturnValue{});
 
-  //dgettext
+  // dgettext
   Sum.addElement("dgettext", 1, ReturnValue{});
 
-  //difftime
+  // difftime
   Sum.addElement("difftime", 0, ReturnValue{});
   Sum.addElement("difftime", 1, ReturnValue{});
 
-  //dirname
+  // dirname
   Sum.addElement("dirname", 0, ReturnValue{});
 
-  //div
+  // div
   Sum.addElement("div", 0, ReturnValue{});
   Sum.addElement("div", 1, ReturnValue{});
 
-  //dngettext
+  // dngettext
   Sum.addElement("dngettext", 1, ReturnValue{});
 
-  //drem
+  // drem
   Sum.addElement("drem", 0, ReturnValue{});
   Sum.addElement("drem", 1, ReturnValue{});
 
-  //dremf
+  // dremf
   Sum.addElement("dremf", 0, ReturnValue{});
   Sum.addElement("dremf", 1, ReturnValue{});
 
-  //dreml
+  // dreml
   Sum.addElement("dreml", 0, ReturnValue{});
   Sum.addElement("dreml", 1, ReturnValue{});
 
-  //dup
+  // dup
   Sum.addElement("dup", 0, ReturnValue{});
 
-  //dup2
+  // dup2
   Sum.addElement("dup2", 0, ReturnValue{});
 
-  //envz_add
+  // envz_add
   Sum.addElement("envz_add", 2, Parameter{0});
   Sum.addElement("envz_add", 3, Parameter{0});
 
-  //envz_entry
+  // envz_entry
   Sum.addElement("envz_entry", 0, ReturnValue{});
 
-  //envz_get
+  // envz_get
   Sum.addElement("envz_get", 0, ReturnValue{});
 
-  //envz_merge
+  // envz_merge
   Sum.addElement("envz_merge", 2, ReturnValue{});
 
-  //erf
+  // erf
   Sum.addElement("erf", 0, ReturnValue{});
 
-  //erfc
+  // erfc
   Sum.addElement("erfc", 0, ReturnValue{});
 
-  //erfcf
+  // erfcf
   Sum.addElement("erfcf", 0, ReturnValue{});
 
-  //erfcl
+  // erfcl
   Sum.addElement("erfcf", 0, ReturnValue{});
 
-  //erff
+  // erff
   Sum.addElement("erff", 0, ReturnValue{});
 
-  //erfl
+  // erfl
   Sum.addElement("erfl", 0, ReturnValue{});
 
-  //exp
+  // exp
   Sum.addElement("exp", 0, ReturnValue{});
 
-  //exp10
+  // exp10
   Sum.addElement("exp10", 0, ReturnValue{});
 
-  //exp10f
+  // exp10f
   Sum.addElement("exp10f", 0, ReturnValue{});
 
-  //exp10l
+  // exp10l
   Sum.addElement("exp10l", 0, ReturnValue{});
 
-  //exp2
+  // exp2
   Sum.addElement("exp2", 0, ReturnValue{});
 
-  //exp2f
+  // exp2f
   Sum.addElement("exp2f", 0, ReturnValue{});
 
-  //exp2l
+  // exp2l
   Sum.addElement("exp2l", 0, ReturnValue{});
 
-  //expf
+  // expf
   Sum.addElement("expf", 0, ReturnValue{});
 
-  //expl
+  // expl
   Sum.addElement("expl", 0, ReturnValue{});
 
-  //expm1
+  // expm1
   Sum.addElement("expm1", 0, ReturnValue{});
 
-  //expm1f
+  // expm1f
   Sum.addElement("expm1f", 0, ReturnValue{});
 
-  //expm1l
+  // expm1l
   Sum.addElement("expm1l", 0, ReturnValue{});
 
-  //fabs
+  // fabs
   Sum.addElement("fabs", 0, ReturnValue{});
 
-  //fabsf
+  // fabsf
   Sum.addElement("fabsf", 0, ReturnValue{});
 
-  //fabsl
+  // fabsl
   Sum.addElement("fabsl", 0, ReturnValue{});
 
-  //fdim
+  // fdim
   Sum.addElement("fdim", 0, ReturnValue{});
 
-  //fdimf
+  // fdimf
   Sum.addElement("fdimf", 0, ReturnValue{});
 
-  //fdiml
+  // fdiml
   Sum.addElement("fdiml", 0, ReturnValue{});
 
-  //fgetc
+  // fgetc
   Sum.addElement("fgetc", 0, ReturnValue{});
 
-  //fgetpwent
+  // fgetpwent
   Sum.addElement("fgetpwent", 0, ReturnValue{});
 
-  //fgetpwent_f
+  // fgetpwent_f
   Sum.addElement("fgetpwent_r", 0, Parameter{1});
 
-  //fgets
+  // fgets
   Sum.addElement("fgets", 2, Parameter{0});
   Sum.addElement("fgets", 0, ReturnValue{});
 
-  //fgetwc
+  // fgetwc
   Sum.addElement("fgetwc", 0, ReturnValue{});
 
-  //fgetws
+  // fgetws
   Sum.addElement("fgetws", 2, Parameter{0});
   Sum.addElement("fgetws", 0, ReturnValue{});
 
-  //finite
+  // finite
   Sum.addElement("finite", 0, ReturnValue{});
 
-  //finitef
+  // finitef
   Sum.addElement("finitef", 0, ReturnValue{});
 
-  //finitel
+  // finitel
   Sum.addElement("finitel", 0, ReturnValue{});
 
-  //floor
+  // floor
   Sum.addElement("floor", 0, ReturnValue{});
 
-  //floorf
+  // floorf
   Sum.addElement("floorf", 0, ReturnValue{});
 
-  //floorl
+  // floorl
   Sum.addElement("floorl", 0, ReturnValue{});
 
-  //fma
+  // fma
   Sum.addElement("fma", 0, ReturnValue{});
   Sum.addElement("fma", 1, ReturnValue{});
   Sum.addElement("fma", 2, ReturnValue{});
 
-  //fmaf
+  // fmaf
   Sum.addElement("fmaf", 0, ReturnValue{});
   Sum.addElement("fmaf", 1, ReturnValue{});
   Sum.addElement("fmaf", 2, ReturnValue{});
 
-  //fmal
+  // fmal
   Sum.addElement("fmal", 0, ReturnValue{});
   Sum.addElement("fmal", 1, ReturnValue{});
   Sum.addElement("fmal", 2, ReturnValue{});
 
-  //fmax
+  // fmax
   Sum.addElement("fmax", 0, ReturnValue{});
   Sum.addElement("fmax", 1, ReturnValue{});
 
-  //fmaxf
+  // fmaxf
   Sum.addElement("fmaxf", 0, ReturnValue{});
   Sum.addElement("fmaxf", 1, ReturnValue{});
 
-  //fmaxl
+  // fmaxl
   Sum.addElement("fmaxl", 0, ReturnValue{});
   Sum.addElement("fmaxl", 1, ReturnValue{});
 
-  //fmaxmag
+  // fmaxmag
   Sum.addElement("fmaxmag", 0, ReturnValue{});
   Sum.addElement("fmaxmag", 1, ReturnValue{});
 
-  //fmaxmagf
+  // fmaxmagf
   Sum.addElement("fmaxmag", 0, ReturnValue{});
   Sum.addElement("fmaxmagf", 1, ReturnValue{});
 
-  //fmaxmagl
+  // fmaxmagl
   Sum.addElement("fmaxmagl", 0, ReturnValue{});
   Sum.addElement("fmaxmag", 1, ReturnValue{});
 
-  //fmin
+  // fmin
   Sum.addElement("fmin", 0, ReturnValue{});
   Sum.addElement("fmin", 1, ReturnValue{});
 
-  //fminf
+  // fminf
   Sum.addElement("fminf", 0, ReturnValue{});
   Sum.addElement("fminf", 1, ReturnValue{});
 
-  //fminl
+  // fminl
   Sum.addElement("fminl", 0, ReturnValue{});
   Sum.addElement("fminl", 1, ReturnValue{});
 
-  //fminmag
+  // fminmag
   Sum.addElement("fminmag", 0, ReturnValue{});
   Sum.addElement("fminmag", 1, ReturnValue{});
 
-  //fminmagf
+  // fminmagf
   Sum.addElement("fminmagf", 0, ReturnValue{});
   Sum.addElement("fminmagf", 1, ReturnValue{});
 
-  //fminmagl
+  // fminmagl
   Sum.addElement("fminmagl", 0, ReturnValue{});
   Sum.addElement("fminmagl", 1, ReturnValue{});
 
-  //fmod
+  // fmod
   Sum.addElement("fmod", 0, ReturnValue{});
   Sum.addElement("fmod", 1, ReturnValue{});
 
-  //fmodf
+  // fmodf
   Sum.addElement("fmodf", 0, ReturnValue{});
   Sum.addElement("fmodf", 1, ReturnValue{});
 
-  //fmodl
+  // fmodl
   Sum.addElement("fmodl", 0, ReturnValue{});
   Sum.addElement("fmodl", 1, ReturnValue{});
 
-  //fprintf
+  // fprintf
   Sum.addElement("fprintf", 1, Parameter{0});
   Sum.addElement("fprintf", 2, Parameter{0});
   Sum.addElement("fprintf", 3, Parameter{0});
   //....
 
-  //fputc
+  // fputc
   Sum.addElement("fputc", 0, Parameter{1});
 
-  //fputs
+  // fputs
   Sum.addElement("fputs", 0, Parameter{1});
 
-  //fputwc
+  // fputwc
   Sum.addElement("fputwc", 0, Parameter{1});
 
-  //fputws
+  // fputws
   Sum.addElement("fputws", 0, Parameter{1});
 
-  //fread
+  // fread
   Sum.addElement("fread", 3, Parameter{0});
 
-  //frexp
+  // frexp
   Sum.addElement("frexp", 0, Parameter{1});
   Sum.addElement("frexp", 0, ReturnValue{});
 
-  //frexpf
+  // frexpf
   Sum.addElement("frexpf", 0, Parameter{1});
   Sum.addElement("frexpf", 0, ReturnValue{});
 
-  //frexpl
+  // frexpl
   Sum.addElement("frexpl", 0, Parameter{1});
   Sum.addElement("frexpl", 0, ReturnValue{});
-
-
-
 
   // TODO
   return Sum;
