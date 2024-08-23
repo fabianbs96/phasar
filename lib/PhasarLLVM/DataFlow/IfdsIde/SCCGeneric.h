@@ -11,7 +11,7 @@
 // error in included header Compressor.h
 //  #include "phasar/PhasarLLVM/Utils/Compressor.h"
 
-#include "phasar/Utils/Utilities.h"
+// #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -145,7 +145,7 @@ template <typename G>
 static void tarjanIt(const G &Graph, SCCDataIt &Data, SCCHolder &Holder) {
 
   auto CurrTime = Data.Time;
-  for (uint32_t Vertex = 0; Vertex < Graph.Nodes.size(); Vertex++) {
+  for (uint32_t Vertex = 0; Vertex < Graph.Adj.size(); Vertex++) {
     if (Data.Disc[size_t(Vertex)] == UINT32_MAX) {
       Data.CallStack.push_back({GraphNodeId(Vertex), 0});
       while (!Data.CallStack.empty()) {
@@ -211,7 +211,7 @@ static void tarjanIt(const G &Graph, SCCDataIt &Data, SCCHolder &Holder) {
 template <typename G> [[nodiscard]] SCCHolder computeSCCs(const G &Graph) {
   SCCHolder Ret{};
 
-  auto NumNodes = Graph.Nodes.size();
+  auto NumNodes = Graph.Adj.size();
   Ret.SCCOfNode.resize(NumNodes);
 
   if (!NumNodes) {
@@ -233,7 +233,7 @@ template <typename G>
 [[nodiscard]] SCCHolder execTarjan(const G &Graph, const bool Iterative) {
   SCCHolder Ret{};
 
-  auto NumNodes = Graph.Nodes.size();
+  auto NumNodes = Graph.Adj.size();
   Ret.SCCOfNode.resize(NumNodes);
 
   if (!NumNodes) {
@@ -241,10 +241,11 @@ template <typename G>
   }
 
   SCCData Data(NumNodes);
+  SCCDataIt DataIt(NumNodes);
   for (uint32_t FunId = 0; FunId != NumNodes; ++FunId) {
     if (!Data.Seen.test(FunId)) {
       if (Iterative) {
-        TarjanIt(Graph, GraphNodeId(FunId), Data, Ret);
+        tarjanIt(Graph, DataIt, Ret);
       } else {
         computeSCCsRec(Graph, GraphNodeId(FunId), Data, Ret);
       }
@@ -286,33 +287,6 @@ auto computeSCCCallers(const G &Graph, const SCCHolder &SCCs) -> SCCCallers {
   }
 
   return Ret;
-}
-
-template <typename G>
-void analysis::call_graph::SCCCallers::print(llvm::raw_ostream &OS,
-                                             const SCCHolder &SCCs,
-                                             const G &Graph) {
-  OS << "digraph SCCTAG {\n";
-  psr::scope_exit CloseBrace = [&OS] { OS << "}\n"; };
-  for (size_t Ctr = 0; Ctr != SCCs.NumSCCs; ++Ctr) {
-    OS << "  " << Ctr << "[label=\"";
-    for (auto TNId : SCCs.NodesInSCC[Ctr]) {
-      auto TN = Graph.Nodes[TNId];
-      printNode(OS, TN);
-      OS << "\\n";
-    }
-    OS << "\"];\n";
-  }
-
-  OS << '\n';
-
-  size_t Ctr = 0;
-  for (const auto &Targets : ChildrenOfSCC) {
-    for (auto Tgt : Targets) {
-      OS << "  " << Ctr << "->" << uint32_t(Tgt) << ";\n";
-    }
-    ++Ctr;
-  }
 }
 
 [[nodiscard]] LLVM_LIBRARY_VISIBILITY SCCOrder

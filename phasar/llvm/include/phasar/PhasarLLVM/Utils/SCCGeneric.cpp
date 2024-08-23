@@ -7,11 +7,12 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#include "SCCGeneric.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/SCCGeneric.h"
+
+#include "phasar/PhasarLLVM/Utils/Compressor.h"
 
 #include "llvm/ADT/SmallBitVector.h"
 
-#include "../../../../../utils/include/phasar/Utils/Compressor.h"
 #include "TypeAssignmentGraph.h"
 
 #include <algorithm>
