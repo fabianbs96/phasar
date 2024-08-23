@@ -11,6 +11,8 @@
 
 // #include "phasar/PhasarLLVM/Utils/Compressor.h"
 
+#include "phasar/Utils/Utilities.h"
+
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -227,12 +229,124 @@ template <typename G> [[nodiscard]] SCCHolder computeSCCs(const G &Graph) {
   return Ret;
 }
 
+// choose which Tarjan implementation will be executed
+template <typename G>
+[[nodiscard]] SCCHolder execTarjan(const G &Graph, const bool Iterative) {
+  SCCHolder Ret{};
+
+  auto NumNodes = Graph.Nodes.size();
+  Ret.SCCOfNode.resize(NumNodes);
+
+  if (!NumNodes) {
+    return Ret;
+  }
+
+  SCCData Data(NumNodes);
+  for (uint32_t FunId = 0; FunId != NumNodes; ++FunId) {
+    if (!Data.Seen.test(FunId)) {
+      if (Iterative) {
+        TarjanIt(Graph, GraphNodeId(FunId), Data, Ret);
+      } else {
+        computeSCCsRec(Graph, GraphNodeId(FunId), Data, Ret);
+      }
+    }
+  }
+
+  return Ret;
+}
+
 template <typename G>
 [[nodiscard]] LLVM_LIBRARY_VISIBILITY SCCCallers
 computeSCCCallers(const G &Graph, const SCCHolder &SCCs);
 
+template <typename G>
+auto computeSCCCallers(const G &Graph, const SCCHolder &SCCs) -> SCCCallers {
+  SCCCallers Ret;
+  Ret.ChildrenOfSCC.resize(SCCs.NumSCCs);
+
+  llvm::SmallBitVector Roots(SCCs.NumSCCs, true);
+
+  size_t NodeId = 0;
+  for (const auto &SuccNodes : Graph.Adj) {
+    auto SrcSCC = SCCs.SCCOfNode[NodeId];
+
+    for (auto SuccNode : SuccNodes) {
+      auto DestSCC = SCCs.SCCOfNode[size_t(SuccNode)];
+      if (DestSCC != SrcSCC) {
+        Ret.ChildrenOfSCC[size_t(SrcSCC)].insert(DestSCC);
+        Roots.reset(uint32_t(DestSCC));
+      }
+    }
+
+    ++NodeId;
+  }
+
+  Ret.SCCRoots.reserve(Roots.count());
+  for (auto Rt : Roots.set_bits()) {
+    Ret.SCCRoots.push_back(SCCId(Rt));
+  }
+
+  return Ret;
+}
+
+template <typename G>
+void analysis::call_graph::SCCCallers::print(llvm::raw_ostream &OS,
+                                             const SCCHolder &SCCs,
+                                             const G &Graph) {
+  OS << "digraph SCCTAG {\n";
+  psr::scope_exit CloseBrace = [&OS] { OS << "}\n"; };
+  for (size_t Ctr = 0; Ctr != SCCs.NumSCCs; ++Ctr) {
+    OS << "  " << Ctr << "[label=\"";
+    for (auto TNId : SCCs.NodesInSCC[Ctr]) {
+      auto TN = Graph.Nodes[TNId];
+      printNode(OS, TN);
+      OS << "\\n";
+    }
+    OS << "\"];\n";
+  }
+
+  OS << '\n';
+
+  size_t Ctr = 0;
+  for (const auto &Targets : ChildrenOfSCC) {
+    for (auto Tgt : Targets) {
+      OS << "  " << Ctr << "->" << uint32_t(Tgt) << ";\n";
+    }
+    ++Ctr;
+  }
+}
+
 [[nodiscard]] LLVM_LIBRARY_VISIBILITY SCCOrder
 computeSCCOrder(const SCCHolder &SCCs, const SCCCallers &Callers);
+
+inline auto computeSCCOrder(const SCCHolder &SCCs, const SCCCallers &Callers)
+    -> SCCOrder {
+  SCCOrder Ret;
+  Ret.SCCIds.reserve(SCCs.NumSCCs);
+
+  llvm::SmallBitVector Seen;
+  Seen.resize(SCCs.NumSCCs);
+
+  auto Dfs = [&](auto &Dfs, SCCId CurrSCC) -> void {
+    Seen.set(uint32_t(CurrSCC));
+    for (auto Caller : Callers.ChildrenOfSCC[size_t(CurrSCC)]) {
+      if (!Seen.test(uint32_t(Caller))) {
+        Dfs(Dfs, Caller);
+      }
+    }
+    Ret.SCCIds.push_back(CurrSCC);
+  };
+
+  for (auto Leaf : Callers.SCCRoots) {
+    if (!Seen.test(uint32_t(Leaf))) {
+      Dfs(Dfs, Leaf);
+    }
+  }
+
+  std::reverse(Ret.SCCIds.begin(), Ret.SCCIds.end());
+
+  return Ret;
+}
 } // namespace psr::analysis::call_graph
 
 namespace llvm {
