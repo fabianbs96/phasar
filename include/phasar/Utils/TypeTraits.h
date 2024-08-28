@@ -172,6 +172,18 @@ struct variant_idx<std::variant<Ts...>, T>
           size_t,
           std::variant<type_identity<Ts>...>(type_identity<T>{}).index()> {};
 
+template <typename T, typename = void>
+struct has_llvm_dense_map_info : std::false_type {};
+template <typename T>
+struct has_llvm_dense_map_info<
+    T, std::void_t<decltype(llvm::DenseMapInfo<T>::getEmptyKey()),
+                   decltype(llvm::DenseMapInfo<T>::getTombstoneKey()),
+                   decltype(llvm::DenseMapInfo<T>::getHashValue(
+                       std::declval<T>())),
+                   decltype(llvm::DenseMapInfo<T>::isEqual(std::declval<T>(),
+                                                           std::declval<T>()))>>
+    : std::true_type {};
+
 } // namespace detail
 
 template <typename T>
@@ -245,6 +257,10 @@ template <typename T> using type_identity_t = typename type_identity<T>::type;
 
 template <typename Var, typename T>
 static constexpr size_t variant_idx = detail::variant_idx<Var, T>::value;
+
+template <typename T>
+static constexpr bool has_llvm_dense_map_info =
+    detail::has_llvm_dense_map_info<T>::value;
 
 struct TrueFn {
   template <typename... Args>

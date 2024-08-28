@@ -7,8 +7,9 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#include "phasar/PhasarLLVM/Utils/TypePropagator.h"
+#include "phasar/PhasarLLVM/ControlFlow/TypePropagator.h"
 
+#include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/SCCGeneric.h"
 #include "phasar/PhasarLLVM/Utils/Compressor.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
@@ -18,7 +19,7 @@ using namespace psr;
 using namespace psr::analysis::call_graph;
 
 static void initialize(TypeAssignment &TA, const TypeAssignmentGraph &TAG,
-                       const SCCHolder &SCCs) {
+                       const SCCHolder<TAGNodeId> &SCCs) {
   for (const auto &[Node, Types] : TAG.TypeEntryPoints) {
     auto SCC = SCCs.SCCOfNode[size_t(Node)];
     TA.TypesPerSCC[size_t(SCC)].insert(Types.begin(), Types.end());

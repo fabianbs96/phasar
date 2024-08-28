@@ -1,4 +1,19 @@
+/******************************************************************************
+ * Copyright (c) 2024 Fabian Schiebel.
+ * All rights reserved. This program and the accompanying materials are made
+ * available under the terms of LICENSE.txt.
+ *
+ * Contributors:
+ *     Fabian Schiebel and other
+ *****************************************************************************/
+
 #pragma once
+
+#include "phasar/ControlFlow/CallGraph.h"
+#include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/Compressor.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -10,12 +25,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/HashBuilder.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "../../../../../utils/include/phasar/Utils/Compressor.h"
-#include "../ControlFlow/CallGraph.h"
-#include "../ControlFlow/LLVMVFTableProvider.h"
-#include "../Pointer/LLVMAliasInfo.h"
-#include "../TypeHierarchy/LLVMTypeHierarchy.h"
 
 #include <optional>
 #include <variant>
@@ -89,13 +98,15 @@ template <> struct DenseMapInfo<psr::analysis::call_graph::TAGNode> {
 };
 
 template <> struct DenseMapInfo<psr::analysis::call_graph::TAGNodeId> {
-  using TAGNodeId = psr::analysis::call_graph::TAGNodeId;
-  inline static TAGNodeId getEmptyKey() noexcept { return TAGNodeId(-1); }
-  inline static TAGNodeId getTombstoneKey() noexcept { return TAGNodeId(-2); }
-  inline static bool isEqual(TAGNodeId L, TAGNodeId R) noexcept {
+  using GraphNodeId = psr::analysis::call_graph::TAGNodeId;
+  inline static GraphNodeId getEmptyKey() noexcept { return GraphNodeId(-1); }
+  inline static GraphNodeId getTombstoneKey() noexcept {
+    return GraphNodeId(-2);
+  }
+  inline static bool isEqual(GraphNodeId L, GraphNodeId R) noexcept {
     return L == R;
   }
-  inline static auto getHashValue(TAGNodeId TN) noexcept {
+  inline static auto getHashValue(GraphNodeId TN) noexcept {
     return llvm::hash_value(uint32_t(TN));
   }
 };
@@ -106,22 +117,23 @@ namespace psr::analysis::call_graph {
 struct ObjectGraph;
 
 struct TypeAssignmentGraph {
+  using GraphNodeId = TAGNodeId;
+  Compressor<TAGNode, GraphNodeId> Nodes;
 
-  Compressor<TAGNode, TAGNodeId> Nodes;
-
-  llvm::SmallVector<llvm::SmallDenseSet<TAGNodeId>, 0> Adj;
-  llvm::SmallDenseMap<TAGNodeId, llvm::SmallDenseSet<const llvm::Value *>>
+  llvm::SmallVector<llvm::SmallDenseSet<GraphNodeId>, 0> Adj;
+  llvm::SmallDenseMap<GraphNodeId, llvm::SmallDenseSet<const llvm::Value *>>
       TypeEntryPoints;
 
-  [[nodiscard]] inline std::optional<TAGNodeId> get(TAGNode TN) const noexcept {
+  [[nodiscard]] inline std::optional<GraphNodeId>
+  get(TAGNode TN) const noexcept {
     return Nodes.getOrNull(TN);
   }
 
-  [[nodiscard]] inline TAGNode operator[](TAGNodeId Id) const noexcept {
+  [[nodiscard]] inline TAGNode operator[](GraphNodeId Id) const noexcept {
     return Nodes[Id];
   }
 
-  inline void addEdge(TAGNodeId From, TAGNodeId To) {
+  inline void addEdge(GraphNodeId From, GraphNodeId To) {
     assert(size_t(From) < Adj.size());
     assert(size_t(To) < Adj.size());
 

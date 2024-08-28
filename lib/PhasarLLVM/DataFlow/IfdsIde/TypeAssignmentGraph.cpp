@@ -7,7 +7,7 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#include "phasar/PhasarLLVM/Utils/TypeAssignmentGraph.h"
+#include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
@@ -231,9 +231,9 @@ static void handleAlloca(const llvm::AllocaInst *Alloca,
   }
 }
 
-static std::optional<GraphNodeId> getGEPNode(const llvm::GetElementPtrInst *GEP,
-                                             TypeAssignmentGraph &TAG,
-                                             const llvm::DataLayout &DL) {
+static std::optional<TAGNodeId> getGEPNode(const llvm::GetElementPtrInst *GEP,
+                                           TypeAssignmentGraph &TAG,
+                                           const llvm::DataLayout &DL) {
   auto Offs = [&]() -> size_t {
     llvm::APInt Offs(64, 0);
     if (GEP->accumulateConstantOffset(DL, Offs)) {
@@ -422,7 +422,7 @@ static const llvm::Value *getTypeFromDI(const llvm::DICompositeType *CompTy,
   return VTP.getVFTableGlobal(ClearName);
 }
 
-static void handleEntryForCall(const llvm::CallBase *Call, GraphNodeId CSNod,
+static void handleEntryForCall(const llvm::CallBase *Call, TAGNodeId CSNod,
                                TypeAssignmentGraph &TAG,
                                const llvm::Function *Callee,
                                const psr::LLVMVFTableProvider &VTP) {
@@ -490,7 +490,7 @@ static void handleCall(const llvm::CallBase *Call, TypeAssignmentGraph &TAG,
                                             const llvm::Function *> &BaseCG,
                        const psr::LLVMVFTableProvider &VTP) {
 
-  llvm::SmallVector<std::optional<GraphNodeId>> Args;
+  llvm::SmallVector<std::optional<TAGNodeId>> Args;
   llvm::SmallBitVector EntryArgs;
   bool HasArgNode = false;
 
