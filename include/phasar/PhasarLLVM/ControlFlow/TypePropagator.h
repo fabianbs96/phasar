@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
+
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
@@ -20,20 +22,22 @@ class Value;
 
 namespace psr::analysis::call_graph {
 struct TypeAssignmentGraph;
-struct SCCHolder;
-struct SCCCallers;
+template <typename GraphNodeId> struct SCCHolder;
+template <typename G> struct SCCCallers;
 struct SCCOrder;
 
 struct TypeAssignment {
   llvm::SmallVector<llvm::SmallDenseSet<const llvm::Value *>, 0> TypesPerSCC;
 
-  LLVM_LIBRARY_VISIBILITY void print(llvm::raw_ostream &OS,
-                                     const TypeAssignmentGraph &TAG,
-                                     const SCCHolder &SCCs);
+  LLVM_LIBRARY_VISIBILITY void
+  print(llvm::raw_ostream &OS, const TypeAssignmentGraph &TAG,
+        const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs);
 };
 
-[[nodiscard]] LLVM_LIBRARY_VISIBILITY TypeAssignment
-propagateTypes(const TypeAssignmentGraph &TAG, const SCCHolder &SCCs,
-               const SCCCallers &Deps, const SCCOrder &Order);
+[[nodiscard]] LLVM_LIBRARY_VISIBILITY TypeAssignment propagateTypes(
+    const TypeAssignmentGraph &TAG,
+    const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs,
+    const SCCCallers<typename TypeAssignmentGraph::GraphNodeId> &Deps,
+    const SCCOrder &Order);
 
 } // namespace psr::analysis::call_graph

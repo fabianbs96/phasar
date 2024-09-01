@@ -161,7 +161,6 @@ static void tarjanIt(const G &Graph, SCCDataIt<typename G::GraphNodeId> &Data,
         }
         // Curr.second > 0 implies that we came back from a recursive call
         if (Curr.second > 0) {
-          //???
           setMin(Data.Low[size_t(Curr.first)],
                  Data.Low[size_t(Curr.second) - 1]);
         }
