@@ -7,13 +7,14 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#pragma once
+#ifndef PHASAR_PHASARLLVM_CONTROLFLOW_TYPEASSIGNMENTGRAPH_H
+#define PHASAR_PHASARLLVM_CONTROLFLOW_TYPEASSIGNMENTGRAPH_H
 
 #include "phasar/ControlFlow/CallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarLLVM/Utils/Compressor.h"
+#include "phasar/Utils/Compressor.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -160,3 +161,5 @@ struct TypeAssignmentGraph {
 
 void printNode(llvm::raw_ostream &OS, TAGNode TN);
 }; // namespace psr::analysis::call_graph
+
+#endif

@@ -7,10 +7,11 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/SCCGeneric.h"
+#include "phasar/Utils/SCCGeneric.h"
 
 #include "gtest/gtest.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -35,23 +36,25 @@ public:
 };
 
 TEST(SCCGenericTest, SCCTest) {
-  ExampleGraph Graph;
-  std::vector<std::vector<ExampleGraph::GraphNodeId>> list = {
-      {ExampleGraph::GraphNodeId(2)},
-      {ExampleGraph::GraphNodeId(0)},
-      {ExampleGraph::GraphNodeId(1)},
-      {ExampleGraph::GraphNodeId(1), ExampleGraph::GraphNodeId(2)},
-      {ExampleGraph::GraphNodeId(1)},
-      {ExampleGraph::GraphNodeId(4), ExampleGraph::GraphNodeId(6)},
-      {ExampleGraph::GraphNodeId(4), ExampleGraph::GraphNodeId(7)},
-      {ExampleGraph::GraphNodeId(5)}};
+  using GraphNodeId = ExampleGraph::GraphNodeId;
+  ExampleGraph Graph{{{GraphNodeId(2)},
+                      {GraphNodeId(0)},
+                      {GraphNodeId(1)},
+                      {GraphNodeId(1), GraphNodeId(2)},
+                      {GraphNodeId(1)},
+                      {GraphNodeId(4), GraphNodeId(6)},
+                      {GraphNodeId(4), GraphNodeId(7)},
+                      {GraphNodeId(5)}}};
 
   auto OutputRec = analysis::call_graph::execTarjan(Graph, false);
   auto OutputIt = analysis::call_graph::execTarjan(Graph, true);
-  ASSERT_EQ(OutputRec.NumSCCs, OutputIt.NumSCCs)
-      << "Unequal number of SCC components\n"
-      << "Abort Test\n";
-  for (int ID = 0; ID < Graph.Adj.size(); ID++) {
+  ASSERT_EQ(OutputIt.SCCOfNode.size(), Graph.Adj.size())
+      << "Iterative Approach did not reach all nodes\n";
+  ASSERT_EQ(OutputRec.SCCOfNode.size(), Graph.Adj.size())
+      << "Recursive Approach did not reach all nodes\n";
+  EXPECT_EQ(OutputRec.NumSCCs, OutputIt.NumSCCs)
+      << "Unequal number of SCC components\n";
+  for (size_t ID = 0; ID < Graph.Adj.size(); ID++) {
     EXPECT_EQ(OutputRec.SCCOfNode[ID], OutputIt.SCCOfNode[ID])
         << "SCCs differ at Index: " << std::to_string(ID) << "\n";
   }

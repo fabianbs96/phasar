@@ -14,6 +14,7 @@
 #include "phasar/PhasarLLVM/Utils/AliasSets.h"
 #include "phasar/PhasarLLVM/Utils/FilteredAliasSet.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/STLExtras.h"
@@ -93,9 +94,10 @@ getPointerIndicesOfType(llvm::Type *Ty, const llvm::DataLayout &DL) {
     if (CurrTy->isPointerTy()) {
       size_t Idx = CurrByteOffs / PointerSize;
       if (CurrByteOffs % PointerSize) [[unlikely]] {
-        llvm::errs() << "[WARNING][getPointerIndicesOfType]: Unaligned pointer "
-                        "found at offset "
-                     << CurrByteOffs << " in type " << *Ty;
+        PHASAR_LOG_LEVEL(WARNING, "Unaligned pointer..");
+        /*llvm::errs() << "[WARNING][getPointerIndicesOfType]: Unaligned pointer
+           " "found at offset "
+                     << CurrByteOffs << " in type " << *Ty;*/
       }
       assert(Ret.size() > Idx &&
              "reserved unsufficient space for pointer indices");

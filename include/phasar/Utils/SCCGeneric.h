@@ -7,13 +7,13 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#pragma once
-// error in included header Compressor.h
-//  #include "phasar/PhasarLLVM/Utils/Compressor.h"
+#ifndef PHASAR_UTILS_SCCGENERIC_H
+#define PHASAR_UTILS_SCCGENERIC_H
 
-#include "phasar/Utils/Utilities.h"
+#include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -29,13 +29,11 @@ class LLVMBasedICFG;
 } // namespace psr
 
 namespace psr::analysis::call_graph {
-// struct TypeAssignmentGraph;
-enum class GraphNodeId : uint32_t;
 
 enum class [[clang::enum_extensibility(open)]] SCCId : uint32_t{};
 
 // holds the scc's of a given graph
-struct SCCHolder {
+template <typename GraphNodeId> struct SCCHolder {
   llvm::SmallVector<SCCId, 0> SCCOfNode{};
   llvm::SmallVector<llvm::SmallVector<GraphNodeId, 1>> NodesInSCC{};
   size_t NumSCCs = 0;
@@ -43,12 +41,12 @@ struct SCCHolder {
 
 // holds a graph were the scc's are compressed to a single node. Resulting graph
 // is a DAG
-struct SCCCallers {
+template <typename G> struct SCCCallers {
   llvm::SmallVector<llvm::SmallDenseSet<SCCId>, 0> ChildrenOfSCC{};
   llvm::SmallVector<SCCId, 0> SCCRoots{};
 
-  template <typename G>
-  void print(llvm::raw_ostream &OS, const SCCHolder &SCCs, const G &Graph);
+  void print(llvm::raw_ostream &OS,
+             const SCCHolder<typename G::GraphNodeId> &SCCs, const G &Graph);
 };
 
 // holds topologically sorted scccallers
@@ -56,7 +54,7 @@ struct SCCOrder {
   llvm::SmallVector<SCCId, 0> SCCIds;
 };
 
-struct SCCData {
+template <typename GraphNodeId> struct SCCData {
   llvm::SmallVector<uint32_t, 128> Disc;
   llvm::SmallVector<uint32_t, 128> Low;
   llvm::SmallBitVector OnStack;
@@ -69,7 +67,7 @@ struct SCCData {
         Seen(NumFuns) {}
 };
 
-struct SCCDataIt {
+template <typename GraphNodeId> struct SCCDataIt {
   llvm::SmallVector<uint32_t, 128> Disc;
   llvm::SmallVector<uint32_t, 128> Low;
   llvm::SmallBitVector OnStack;
@@ -83,7 +81,7 @@ struct SCCDataIt {
         Seen(NumFuns) {}
 };
 
-static void setMin(uint32_t &InOut, uint32_t Other) {
+constexpr void setMin(uint32_t &InOut, uint32_t Other) {
   if (Other < InOut) {
     InOut = Other;
   }
@@ -91,8 +89,9 @@ static void setMin(uint32_t &InOut, uint32_t Other) {
 
 // TODO: Non-recursive version
 template <typename G>
-static void computeSCCsRec(const G &Graph, GraphNodeId CurrNode, SCCData &Data,
-                           SCCHolder &Holder) {
+static void computeSCCsRec(const G &Graph, typename G::GraphNodeId CurrNode,
+                           SCCData<typename G::GraphNodeId> &Data,
+                           SCCHolder<typename G::GraphNodeId> &Holder) {
   // See
   // https://www.geeksforgeeks.org/tarjan-algorithm-find-strongly-connected-components
 
@@ -139,39 +138,41 @@ static void computeSCCsRec(const G &Graph, GraphNodeId CurrNode, SCCData &Data,
   }
 }
 
-// Iterative Implementation for Tarjan's SCC Alg.
+// Iterative IMplementation for Tarjan's SCC Alg.
 // -> Heapoverflow through simulated Stack?
 template <typename G>
-static void tarjanIt(const G &Graph, SCCDataIt &Data, SCCHolder &Holder) {
-
+static void tarjanIt(const G &Graph, SCCDataIt<typename G::GraphNodeId> &Data,
+                     SCCHolder<typename G::GraphNodeId> &Holder) {
+  using GraphNodeId = typename G::GraphNodeId;
   auto CurrTime = Data.Time;
-  for (uint32_t Vertex = 0; Vertex < Graph.Nodes.size(); Vertex++) {
-    if (Data.Disc[size_t(Vertex)] == UINT32_MAX) {
+  for (uint32_t Vertex = 0; Vertex < Graph.Adj.size(); Vertex++) {
+    if (Data.Disc[Vertex] == UINT32_MAX) {
       Data.CallStack.push_back({GraphNodeId(Vertex), 0});
       while (!Data.CallStack.empty()) {
         auto Curr = Data.CallStack.pop_back_val();
-        // Curr.second = 0 implies that Curr.fist was not visited before
+        // Curr.second = 0 implies that node Curr.fist was not visited before
         if (Curr.second == 0) {
-          Data.Disc[size_t(Curr.first)] = CurrTime;
-          Data.Low[size_t(Curr.first)] = CurrTime;
+          Data.Disc[Curr.first] = CurrTime;
+          Data.Low[Curr.first] = CurrTime;
           CurrTime++;
           Data.Stack.push_back(Curr.first);
-          Data.OnStack.set(uint32_t(Curr.first));
+          Data.OnStack.set(Curr.first);
         }
-        // Curr.second > 0 implies that we came back from a recursive call
+        // Curr.second > 0 implies that we came back from a recursive call of
+        // node with higher depth
         if (Curr.second > 0) {
-          setMin(Data.Low[size_t(Curr.first)],
-                 Data.Low[size_t(Curr.second) - 1]);
+          setMin(Data.Low[Curr.first], Data.Low[Curr.second - 1]);
         }
-        // find the next recursive function call
+        // find the next node for recursion
         while (Curr.second < Graph.getEdges(Curr.first).size() &&
-               Data.Disc[size_t(Graph.getEdges(Curr.first)[Curr.second])]) {
+               Data.Disc[Graph.getEdges(Curr.first)[Curr.second]] !=
+                   UINT32_MAX) {
           GraphNodeId W = Graph.getEdges(Curr.first)[Curr.second];
-          if (Data.OnStack.test(uint32_t(W))) {
-            setMin(Data.Low[size_t(Curr.first)], Data.Disc[size_t(W)]);
+          if (Data.OnStack.test(W)) {
+            setMin(Data.Low[Curr.first], Data.Disc[W]);
           }
           Curr.second++;
-          // If a Node u is undiscovered i.e. Data.Disc[size_t(u)] = UINT32_MAX
+          // If a Node u is undiscovered i.e. Data.Disc[u] = UINT32_MAX
           // start a recursive function call
           if (Curr.second < Graph.getEdges(Curr.first).size()) {
             GraphNodeId U = Graph.getEdges(Curr.first)[Curr.second];
@@ -179,8 +180,8 @@ static void tarjanIt(const G &Graph, SCCDataIt &Data, SCCHolder &Holder) {
             Data.CallStack.push_back({U, 0});
           }
           // If Curr.first is the root of a connected component i.e. Data.Disc =
-          // Data.Low
-          if (Data.Low[size_t(Curr.first)] == Data.Disc[size_t(Curr.first)]) {
+          // Data.Low i.e. cycle found
+          if (Data.Low[Curr.first] == Data.Disc[Curr.first]) {
             //-> SCC found
             auto SCCIdx = SCCId(Holder.NumSCCs++);
             auto &NodesInSCC = Holder.NodesInSCC.emplace_back();
@@ -207,10 +208,11 @@ static void tarjanIt(const G &Graph, SCCDataIt &Data, SCCHolder &Holder) {
   }
 }
 
-template <typename G> [[nodiscard]] SCCHolder computeSCCs(const G &Graph) {
-  SCCHolder Ret{};
+template <typename G>
+[[nodiscard]] SCCHolder<typename G::GraphNodeId> computeSCCs(const G &Graph) {
+  SCCHolder<typename G::GraphNodeId> Ret{};
 
-  auto NumNodes = Graph.Nodes.size();
+  auto NumNodes = Graph.Adj.size();
   Ret.SCCOfNode.resize(NumNodes);
 
   if (!NumNodes) {
@@ -220,7 +222,7 @@ template <typename G> [[nodiscard]] SCCHolder computeSCCs(const G &Graph) {
   SCCData Data(NumNodes);
   for (uint32_t FunId = 0; FunId != NumNodes; ++FunId) {
     if (!Data.Seen.test(FunId)) {
-      computeSCCsRec(Graph, GraphNodeId(FunId), Data, Ret);
+      computeSCCsRec(Graph, G::GraphNodeId(FunId), Data, Ret);
     }
   }
 
@@ -229,10 +231,12 @@ template <typename G> [[nodiscard]] SCCHolder computeSCCs(const G &Graph) {
 
 // choose which Tarjan implementation will be executed
 template <typename G>
-[[nodiscard]] SCCHolder execTarjan(const G &Graph, const bool Iterative) {
-  SCCHolder Ret{};
+[[nodiscard]] SCCHolder<typename G::GraphNodeId>
+execTarjan(const G &Graph, const bool Iterative) {
+  using GraphNodeId = typename G::GraphNodeId;
+  SCCHolder<typename G::GraphNodeId> Ret{};
 
-  auto NumNodes = Graph.Nodes.size();
+  auto NumNodes = Graph.Adj.size();
   Ret.SCCOfNode.resize(NumNodes);
 
   if (!NumNodes) {
@@ -240,11 +244,14 @@ template <typename G>
   }
 
   SCCData Data(NumNodes);
+  SCCDataIt DataIt(NumNodes);
   for (uint32_t FunId = 0; FunId != NumNodes; ++FunId) {
-    if (!Data.Seen.test(FunId)) {
-      if (Iterative) {
-        TarjanIt(Graph, GraphNodeId(FunId), Data, Ret);
-      } else {
+    if (Iterative) {
+      if (!DataIt.Senn.text(FunId)) {
+        tarjanIt(Graph, DataIt, Ret);
+      }
+    } else {
+      if (!Data.Seen.test(FunId)) {
         computeSCCsRec(Graph, GraphNodeId(FunId), Data, Ret);
       }
     }
@@ -254,12 +261,15 @@ template <typename G>
 }
 
 template <typename G>
-[[nodiscard]] LLVM_LIBRARY_VISIBILITY SCCCallers
-computeSCCCallers(const G &Graph, const SCCHolder &SCCs);
+[[nodiscard]] SCCCallers<typename G::GraphNodeId>
+computeSCCCallers(const G &Graph,
+                  const SCCHolder<typename G::GraphNodeId> &SCCs);
 
 template <typename G>
-auto computeSCCCallers(const G &Graph, const SCCHolder &SCCs) -> SCCCallers {
-  SCCCallers Ret;
+auto computeSCCCallers(const G &Graph,
+                       const SCCHolder<typename G::GraphNodeId> &SCCs)
+    -> SCCCallers<typename G::GraphNodeId> {
+  SCCCallers<typename G::GraphNodeId> Ret;
   Ret.ChildrenOfSCC.resize(SCCs.NumSCCs);
 
   llvm::SmallBitVector Roots(SCCs.NumSCCs, true);
@@ -288,36 +298,12 @@ auto computeSCCCallers(const G &Graph, const SCCHolder &SCCs) -> SCCCallers {
 }
 
 template <typename G>
-void analysis::call_graph::SCCCallers::print(llvm::raw_ostream &OS,
-                                             const SCCHolder &SCCs,
-                                             const G &Graph) {
-  OS << "digraph SCCTAG {\n";
-  psr::scope_exit CloseBrace = [&OS] { OS << "}\n"; };
-  for (size_t Ctr = 0; Ctr != SCCs.NumSCCs; ++Ctr) {
-    OS << "  " << Ctr << "[label=\"";
-    for (auto TNId : SCCs.NodesInSCC[Ctr]) {
-      auto TN = Graph.Nodes[TNId];
-      printNode(OS, TN);
-      OS << "\\n";
-    }
-    OS << "\"];\n";
-  }
-
-  OS << '\n';
-
-  size_t Ctr = 0;
-  for (const auto &Targets : ChildrenOfSCC) {
-    for (auto Tgt : Targets) {
-      OS << "  " << Ctr << "->" << uint32_t(Tgt) << ";\n";
-    }
-    ++Ctr;
-  }
-}
-
-[[nodiscard]] LLVM_LIBRARY_VISIBILITY SCCOrder
-computeSCCOrder(const SCCHolder &SCCs, const SCCCallers &Callers);
-
-inline auto computeSCCOrder(const SCCHolder &SCCs, const SCCCallers &Callers)
+[[nodiscard]] SCCOrder
+computeSCCOrder(const SCCHolder<typename G::GraphNodeId> &SCCs,
+                const SCCCallers<typename G::GraphNodeId> &Callers);
+template <typename G>
+inline auto computeSCCOrder(const SCCHolder<typename G::GraphNodeId> &SCCs,
+                            const SCCCallers<typename G::GraphNodeId> &Callers)
     -> SCCOrder {
   SCCOrder Ret;
   Ret.SCCIds.reserve(SCCs.NumSCCs);
@@ -359,3 +345,5 @@ template <> struct DenseMapInfo<psr::analysis::call_graph::SCCId> {
   static inline bool isEqual(SCCId L, SCCId R) noexcept { return L == R; }
 };
 } // namespace llvm
+
+#endif

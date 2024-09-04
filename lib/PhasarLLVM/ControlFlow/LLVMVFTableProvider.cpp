@@ -63,3 +63,18 @@ LLVMVFTableProvider::getVFTableOrNull(const llvm::StructType *Type) const {
   auto It = TypeVFTMap.find(Type);
   return It != TypeVFTMap.end() ? &It->second : nullptr;
 }
+
+const llvm::GlobalVariable *
+LLVMVFTableProvider::getVFTableGlobal(const llvm::StructType *Type) const {
+  auto Name = LLVMTypeHierarchy::removeStructOrClassPrefix(*Type);
+  return getVFTableGlobal(Name);
+}
+
+const llvm::GlobalVariable *
+LLVMVFTableProvider::getVFTableGlobal(const std::string &ClearTypeName) const {
+  if (auto It = ClearNameTVMap.find(ClearTypeName);
+      It != ClearNameTVMap.end()) {
+    return It->second;
+  }
+  return nullptr;
+}

@@ -259,8 +259,7 @@ template <typename Var, typename T>
 static constexpr size_t variant_idx = detail::variant_idx<Var, T>::value;
 
 template <typename T>
-static constexpr bool has_llvm_dense_map_info =
-    detail::has_llvm_dense_map_info<T>::value;
+PSR_CONCEPT has_llvm_dense_map_info = detail::has_llvm_dense_map_info<T>::value;
 
 struct TrueFn {
   template <typename... Args>

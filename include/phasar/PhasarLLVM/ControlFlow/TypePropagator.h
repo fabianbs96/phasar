@@ -7,7 +7,8 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-#pragma once
+#ifndef PHASAR_PHASARLLVM_CONTROLFLOW_TYPEPROPAGATOR_H
+#define PHASAR_PHASARLLVM_CONTROLFLOW_TYPEPROPAGATOR_H
 
 #include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 
@@ -37,7 +38,9 @@ struct TypeAssignment {
 [[nodiscard]] LLVM_LIBRARY_VISIBILITY TypeAssignment propagateTypes(
     const TypeAssignmentGraph &TAG,
     const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs,
-    const SCCCallers<typename TypeAssignmentGraph::GraphNodeId> &Deps,
+    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
+        &Deps,
     const SCCOrder &Order);
 
 } // namespace psr::analysis::call_graph
+#endif

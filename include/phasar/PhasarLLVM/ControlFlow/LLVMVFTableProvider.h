@@ -14,6 +14,8 @@
 
 #include <unordered_map>
 
+#include <llvm/ADT/StringMap.h>
+
 namespace llvm {
 class Module;
 class StructType;
@@ -32,8 +34,15 @@ public:
   [[nodiscard]] const LLVMVFTable *
   getVFTableOrNull(const llvm::StructType *Type) const;
 
+  [[nodiscard]] const llvm::GlobalVariable *
+  getVFTableGlobal(const llvm::StructType *Type) const;
+
+  [[nodiscard]] const llvm::GlobalVariable *
+  getVFTableGlobal(const std::string &ClearTypeName) const;
+
 private:
   std::unordered_map<const llvm::StructType *, LLVMVFTable> TypeVFTMap;
+  llvm::StringMap<const llvm::GlobalVariable *> ClearNameTVMap;
 };
 } // namespace psr
 

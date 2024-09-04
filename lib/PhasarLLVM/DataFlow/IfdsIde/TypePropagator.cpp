@@ -11,8 +11,8 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/SCCGeneric.h"
-#include "phasar/PhasarLLVM/Utils/Compressor.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Compressor.h"
 
 using namespace psr;
 using namespace psr::analysis::call_graph;
@@ -26,13 +26,15 @@ initialize(TypeAssignment &TA, const TypeAssignmentGraph &TAG,
   }
 }
 
-static void
-propagate(TypeAssignment &TA,
-          const SCCCallers<typename TypeAssignmentGraph::GraphNodeId> &Deps,
-          SCCId CurrSCC) {
+static void propagate(
+    TypeAssignment &TA,
+    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
+        &Deps,
+    SCCId CurrSCC) {
   const auto &Types = TA.TypesPerSCC[size_t(CurrSCC)];
-  if (Types.empty())
+  if (Types.empty()) {
     return;
+  }
 
   for (auto Succ : Deps.ChildrenOfSCC[size_t(CurrSCC)]) {
     TA.TypesPerSCC[size_t(Succ)].insert(Types.begin(), Types.end());
@@ -42,7 +44,8 @@ propagate(TypeAssignment &TA,
 TypeAssignment analysis::call_graph::propagateTypes(
     const TypeAssignmentGraph &TAG,
     const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs,
-    const SCCCallers<typename TypeAssignmentGraph::GraphNodeId> &Deps,
+    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
+        &Deps,
     const SCCOrder &Order) {
   TypeAssignment Ret;
   Ret.TypesPerSCC.resize(SCCs.NumSCCs);

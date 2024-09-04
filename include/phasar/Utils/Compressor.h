@@ -7,7 +7,9 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-// nach phasar utils
+#ifndef PHASAR_UTILS_COMPRESSOR_H
+#define PHASAR_UTILS_COMPRESSOR_H
+
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/TypeTraits.h"
 
@@ -209,3 +211,4 @@ struct NoneCompressor final {
 };
 
 } // namespace psr
+#endif

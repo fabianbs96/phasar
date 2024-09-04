@@ -7,10 +7,10 @@
  *     Fabian Schiebel and other
  *****************************************************************************/
 
-// #include "TypeAssignmentGraph.h"
+#ifndef PHASAR_PHASARLLVM_UTILS_FILTEREDALIASSET_H
+#define PHASAR_PHASARLLVM_UTILS_FILTEREDALIASSET_H
 
-#pragma once
-
+#include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 
 #include "llvm/ADT/DenseSet.h"
@@ -25,7 +25,7 @@ class Instruction;
 } // namespace llvm
 
 namespace psr {
-// Belongs into phasar!
+
 class FilteredAliasSet {
 public:
   using d_t = const llvm::Value *;
@@ -64,3 +64,5 @@ private:
   alias_info_t PT;
 };
 } // namespace psr
+
+#endif
