@@ -24,7 +24,9 @@ namespace psr {
 
 #if __cplusplus < 202002L
 #define PSR_CONCEPT static constexpr bool
-template <typename T> struct type_identity { using type = T; };
+template <typename T> struct TypeIdentity { // type_identity
+  using type = T;
+};
 #else
 #define PSR_CONCEPT concept
 template <typename T> using type_identity = std::type_identity<T>;
@@ -170,7 +172,7 @@ template <typename... Ts, typename T>
 struct variant_idx<std::variant<Ts...>, T>
     : std::integral_constant<
           size_t,
-          std::variant<type_identity<Ts>...>(type_identity<T>{}).index()> {};
+          std::variant<TypeIdentity<Ts>...>(TypeIdentity<T>{}).index()> {};
 
 template <typename T, typename = void>
 struct has_llvm_dense_map_info : std::false_type {};
@@ -253,7 +255,7 @@ PSR_CONCEPT IsEqualityComparable = detail::IsEqualityComparable<T>::value;
 template <typename T, typename U>
 PSR_CONCEPT AreEqualityComparable = detail::AreEqualityComparable<T, U>::value;
 
-template <typename T> using type_identity_t = typename type_identity<T>::type;
+template <typename T> using type_identity_t = typename TypeIdentity<T>::type;
 
 template <typename Var, typename T>
 static constexpr size_t variant_idx = detail::variant_idx<Var, T>::value;

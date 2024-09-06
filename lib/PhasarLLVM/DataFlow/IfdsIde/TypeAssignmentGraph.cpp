@@ -11,7 +11,6 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
-#include "phasar/PhasarLLVM/Utils/AliasSets.h"
 #include "phasar/PhasarLLVM/Utils/FilteredAliasSet.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -175,12 +174,14 @@ static void initializeWithFun(const llvm::Function *Fun,
   // Add all locals
   // Add return
 
-  if (Fun->isDeclaration())
+  if (Fun->isDeclaration()) {
     return;
+  }
 
   for (const auto &Arg : Fun->args()) {
-    if (!Arg.getType()->isPointerTy())
+    if (!Arg.getType()->isPointerTy()) {
       continue;
+    }
 
     addTAGNode({Variable{&Arg}}, TAG);
   }
@@ -201,17 +202,20 @@ static void initializeWithFun(const llvm::Function *Fun,
     addTAGNode({Variable{&I}}, TAG);
   }
 
-  if (Fun->getReturnType() && Fun->getReturnType()->isPointerTy())
+  if (Fun->getReturnType() && Fun->getReturnType()->isPointerTy()) {
     addTAGNode({Return{Fun}}, TAG);
+  }
 }
 
 [[nodiscard]] static bool isVTableOrFun(const llvm::Value *Val) {
   const auto *Base = Val->stripPointerCastsAndAliases();
-  if (llvm::isa<llvm::Function>(Base))
+  if (llvm::isa<llvm::Function>(Base)) {
     return true;
+  }
 
-  if (const auto *Glob = llvm::dyn_cast<llvm::GlobalVariable>(Base))
+  if (const auto *Glob = llvm::dyn_cast<llvm::GlobalVariable>(Base)) {
     return Glob->isConstant() && Glob->getName().startswith("_ZTV");
+  }
 
   return false;
 }
@@ -220,13 +224,15 @@ static void handleAlloca(const llvm::AllocaInst *Alloca,
                          TypeAssignmentGraph &TAG,
                          const psr::LLVMVFTableProvider &VTP) {
   auto TN = TAG.get({Variable{Alloca}});
-  if (!TN)
+  if (!TN) {
     return;
+  }
 
   const auto *AllocTy =
       llvm::dyn_cast<llvm::StructType>(Alloca->getAllocatedType());
-  if (!AllocTy)
+  if (!AllocTy) {
     return;
+  }
 
   if (const auto *TV = VTP.getVFTableGlobal(AllocTy)) {
     TAG.TypeEntryPoints[*TN].insert(TV);
@@ -250,22 +256,25 @@ static std::optional<TAGNodeId> getGEPNode(const llvm::GetElementPtrInst *GEP,
 static void handleGEP(const llvm::GetElementPtrInst *GEP,
                       TypeAssignmentGraph &TAG, const llvm::DataLayout &DL) {
   auto To = TAG.get({Variable{GEP}});
-  if (!To)
+  if (!To) {
     return;
+  }
 
   if (!GEP->isInBounds()) {
     auto From = TAG.get({Variable{GEP->getPointerOperand()}});
 
-    if (From && To)
+    if (From && To) {
       TAG.addEdge(*From, *To);
+    }
 
     return;
   }
   // TODO: Is this correct? -- also check load
 
   auto From = getGEPNode(GEP, TAG, DL);
-  if (From)
+  if (From) {
     TAG.addEdge(*From, *To);
+  }
 }
 
 static bool handleEntryForStore(const llvm::StoreInst *Store,
@@ -274,8 +283,9 @@ static bool handleEntryForStore(const llvm::StoreInst *Store,
   const auto *Base = Store->getValueOperand()->stripPointerCastsAndAliases();
   bool IsEntry = isVTableOrFun(Base);
 
-  if (!IsEntry)
+  if (!IsEntry) {
     return false;
+  }
 
   if (const auto *GEPDest =
           llvm::dyn_cast<llvm::GetElementPtrInst>(Store->getPointerOperand())) {
@@ -286,8 +296,9 @@ static bool handleEntryForStore(const llvm::StoreInst *Store,
       if (const auto *FldDest = std::get_if<Field>(&GEPNode.Label)) {
         auto ApproxDest = TAG.get({Field{FldDest->Base, SIZE_MAX}});
 
-        if (ApproxDest)
+        if (ApproxDest) {
           TAG.TypeEntryPoints[*ApproxDest].insert(Base);
+        }
       }
     }
   }
@@ -296,8 +307,9 @@ static bool handleEntryForStore(const llvm::StoreInst *Store,
     // TODO: Fuse store and GEP!
 
     auto DestNodeId = TAG.get({Variable{Dest}});
-    if (!DestNodeId)
+    if (!DestNodeId) {
       return;
+    }
 
     TAG.TypeEntryPoints[*DestNodeId].insert(Base);
   });
@@ -307,12 +319,14 @@ static bool handleEntryForStore(const llvm::StoreInst *Store,
 static void handleStore(const llvm::StoreInst *Store, TypeAssignmentGraph &TAG,
                         TAGAliasInfo AI, const llvm::DataLayout &DL) {
 
-  if (handleEntryForStore(Store, TAG, AI, DL))
+  if (handleEntryForStore(Store, TAG, AI, DL)) {
     return;
+  }
 
   auto From = TAG.get({Variable{Store->getValueOperand()}});
-  if (!From)
+  if (!From) {
     return;
+  }
 
   if (const auto *GEPDest =
           llvm::dyn_cast<llvm::GetElementPtrInst>(Store->getPointerOperand())) {
@@ -323,8 +337,9 @@ static void handleStore(const llvm::StoreInst *Store, TypeAssignmentGraph &TAG,
       if (const auto *FldDest = std::get_if<Field>(&GEPNode.Label)) {
         auto ApproxDest = TAG.get({Field{FldDest->Base, SIZE_MAX}});
 
-        if (ApproxDest)
+        if (ApproxDest) {
           TAG.addEdge(*From, *ApproxDest);
+        }
       }
     }
   }
@@ -333,8 +348,9 @@ static void handleStore(const llvm::StoreInst *Store, TypeAssignmentGraph &TAG,
     // TODO: Fuse store and GEP!
 
     auto DestNodeId = TAG.get({Variable{Dest}});
-    if (!DestNodeId)
+    if (!DestNodeId) {
       return;
+    }
 
     TAG.addEdge(*From, *DestNodeId);
   });
@@ -343,29 +359,34 @@ static void handleStore(const llvm::StoreInst *Store, TypeAssignmentGraph &TAG,
 static void handleLoad(const llvm::LoadInst *Load, TypeAssignmentGraph &TAG,
                        const llvm::DataLayout &DL) {
   auto To = TAG.get({Variable{Load}});
-  if (!To)
+  if (!To) {
     return;
+  }
 
   auto From = TAG.get({Variable{Load->getPointerOperand()}});
-  if (From)
+  if (From) {
     TAG.addEdge(*From, *To);
+  }
 
   if (const auto *GEPDest =
           llvm::dyn_cast<llvm::GetElementPtrInst>(Load->getPointerOperand())) {
-    if (auto GEPNodeId = getGEPNode(GEPDest, TAG, DL))
+    if (auto GEPNodeId = getGEPNode(GEPDest, TAG, DL)) {
       TAG.addEdge(*GEPNodeId, *To);
+    }
   }
 }
 
 static void handlePhi(const llvm::PHINode *Phi, TypeAssignmentGraph &TAG) {
   auto To = TAG.get({Variable{Phi}});
-  if (!To)
+  if (!To) {
     return;
+  }
 
   for (const auto &Inc : Phi->incoming_values()) {
     auto From = TAG.get({Variable{Inc.get()}});
-    if (From)
+    if (From) {
       TAG.addEdge(*From, *To);
+    }
   }
 }
 
@@ -373,18 +394,21 @@ static llvm::StringRef extractTypeName(llvm::StringRef CtorName) {
   // Example: _ZN3OneC2Ev
 
   auto EndIdx = CtorName.rfind("C2E");
-  if (EndIdx == llvm::StringRef::npos)
+  if (EndIdx == llvm::StringRef::npos) {
     EndIdx = CtorName.rfind("C1E");
+  }
 
-  if (EndIdx == llvm::StringRef::npos)
+  if (EndIdx == llvm::StringRef::npos) {
     EndIdx = CtorName.size();
+  }
 
   auto StartIdx = EndIdx;
   while (StartIdx) {
     --StartIdx;
 
-    if (llvm::isDigit(CtorName[StartIdx]))
+    if (llvm::isDigit(CtorName[StartIdx])) {
       break;
+    }
   }
   return CtorName.slice(StartIdx, EndIdx);
 }
@@ -429,8 +453,9 @@ static void handleEntryForCall(const llvm::CallBase *Call, TAGNodeId CSNod,
                                const llvm::Function *Callee,
                                const psr::LLVMVFTableProvider &VTP) {
 
-  if (!psr::isHeapAllocatingFunction(Callee))
+  if (!psr::isHeapAllocatingFunction(Callee)) {
     return;
+  }
 
   if (const auto *MDNode = Call->getMetadata("heapallocsite")) {
 
@@ -499,8 +524,9 @@ static void handleCall(const llvm::CallBase *Call, TypeAssignmentGraph &TAG,
   for (const auto &Arg : Call->args()) {
     auto TN = TAG.get({Variable{Arg.get()}});
     Args.push_back(TN);
-    if (TN)
+    if (TN) {
       HasArgNode = true;
+    }
 
     bool IsEntry = isVTableOrFun(Arg.get());
     EntryArgs.push_back(IsEntry);
@@ -509,16 +535,18 @@ static void handleCall(const llvm::CallBase *Call, TypeAssignmentGraph &TAG,
   auto CSNod = TAG.get({Variable{Call}});
 
   // TODO: Handle struct returns that contain pointers
-  if (!HasArgNode && !CSNod)
+  if (!HasArgNode && !CSNod) {
     return;
+  }
 
   for (const auto *Callee : BaseCG.getCalleesOfCallAt(Call)) {
     handleEntryForCall(Call, *CSNod, TAG, Callee, VTP);
 
     for (const auto &[Param, Arg] : llvm::zip(Callee->args(), Args)) {
       auto ParamNodId = TAG.get({Variable{&Param}});
-      if (!ParamNodId)
+      if (!ParamNodId) {
         continue;
+      }
 
       if (EntryArgs.test(Param.getArgNo())) {
         TAG.TypeEntryPoints[*ParamNodId].insert(
@@ -526,19 +554,22 @@ static void handleCall(const llvm::CallBase *Call, TypeAssignmentGraph &TAG,
                 ->stripPointerCastsAndAliases());
       }
 
-      if (!Arg)
+      if (!Arg) {
         continue;
+      }
 
-      if (!Param.hasStructRetAttr())
+      if (!Param.hasStructRetAttr()) {
         TAG.addEdge(*Arg, *ParamNodId);
+      }
 
       // if (!Param.hasByValAttr())
       //   TAG.addEdge(*ParamNodId, *Arg);
     }
     if (CSNod) {
       auto RetNod = TAG.get({Return{Callee}});
-      if (RetNod)
+      if (RetNod) {
         TAG.addEdge(*RetNod, *CSNod);
+      }
     }
   }
 }
@@ -547,8 +578,9 @@ static void handleReturn(const llvm::ReturnInst *Ret,
                          TypeAssignmentGraph &TAG) {
 
   auto TNId = TAG.get({Return{Ret->getFunction()}});
-  if (!TNId)
+  if (!TNId) {
     return;
+  }
 
   if (const auto *RetVal = Ret->getReturnValue()) {
     const auto *Base = RetVal->stripPointerCastsAndAliases();
@@ -558,8 +590,9 @@ static void handleReturn(const llvm::ReturnInst *Ret,
     }
 
     auto From = TAG.get({Variable{Base}});
-    if (From)
+    if (From) {
       TAG.addEdge(*From, *TNId);
+    }
   }
 }
 
@@ -592,8 +625,9 @@ static void dispatch(const llvm::Instruction &I, TypeAssignmentGraph &TAG,
     auto From = TAG.get({Variable{Cast->getOperand(0)}});
     auto To = TAG.get({Variable{Cast}});
 
-    if (From && To)
+    if (From && To) {
       TAG.addEdge(*From, *To);
+    }
   }
   if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(&I)) {
     handleCall(Call, TAG, BaseCG, VTP);
@@ -650,22 +684,6 @@ auto analysis::call_graph::computeTypeAssignmentGraph(
     psr::LLVMAliasInfoRef AS, const psr::LLVMVFTableProvider &VTP)
     -> TypeAssignmentGraph {
   FilteredAliasSet FAS(AS);
-  return computeTypeAssignmentGraphImpl(
-      Mod, BaseCG,
-      [&FAS](const auto *Fact, const auto *At, TAGAliasHandler Handler) {
-        FAS.foreachAlias(Fact, At, Handler);
-      },
-      VTP);
-}
-
-auto analysis::call_graph::computeTypeAssignmentGraph(
-    const llvm::Module &Mod,
-    const psr::CallGraph<const llvm::Instruction *, const llvm::Function *>
-        &BaseCG,
-    const ObjectGraph &ObjGraph, const psr::LLVMVFTableProvider &VTP)
-    -> TypeAssignmentGraph {
-  AliasInfo AI(&ObjGraph);
-  FilteredAliasSet FAS(AI.aliases());
   return computeTypeAssignmentGraphImpl(
       Mod, BaseCG,
       [&FAS](const auto *Fact, const auto *At, TAGAliasHandler Handler) {

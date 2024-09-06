@@ -11,6 +11,8 @@
 #define PHASAR_UTILS_SCCGENERIC_H
 
 #include "phasar/PhasarLLVM/ControlFlow/TypeAssignmentGraph.h"
+#include "phasar/Utils/BitSet.h"
+#include "phasar/Utils/TypedVector.h"
 
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -23,6 +25,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>
+#include <iostream>
+#include <string>
 
 namespace psr {
 class LLVMBasedICFG;
@@ -34,7 +38,7 @@ enum class [[clang::enum_extensibility(open)]] SCCId : uint32_t{};
 
 // holds the scc's of a given graph
 template <typename GraphNodeId> struct SCCHolder {
-  llvm::SmallVector<SCCId, 0> SCCOfNode{};
+  llvm::SmallVector<SCCId, 0> SCCOfNode;
   llvm::SmallVector<llvm::SmallVector<GraphNodeId, 1>> NodesInSCC{};
   size_t NumSCCs = 0;
 };
@@ -42,8 +46,8 @@ template <typename GraphNodeId> struct SCCHolder {
 // holds a graph were the scc's are compressed to a single node. Resulting graph
 // is a DAG
 template <typename G> struct SCCCallers {
-  llvm::SmallVector<llvm::SmallDenseSet<SCCId>, 0> ChildrenOfSCC{};
-  llvm::SmallVector<SCCId, 0> SCCRoots{};
+  llvm::SmallVector<llvm::SmallDenseSet<SCCId>, 0> ChildrenOfSCC;
+  llvm::SmallVector<SCCId, 0> SCCRoots;
 
   void print(llvm::raw_ostream &OS,
              const SCCHolder<typename G::GraphNodeId> &SCCs, const G &Graph);
@@ -68,13 +72,13 @@ template <typename GraphNodeId> struct SCCData {
 };
 
 template <typename GraphNodeId> struct SCCDataIt {
-  llvm::SmallVector<uint32_t, 128> Disc;
-  llvm::SmallVector<uint32_t, 128> Low;
-  llvm::SmallBitVector OnStack;
+  TypedVector<GraphNodeId, uint32_t> Disc;
+  TypedVector<GraphNodeId, uint32_t> Low;
+  BitSet<GraphNodeId> OnStack;
   llvm::SmallVector<GraphNodeId> Stack;
   llvm::SmallVector<std::pair<GraphNodeId, uint32_t>> CallStack;
   uint32_t Time = 0;
-  llvm::SmallBitVector Seen;
+  BitSet<GraphNodeId> Seen;
 
   explicit SCCDataIt(size_t NumFuns)
       : Disc(NumFuns, UINT32_MAX), Low(NumFuns, UINT32_MAX), OnStack(NumFuns),
@@ -138,15 +142,16 @@ static void computeSCCsRec(const G &Graph, typename G::GraphNodeId CurrNode,
   }
 }
 
-// Iterative IMplementation for Tarjan's SCC Alg.
-// -> Heapoverflow through simulated Stack?
+// Iterative Implementation for Tarjan's SCC Alg.
 template <typename G>
-static void tarjanIt(const G &Graph, SCCDataIt<typename G::GraphNodeId> &Data,
-                     SCCHolder<typename G::GraphNodeId> &Holder) {
+static void tarjanSCCIt(const G &Graph,
+                        SCCDataIt<typename G::GraphNodeId> &Data,
+                        SCCHolder<typename G::GraphNodeId> &Holder) {
   using GraphNodeId = typename G::GraphNodeId;
-  auto CurrTime = Data.Time;
+  uint32_t Unvisited = UINT32_MAX;
+  auto CurrTime = 0;
   for (uint32_t Vertex = 0; Vertex < Graph.Adj.size(); Vertex++) {
-    if (Data.Disc[Vertex] == UINT32_MAX) {
+    if (Data.Disc[GraphNodeId(Vertex)] == Unvisited) {
       Data.CallStack.push_back({GraphNodeId(Vertex), 0});
       while (!Data.CallStack.empty()) {
         auto Curr = Data.CallStack.pop_back_val();
@@ -156,52 +161,54 @@ static void tarjanIt(const G &Graph, SCCDataIt<typename G::GraphNodeId> &Data,
           Data.Low[Curr.first] = CurrTime;
           CurrTime++;
           Data.Stack.push_back(Curr.first);
-          Data.OnStack.set(Curr.first);
+          Data.OnStack.insert(Curr.first);
         }
         // Curr.second > 0 implies that we came back from a recursive call of
         // node with higher depth
         if (Curr.second > 0) {
-          setMin(Data.Low[Curr.first], Data.Low[Curr.second - 1]);
+          GraphNodeId Pred = Graph.getEdges(Curr.first)[Curr.second - 1];
+          setMin(Data.Low[Curr.first], Data.Low[Pred]);
         }
         // find the next node for recursion
         while (Curr.second < Graph.getEdges(Curr.first).size() &&
                Data.Disc[Graph.getEdges(Curr.first)[Curr.second]] !=
-                   UINT32_MAX) {
+                   Unvisited) {
           GraphNodeId W = Graph.getEdges(Curr.first)[Curr.second];
-          if (Data.OnStack.test(W)) {
+          if (Data.OnStack.test(uint32_t(W))) {
             setMin(Data.Low[Curr.first], Data.Disc[W]);
           }
           Curr.second++;
-          // If a Node u is undiscovered i.e. Data.Disc[u] = UINT32_MAX
-          // start a recursive function call
-          if (Curr.second < Graph.getEdges(Curr.first).size()) {
-            GraphNodeId U = Graph.getEdges(Curr.first)[Curr.second];
-            Data.CallStack.push_back({Curr.first, Curr.second++});
-            Data.CallStack.push_back({U, 0});
-          }
-          // If Curr.first is the root of a connected component i.e. Data.Disc =
-          // Data.Low i.e. cycle found
-          if (Data.Low[Curr.first] == Data.Disc[Curr.first]) {
-            //-> SCC found
-            auto SCCIdx = SCCId(Holder.NumSCCs++);
-            auto &NodesInSCC = Holder.NodesInSCC.emplace_back();
+        }
+        // If a Node u is undiscovered i.e. Data.Disc[u] = UINT32_MAX
+        // start a recursive function call
+        if (Curr.second < Graph.getEdges(Curr.first).size()) {
+          GraphNodeId U = Graph.getEdges(Curr.first)[Curr.second];
+          Data.CallStack.push_back({Curr.first, (Curr.second++)});
+          Data.CallStack.push_back({U, 0});
+          continue;
+        }
+        // If Curr.first is the root of a connected component i.e. Data.Disc =
+        // Data.Low i.e. cycle found
+        if (Data.Low[Curr.first] == Data.Disc[Curr.first]) {
+          //-> SCC found
+          auto SCCIdx = SCCId(Holder.NumSCCs++);
+          auto &NodesInSCC = Holder.NodesInSCC.emplace_back();
 
-            assert(!Data.Stack.empty());
+          assert(!Data.Stack.empty());
 
-            while (Data.Stack.back() != Curr.first) {
-              auto Fun = Data.Stack.pop_back_val();
-              Holder.SCCOfNode[size_t(Fun)] = SCCIdx;
-              Data.OnStack.reset(uint32_t(Fun));
-              Data.Seen.set(uint32_t(Fun));
-              NodesInSCC.push_back(Fun);
-            }
-
+          while (Data.Stack.back() != Curr.first) {
             auto Fun = Data.Stack.pop_back_val();
             Holder.SCCOfNode[size_t(Fun)] = SCCIdx;
-            Data.OnStack.reset(uint32_t(Fun));
-            Data.Seen.set(uint32_t(Fun));
+            Data.OnStack.erase(Fun);
+            Data.Seen.insert(Fun);
             NodesInSCC.push_back(Fun);
           }
+
+          auto Fun = Data.Stack.pop_back_val();
+          Holder.SCCOfNode[size_t(Fun)] = SCCIdx;
+          Data.OnStack.erase(Fun);
+          Data.Seen.insert(Fun);
+          NodesInSCC.push_back(Fun);
         }
       }
     }
@@ -243,12 +250,12 @@ execTarjan(const G &Graph, const bool Iterative) {
     return Ret;
   }
 
-  SCCData Data(NumNodes);
-  SCCDataIt DataIt(NumNodes);
+  SCCData<GraphNodeId> Data(NumNodes);
+  SCCDataIt<GraphNodeId> DataIt(NumNodes);
   for (uint32_t FunId = 0; FunId != NumNodes; ++FunId) {
     if (Iterative) {
-      if (!DataIt.Senn.text(FunId)) {
-        tarjanIt(Graph, DataIt, Ret);
+      if (!DataIt.Seen.test(FunId)) {
+        tarjanSCCIt(Graph, DataIt, Ret);
       }
     } else {
       if (!Data.Seen.test(FunId)) {

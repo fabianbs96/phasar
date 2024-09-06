@@ -29,8 +29,9 @@ public:
 
   ExampleGraph() = default;
 
-  [[nodiscard]] std::vector<GraphNodeId> getEdges(const GraphNodeId ID) const {
-    return Adj[uint32_t(ID)];
+  [[nodiscard]] std::vector<GraphNodeId>
+  getEdges(const GraphNodeId Vertex) const {
+    return Adj[uint32_t(Vertex)];
   }
   std::vector<std::vector<GraphNodeId>> Adj;
 };

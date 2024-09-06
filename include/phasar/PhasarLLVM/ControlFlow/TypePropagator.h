@@ -30,17 +30,15 @@ struct SCCOrder;
 struct TypeAssignment {
   llvm::SmallVector<llvm::SmallDenseSet<const llvm::Value *>, 0> TypesPerSCC;
 
-  LLVM_LIBRARY_VISIBILITY void
-  print(llvm::raw_ostream &OS, const TypeAssignmentGraph &TAG,
-        const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs);
+  void print(llvm::raw_ostream &OS, const TypeAssignmentGraph &TAG,
+             const SCCHolder<TypeAssignmentGraph::GraphNodeId> &SCCs);
 };
 
-[[nodiscard]] LLVM_LIBRARY_VISIBILITY TypeAssignment propagateTypes(
-    const TypeAssignmentGraph &TAG,
-    const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs,
-    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
-        &Deps,
-    const SCCOrder &Order);
+[[nodiscard]] TypeAssignment
+propagateTypes(const TypeAssignmentGraph &TAG,
+               const SCCHolder<TypeAssignmentGraph::GraphNodeId> &SCCs,
+               const SCCCallers<TypeAssignmentGraph> &Deps,
+               const SCCOrder &Order);
 
 } // namespace psr::analysis::call_graph
 #endif

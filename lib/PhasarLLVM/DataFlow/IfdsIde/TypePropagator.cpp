@@ -19,18 +19,16 @@ using namespace psr::analysis::call_graph;
 
 static void
 initialize(TypeAssignment &TA, const TypeAssignmentGraph &TAG,
-           const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs) {
+           const SCCHolder<TypeAssignmentGraph::GraphNodeId> &SCCs) {
   for (const auto &[Node, Types] : TAG.TypeEntryPoints) {
     auto SCC = SCCs.SCCOfNode[size_t(Node)];
     TA.TypesPerSCC[size_t(SCC)].insert(Types.begin(), Types.end());
   }
 }
 
-static void propagate(
-    TypeAssignment &TA,
-    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
-        &Deps,
-    SCCId CurrSCC) {
+static void propagate(TypeAssignment &TA,
+                      const SCCCallers<TypeAssignmentGraph> &Deps,
+                      SCCId CurrSCC) {
   const auto &Types = TA.TypesPerSCC[size_t(CurrSCC)];
   if (Types.empty()) {
     return;
@@ -43,10 +41,8 @@ static void propagate(
 
 TypeAssignment analysis::call_graph::propagateTypes(
     const TypeAssignmentGraph &TAG,
-    const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs,
-    const SCCCallers<typename psr::analysis::call_graph::TypeAssignmentGraph>
-        &Deps,
-    const SCCOrder &Order) {
+    const SCCHolder<TypeAssignmentGraph::GraphNodeId> &SCCs,
+    const SCCCallers<TypeAssignmentGraph> &Deps, const SCCOrder &Order) {
   TypeAssignment Ret;
   Ret.TypesPerSCC.resize(SCCs.NumSCCs);
 
@@ -60,7 +56,7 @@ TypeAssignment analysis::call_graph::propagateTypes(
 
 void TypeAssignment::print(
     llvm::raw_ostream &OS, const TypeAssignmentGraph &TAG,
-    const SCCHolder<typename TypeAssignmentGraph::GraphNodeId> &SCCs) {
+    const SCCHolder<TypeAssignmentGraph::GraphNodeId> &SCCs) {
   OS << "digraph TypeAssignment {\n";
   psr::scope_exit CloseBrace = [&OS] { OS << "}\n"; };
 

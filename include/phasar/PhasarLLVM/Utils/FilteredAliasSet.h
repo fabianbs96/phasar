@@ -50,12 +50,12 @@ public:
         }) {}
 
   [[nodiscard]] container_type getAliasSet(d_t Val, n_t At);
-  [[nodiscard]] container_type getMustAliasSet(d_t Val, n_t At) {
+  [[nodiscard]] container_type getMustAliasSet(d_t Val, n_t /*At*/) {
     return {Val};
   }
 
   void foreachAlias(d_t Fact, n_t At, llvm::function_ref<void(d_t)> WithAlias);
-  void foreachMustAlias(d_t Fact, n_t At,
+  void foreachMustAlias(d_t Fact, n_t /*At*/,
                         llvm::function_ref<void(d_t)> WithAlias) {
     WithAlias(Fact);
   }

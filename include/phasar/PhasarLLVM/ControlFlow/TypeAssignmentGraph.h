@@ -138,8 +138,9 @@ struct TypeAssignmentGraph {
     assert(size_t(From) < Adj.size());
     assert(size_t(To) < Adj.size());
 
-    if (From == To)
+    if (From == To) {
       return;
+    }
 
     Adj[size_t(From)].insert(To);
   }
@@ -152,12 +153,6 @@ struct TypeAssignmentGraph {
     const psr::CallGraph<const llvm::Instruction *, const llvm::Function *>
         &BaseCG,
     psr::LLVMAliasInfoRef AS, const psr::LLVMVFTableProvider &VTP);
-
-[[nodiscard]] TypeAssignmentGraph computeTypeAssignmentGraph(
-    const llvm::Module &Mod,
-    const psr::CallGraph<const llvm::Instruction *, const llvm::Function *>
-        &BaseCG,
-    const ObjectGraph &ObjGraph, const psr::LLVMVFTableProvider &VTP);
 
 void printNode(llvm::raw_ostream &OS, TAGNode TN);
 }; // namespace psr::analysis::call_graph
