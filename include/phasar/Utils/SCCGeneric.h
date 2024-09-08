@@ -151,6 +151,7 @@ static void tarjanSCCIt(const G &Graph,
   uint32_t Unvisited = UINT32_MAX;
   auto CurrTime = 0;
   for (uint32_t Vertex = 0; Vertex < Graph.Adj.size(); Vertex++) {
+    // std::cout << std::to_string(Vertex) << "\n";
     if (Data.Disc[GraphNodeId(Vertex)] == Unvisited) {
       Data.CallStack.push_back({GraphNodeId(Vertex), 0});
       while (!Data.CallStack.empty()) {
@@ -183,7 +184,7 @@ static void tarjanSCCIt(const G &Graph,
         // start a recursive function call
         if (Curr.second < Graph.getEdges(Curr.first).size()) {
           GraphNodeId U = Graph.getEdges(Curr.first)[Curr.second];
-          Data.CallStack.push_back({Curr.first, (Curr.second++)});
+          Data.CallStack.push_back({Curr.first, Curr.second + 1});
           Data.CallStack.push_back({U, 0});
           continue;
         }
