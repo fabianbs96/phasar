@@ -40,6 +40,12 @@ public:
     Fdff[FuncKey][Index].emplace_back(Out);
   }
 
+  void
+  insert(llvm::StringRef FuncKey,
+         std::unordered_map<uint32_t, std::vector<DataFlowFact>> &InnerMap) {
+    Fdff[FuncKey] = InnerMap;
+  }
+
   // get outset for a function an the parameter index
   [[nodiscard]] const std::vector<DataFlowFact> &
   getDataFlowFacts(llvm::StringRef FuncKey, uint32_t &Index) const {
@@ -50,6 +56,16 @@ public:
     }
 
     return getDefaultValue<std::vector<DataFlowFact>>();
+  }
+
+  [[nodiscard]] std::unordered_map<uint32_t, std::vector<DataFlowFact>>
+  get(llvm::StringRef FuncKey) {
+    auto It = Fdff.find(FuncKey);
+    if (It != Fdff.end()) {
+      return It->second;
+    }
+
+    return It->second;
   }
 
   [[nodiscard]] auto begin() const { return Fdff.begin(); }

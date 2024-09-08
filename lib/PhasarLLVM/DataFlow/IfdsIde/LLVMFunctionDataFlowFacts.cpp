@@ -12,7 +12,7 @@ static LLVMFunctionDataFlowFacts readFromFDFF(const FunctionDataFlowFacts &Fdff,
     if (Fun == nullptr) {
       continue;
     }
-    for (const auto [ArgIndex, OutSet] : It.second) {
+    for (const auto &[ArgIndex, OutSet] : It.second) {
       const llvm::Argument *Arg = Fun->getArg(ArgIndex);
       for (const auto &I : OutSet) {
         if (std::holds_alternative<ReturnValue>(I.Fact)) {

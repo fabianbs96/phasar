@@ -411,29 +411,29 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
   if (Gen.empty() && Leak.empty() && Kill.empty()) {
     if (Llvmfdff.contains(DestFun)) {
       const auto &DestFunFacts = Llvmfdff.getFactsForFunction(DestFun);
-      return lambdaFlow([this, CallSite, DestFun,
-                         DestFunFacts](d_t Source) -> container_type {
-        std::set<d_t> Facts;
-        const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
-        for (const auto &[Arg, DestParam] :
-             llvm::zip(CS->args(), DestFun->args())) {
-          if (Source == Arg.get()) {
-            auto VecFacts = DestFunFacts.find(&DestParam);
-            for (const auto &VecFact : VecFacts->second) {
-              if (const auto *Param =
-                      std::get_if<LLVMParameter>(&VecFact.Fact)) {
-                Facts.insert(CS->getArgOperand(Param->Index->getArgNo()));
-              }
+      return lambdaFlow(
+          [CallSite, DestFun, DestFunFacts](d_t Source) -> container_type {
+            std::set<d_t> Facts;
+            const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
+            for (const auto &[Arg, DestParam] :
+                 llvm::zip(CS->args(), DestFun->args())) {
+              if (Source == Arg) {
+                auto VecFacts = DestFunFacts.find(&DestParam);
+                for (const auto &VecFact : VecFacts->second) {
+                  if (const auto *Param =
+                          std::get_if<LLVMParameter>(&VecFact.Fact)) {
+                    Facts.insert(CS->getArgOperand(Param->Index->getArgNo()));
+                  }
 
-              else {
-                Facts.insert(CallSite);
+                  else {
+                    Facts.insert(CallSite);
+                  }
+                }
               }
             }
-          }
-        }
-        Facts.insert(Source);
-        return Facts;
-      });
+            Facts.insert(Source);
+            return Facts;
+          });
     }
 
     // not found

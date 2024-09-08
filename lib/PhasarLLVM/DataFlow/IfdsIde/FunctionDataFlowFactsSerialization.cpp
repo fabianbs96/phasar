@@ -8,66 +8,96 @@
 #include <cstring>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
-#include <llvm-14/llvm/ADT/StringMap.h>
-#include <llvm-14/llvm/ADT/StringRef.h>
-#include <llvm-14/llvm/Support/Path.h>
-#include <llvm-14/llvm/Support/raw_ostream.h>
+#include <llvm/ADT/StringMap.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/Support/Path.h>
+#include <llvm/Support/raw_ostream.h>
 
 using namespace psr;
+using llvm::yaml::CustomMappingTraits;
 using llvm::yaml::Input;
 using llvm::yaml::IO;
-using llvm::yaml::MappingTraits;
 using llvm::yaml::Output;
-using llvm::yaml::SequenceTraits;
+
+namespace llvm::yaml {
+template <> struct MissingTrait<psr::DataFlowFact>;
+} // namespace llvm::yaml
+
+namespace llvm::yaml {
+template <>
+struct MissingTrait<std::unordered_map<uint32_t, psr::DataFlowFact>>;
+} // namespace llvm::yaml
+
+namespace llvm::yaml {
+template <> struct MissingTrait<FunctionDataFlowFacts>;
+} // namespace llvm::yaml
+
+namespace llvm::yaml {
+template <> struct ScalarTraits<psr::DataFlowFact> {
+  static void output(const psr::DataFlowFact &Val, void * /*unused*/,
+                     llvm::raw_ostream &Out) {
+    // stream out custom formatting
+    if (const auto &Param = std::get_if<psr::Parameter>(&Val.Fact)) {
+      Out << std::to_string(Param->Index);
+    } else {
+      Out << "ReturnValue";
+    }
+  }
+  static StringRef input(StringRef Scalar, void * /*unused*/,
+                         psr::DataFlowFact &Value) {
+    // parse scalar and set `value`
+    // return empty string on success, or error string
+    uint16_t IntVal = 0;
+    if (Scalar.getAsInteger(0, IntVal)) {
+      Value = DataFlowFact(ReturnValue{});
+      return {};
+    }
+    Value = DataFlowFact(psr::Parameter{IntVal});
+
+    return {};
+  }
+  static QuotingType mustQuote(StringRef /*unused*/) {
+    return QuotingType::Single;
+  }
+};
+} // namespace llvm::yaml
+
+namespace llvm::yaml {
+template <> struct SequenceElementTraits<psr::DataFlowFact> {
+  static const bool flow = true; // NOLINT
+};
+} // namespace llvm::yaml
 
 template <>
-struct MappingTraits<
-    std::unordered_map<uint32_t, std::vector<DataFlowFact>>::iterator> {
+struct CustomMappingTraits<
+    std::unordered_map<uint32_t, std::vector<psr::DataFlowFact>>> {
   static void
-  mapping(IO &Io,
-          std::unordered_map<uint32_t, std::vector<DataFlowFact>>::iterator
-              InnerElemPtr) {
-    for (const auto &Dff : InnerElemPtr->second) {
-      if (const Parameter *Param = std::get_if<Parameter>(&Dff.Fact)) {
-        Io.mapOptional(std::to_string(InnerElemPtr->first).c_str(),
-                       Param->Index);
-      } else {
-        Io.mapOptional(std::to_string(InnerElemPtr->first).c_str(),
-                       "ReturnValue");
-      }
+  inputOne(IO &Io, StringRef Key,
+           std::unordered_map<uint32_t, std::vector<psr::DataFlowFact>> &V) {
+    Io.mapRequired(Key.str().c_str(), V[std::atoi(Key.str().c_str())]);
+  }
+  static void
+  output(IO &Io,
+         std::unordered_map<uint32_t, std::vector<psr::DataFlowFact>> &V) {
+    for (auto &Iter : V) {
+      Io.mapRequired(utostr(Iter.first).c_str(), Iter.second);
     }
   }
 };
 
-template <>
-struct MappingTraits<llvm::StringMapConstIterator<
-    std::unordered_map<uint32_t, std::vector<DataFlowFact>>>> {
-  static void
-  mapping(IO &Io, llvm::StringMapConstIterator<
-                      std::unordered_map<uint32_t, std::vector<DataFlowFact>>>
-                      ElemPtr) {
-    struct MappingTraits<
-        std::unordered_map<uint32_t, std::vector<DataFlowFact>>>
-        InnerElem; //{ElemPtr->second.begin()};
-    Io.mapOptional(((ElemPtr->first()).str()).c_str(), "");
-    Io.mapOptional(std::to_string(ElemPtr->second.begin()->first).c_str(), "");
-    // InnerElem.mapping(Io, ElemPtr->second.begin());
+template <> struct CustomMappingTraits<psr::FunctionDataFlowFacts> {
+  static void inputOne(IO &Io, StringRef Key, psr::FunctionDataFlowFacts &V) {
+    std::unordered_map<uint32_t, std::vector<psr::DataFlowFact>> FunctionFacts =
+        V.get(Key);
+    Io.mapRequired(Key.str().c_str(), FunctionFacts);
   }
-};
-
-template <> struct SequenceTraits<std::vector<DataFlowFact>> {
-  static size_t size(IO &Io, std::vector<DataFlowFact> &List) {
-    return List.size();
-  }
-  static DataFlowFact &element(IO &Io, std::vector<DataFlowFact> &List,
-                               size_t Index) {
-    if (Index < List.size()) {
-      return List[Index];
+  static void output(IO &Io, psr::FunctionDataFlowFacts &Val) {
+    for (const auto &Iter : Val) {
+      Io.mapRequired(Iter.first().str().c_str(), Iter.second);
     }
-    List.emplace_back();
-    return List[List.size() - 1];
   }
 };
 
@@ -96,6 +126,10 @@ void serialize(const FunctionDataFlowFacts &Fdff, llvm::raw_ostream &OS) {
       }
     }
   }*/
+  Output YamlOut(OS);
+  YamlOut << Fdff;
 }
 
-[[nodiscard]] FunctionDataFlowFacts deserialize(llvm::raw_ostream &OS) {}
+/*[[nodiscard]] FunctionDataFlowFacts deserialize(llvm::raw_ostream &OS) {
+  //Input YamlIn(OS);
+}*/
