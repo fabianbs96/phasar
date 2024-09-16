@@ -15,7 +15,7 @@
 #include <optional>
 #include <string>
 
-namespace t2 {
+namespace psr {
 struct AnalysisConfig {
   std::string OutputFile;
   bool TreatWarningsAsError = false;
@@ -24,6 +24,6 @@ struct AnalysisConfig {
   std::optional<nlohmann::json> PrecomputedAA;
   /// TODO: More config options
 };
-} // namespace t2
+} // namespace psr
 
 #endif
