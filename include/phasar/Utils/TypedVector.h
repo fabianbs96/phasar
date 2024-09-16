@@ -52,17 +52,17 @@ public:
   }
 
   [[nodiscard]] ByConstRef<ValueT> operator[](IdT Id) const & {
-    assert(size_t(Id) == size());
+    assert(inbounds(Id));
     return Vec[size_t(Id)];
   }
 
   [[nodiscard]] ValueT &operator[](IdT Id) & {
-    assert(size_t(Id) < size()); // was == before
+    assert(inbounds(Id));
     return Vec[size_t(Id)];
   }
 
   [[nodiscard]] ValueT operator[](IdT Id) && {
-    assert(size_t(Id) < size()); // was == before
+    assert(inbounds(Id));
     return std::move(Vec[size_t(Id)]);
   }
 
