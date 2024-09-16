@@ -1,5 +1,5 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
-// #include nlohman.json oder YAML
+
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -32,7 +32,7 @@ struct MissingTrait<std::unordered_map<uint32_t, psr::DataFlowFact>>;
 } // namespace llvm::yaml
 
 namespace llvm::yaml {
-template <> struct MissingTrait<FunctionDataFlowFacts>;
+template <> struct MissingTrait<psr::FunctionDataFlowFacts>;
 } // namespace llvm::yaml
 
 namespace llvm::yaml {
@@ -60,16 +60,12 @@ template <> struct ScalarTraits<psr::DataFlowFact> {
     return {};
   }
   static QuotingType mustQuote(StringRef /*unused*/) {
-    return QuotingType::Single;
+    return QuotingType::Double;
   }
 };
 } // namespace llvm::yaml
 
-namespace llvm::yaml {
-template <> struct SequenceElementTraits<psr::DataFlowFact> {
-  static const bool flow = true; // NOLINT
-};
-} // namespace llvm::yaml
+LLVM_YAML_IS_FLOW_SEQUENCE_VECTOR(psr::DataFlowFact)
 
 template <>
 struct CustomMappingTraits<
@@ -95,41 +91,28 @@ template <> struct CustomMappingTraits<psr::FunctionDataFlowFacts> {
     Io.mapRequired(Key.str().c_str(), FunctionFacts);
   }
   static void output(IO &Io, psr::FunctionDataFlowFacts &Val) {
-    for (const auto &Iter : Val) {
+    for (auto &Iter : Val) {
       Io.mapRequired(Iter.first().str().c_str(), Iter.second);
     }
   }
 };
 
+LLVM_YAML_IS_SEQUENCE_VECTOR(FunctionDataFlowFacts)
+
 void serialize(const FunctionDataFlowFacts &Fdff, llvm::raw_ostream &OS) {
-  /*std::string Yaml;
-  for (const auto &ItOuter : Fdff) {
-    OS << "- "
-       << "ItOuter.first"
-       << ":"
-       << "\n";
-    for (const auto &ItInner : ItOuter.second) {
-      OS << "    "
-         << "- " << std::to_string(ItInner.first) << ":"
-         << "\n";
-      for (DataFlowFact DFF : ItInner.second) {
-        if (const Parameter *Param = std::get_if<Parameter>(&DFF.Fact)) {
-          OS << "        "
-             << "- " << std::to_string(Param->Index) << "\n";
-        } else {
-          OS << "        "
-             << "- "
-             << "ReturnValue"
-             << "\n";
-        }
-        // Output yout(OS);
-      }
-    }
-  }*/
   Output YamlOut(OS);
-  YamlOut << Fdff;
+  // YAML IO needs mutable types
+  // TODO: Fix once LLVM fixed API
+  YamlOut << const_cast<FunctionDataFlowFacts &>(Fdff);
 }
 
-/*[[nodiscard]] FunctionDataFlowFacts deserialize(llvm::raw_ostream &OS) {
-  //Input YamlIn(OS);
-}*/
+[[nodiscard]] FunctionDataFlowFacts
+deserialize(/*llvm::raw_ostream &OS*/ llvm::StringRef FilePath) {
+  /*if (llvm::raw_fd_stream::classof(&OS)) {
+      llvm::raw_fd_stream IStream = OS;
+  }*/
+  Input YamlIn(FilePath);
+  std::vector<FunctionDataFlowFacts> YamlResult;
+  YamlIn >> YamlResult;
+  return YamlResult[0];
+}

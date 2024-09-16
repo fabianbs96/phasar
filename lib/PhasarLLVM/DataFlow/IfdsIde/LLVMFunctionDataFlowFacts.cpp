@@ -4,8 +4,9 @@
 
 using namespace psr;
 
-static LLVMFunctionDataFlowFacts readFromFDFF(const FunctionDataFlowFacts &Fdff,
-                                              const LLVMProjectIRDB &Irdb) {
+LLVMFunctionDataFlowFacts
+LLVMFunctionDataFlowFacts::readFromFDFF(const FunctionDataFlowFacts &Fdff,
+                                        const LLVMProjectIRDB &Irdb) {
   LLVMFunctionDataFlowFacts Llvmfdff;
   for (const auto &It : Fdff) {
     const llvm::Function *Fun = Irdb.getFunction(It.first());

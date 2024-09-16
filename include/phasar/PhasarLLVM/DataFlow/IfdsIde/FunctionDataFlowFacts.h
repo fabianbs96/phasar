@@ -21,6 +21,7 @@ struct ReturnValue {};
 struct DataFlowFact {
   DataFlowFact(Parameter Param) noexcept : Fact(Param) {}
   DataFlowFact(ReturnValue Ret) noexcept : Fact(Ret) {}
+  DataFlowFact() noexcept : Fact(Parameter{UINT16_MAX}) {}
 
   std::variant<Parameter, ReturnValue> Fact;
 };
@@ -68,11 +69,15 @@ public:
     return It->second;
   }
 
-  [[nodiscard]] auto begin() const { return Fdff.begin(); }
+  [[nodiscard]] auto begin() const noexcept { return Fdff.begin(); }
 
-  [[nodiscard]] auto end() const { return Fdff.end(); }
+  [[nodiscard]] auto begin() noexcept { return Fdff.begin(); }
 
-  [[nodiscard]] size_t size() { return Fdff.size(); }
+  [[nodiscard]] auto end() const noexcept { return Fdff.end(); }
+
+  [[nodiscard]] auto end() noexcept { return Fdff.end(); }
+
+  [[nodiscard]] size_t size() const { return Fdff.size(); }
 
 private:
   [[nodiscard]] const auto &
