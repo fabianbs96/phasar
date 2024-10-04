@@ -26,11 +26,11 @@ class Function;
 } // namespace llvm
 
 namespace psr {
-class LLVMTypeHierarchy;
+class DIBasedTypeHierarchy;
 class CHAResolver : public Resolver {
 public:
   CHAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
-              const LLVMTypeHierarchy *TH);
+              const DIBasedTypeHierarchy *TH);
 
   ~CHAResolver() override = default;
 
@@ -39,7 +39,7 @@ public:
   [[nodiscard]] std::string str() const override;
 
 protected:
-  MaybeUniquePtr<const LLVMTypeHierarchy, true> TH;
+  MaybeUniquePtr<const DIBasedTypeHierarchy, true> TH;
 };
 } // namespace psr
 
