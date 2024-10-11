@@ -91,8 +91,26 @@ TEST(SCCGenericTest, SCCTest) {
                           {GraphNodeId(1), GraphNodeId(8)},
                           {}}};
 
-  std::vector<ExampleGraph> TestGraphs = {GraphOne, GraphTwo, GraphThree,
-                                          GraphFour, GraphFive};
+  ExampleGraph GraphSix{{{GraphNodeId(1)},
+                         {GraphNodeId(2)},
+                         {GraphNodeId(3)},
+                         {GraphNodeId(4)},
+                         {GraphNodeId(5)},
+                         {GraphNodeId(6)},
+                         {GraphNodeId(7)},
+                         {GraphNodeId(0)},
+                         {GraphNodeId(9)},
+                         {GraphNodeId(10)},
+                         {GraphNodeId(11)},
+                         {GraphNodeId(12)},
+                         {GraphNodeId(13), GraphNodeId(4)},
+                         {GraphNodeId(8)},
+                         {GraphNodeId(9)},
+                         {GraphNodeId(3)},
+                         {GraphNodeId(5)}}};
+
+  std::vector<ExampleGraph> TestGraphs = {GraphOne,  GraphTwo,  GraphThree,
+                                          GraphFour, GraphFive, GraphSix};
 
   for (size_t Index = 0; Index < TestGraphs.size(); Index++) {
     computeSCCsAndCompare(TestGraphs[Index]);

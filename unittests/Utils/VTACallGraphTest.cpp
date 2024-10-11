@@ -7,7 +7,7 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#include "phasar/AnalysisConfig.h"
+// #include "phasar/AnalysisConfig.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/RTAResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/call_graph.h"
