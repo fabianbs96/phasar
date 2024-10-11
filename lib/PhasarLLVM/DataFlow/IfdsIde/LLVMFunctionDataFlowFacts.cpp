@@ -1,5 +1,10 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFunctionDataFlowFacts.h"
 
+#include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
+#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
+
+#include <llvm-14/llvm/IR/Instructions.h>
+
 using namespace psr;
 using namespace psr::library_summary;
 
@@ -15,4 +20,40 @@ library_summary::readFromFDFF(const FunctionDataFlowFacts &Fdff,
     }
   }
   return Llvmfdff;
+}
+
+static LLVMFunctionDataFlowFacts
+convertFromEndsummaryTab(IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver) {
+  auto const &SolverEST = Solver.getEndsummaryTab();
+  LLVMFunctionDataFlowFacts FromEndsumTab;
+  SolverEST.foreachCell(
+      [&FromEndsumTab](llvm::Instruction *RowKey, llvm::Value *ColumnKey,
+                       decltype((SolverEST.get(RowKey, ColumnKey))) Value) {
+        if (auto const &FactIn = llvm::dyn_cast<llvm::Argument>(ColumnKey)) {
+          llvm::Function *FlowFunc = FactIn->getParent();
+          Value.foreachCell(
+              [FlowFunc, &FactIn, &FromEndsumTab](
+                  llvm::Instruction *InnerRowKey, llvm::Value *InnerColumnKey,
+                  decltype((
+                      Value.get(InnerRowKey, InnerColumnKey))) /*InnerValue*/) {
+                if (auto const &FactOut =
+                        llvm::dyn_cast<llvm::Argument>(InnerColumnKey)) {
+                  FromEndsumTab.addElement(
+                      FlowFunc, FactIn->getArgNo(),
+                      Parameter{static_cast<uint16_t>(FactOut->getArgNo())});
+                } else {
+                  // TODO
+
+                  if (auto const &Inst = FlowFunc->begin()->getTerminator()) {
+                    if (auto const &RetInst =
+                            llvm::dyn_cast<llvm::ReturnInst>(Inst)) {
+                      FromEndsumTab.addElement(FlowFunc, FactIn->getArgNo(),
+                                               ReturnValue{});
+                    }
+                  }
+                }
+              });
+        }
+      });
+  return FromEndsumTab;
 }
