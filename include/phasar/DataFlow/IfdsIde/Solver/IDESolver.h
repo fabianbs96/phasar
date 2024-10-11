@@ -334,7 +334,7 @@ public:
     OS << getEdgeFunctionStatistics() << '\n';
   }
 
-  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> getEndsummaryTab() {
+  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> &getEndsummaryTab() {
     return EndsummaryTab;
   }
 
