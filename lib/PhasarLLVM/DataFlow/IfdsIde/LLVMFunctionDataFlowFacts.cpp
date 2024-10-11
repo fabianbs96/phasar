@@ -3,7 +3,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 
-#include <llvm-14/llvm/IR/Instructions.h>
+#include "llvm/IR/Instructions.h"
 
 using namespace psr;
 using namespace psr::library_summary;
