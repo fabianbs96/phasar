@@ -22,8 +22,9 @@ library_summary::readFromFDFF(const FunctionDataFlowFacts &Fdff,
   return Llvmfdff;
 }
 
-static LLVMFunctionDataFlowFacts
-convertFromEndsummaryTab(IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver) {
+LLVMFunctionDataFlowFacts
+psr::library_summary::LLVMFunctionDataFlowFacts::convertFromEndsummaryTab(
+    IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver) {
   auto const &SolverEST = Solver.getEndsummaryTab();
   LLVMFunctionDataFlowFacts FromEndsumTab;
   SolverEST.foreachCell(

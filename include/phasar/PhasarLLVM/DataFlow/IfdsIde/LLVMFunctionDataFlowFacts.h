@@ -1,5 +1,7 @@
+#include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
+#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/Utils/DefaultValue.h"
 
 #include "llvm/IR/Argument.h"
@@ -67,6 +69,9 @@ public:
 
   friend LLVMFunctionDataFlowFacts
   readFromFDFF(const FunctionDataFlowFacts &Fdff, const LLVMProjectIRDB &Irdb);
+
+  LLVMFunctionDataFlowFacts
+  convertFromEndsummaryTab(IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver);
 
 private:
   std::unordered_map<const llvm::Function *, ParamaterMappingTy> LLVMFdff;
