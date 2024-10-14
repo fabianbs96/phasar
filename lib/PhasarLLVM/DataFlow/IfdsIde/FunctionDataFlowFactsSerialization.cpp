@@ -1,7 +1,12 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
 
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -10,11 +15,6 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-#include <llvm/ADT/StringMap.h>
-#include <llvm/ADT/StringRef.h>
-#include <llvm/Support/Path.h>
-#include <llvm/Support/raw_ostream.h>
 
 using namespace psr;
 using llvm::yaml::CustomMappingTraits;
@@ -99,7 +99,7 @@ template <> struct CustomMappingTraits<psr::FunctionDataFlowFacts> {
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(FunctionDataFlowFacts)
 
-void serialize(const FunctionDataFlowFacts &Fdff, llvm::raw_ostream &OS) {
+void psr::serialize(const FunctionDataFlowFacts &Fdff, llvm::raw_ostream &OS) {
   Output YamlOut(OS);
   // YAML IO needs mutable types
   // TODO: Fix once LLVM fixed API
@@ -107,11 +107,17 @@ void serialize(const FunctionDataFlowFacts &Fdff, llvm::raw_ostream &OS) {
 }
 
 [[nodiscard]] FunctionDataFlowFacts
-deserialize(/*llvm::raw_ostream &OS*/ llvm::StringRef FilePath) {
-  /*if (llvm::raw_fd_stream::classof(&OS)) {
-      llvm::raw_fd_stream IStream = OS;
-  }*/
-  Input YamlIn(FilePath);
+FunctionDataFlowFacts::deserialize(const llvm::Twine &FilePath) {
+  llvm::SmallVector<char> BUF(256);
+  Input YamlIn(FilePath.toStringRef(BUF));
+  std::vector<FunctionDataFlowFacts> YamlResult;
+  YamlIn >> YamlResult;
+  return YamlResult[0];
+}
+
+[[nodiscard]] FunctionDataFlowFacts
+FunctionDataFlowFacts::deserialize(llvm::MemoryBufferRef File) {
+  Input YamlIn(File);
   std::vector<FunctionDataFlowFacts> YamlResult;
   YamlIn >> YamlResult;
   return YamlResult[0];
