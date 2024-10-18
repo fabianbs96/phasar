@@ -29,29 +29,40 @@ psr::library_summary::LLVMFunctionDataFlowFacts::convertFromEndsummaryTab(
   LLVMFunctionDataFlowFacts FromEndsumTab;
   SolverEST.foreachCell([&FromEndsumTab](const llvm::Instruction *RowKey,
                                          const llvm::Value *ColumnKey,
-                                         decltype((SolverEST.get(
-                                             RowKey, ColumnKey))) Value) {
+                                         const auto &Value) {
     if (auto const &FactIn = llvm::dyn_cast<llvm::Argument>(ColumnKey)) {
       const llvm::Function *FlowFunc = FactIn->getParent();
-      Value.foreachCell([FlowFunc, &FactIn, &FromEndsumTab](
-                            const llvm::Instruction *InnerRowKey,
-                            const llvm::Value *InnerColumnKey,
-                            decltype((Value.get(
-                                InnerRowKey, InnerColumnKey))) /*InnerValue*/) {
+      Value.foreachCell([FlowFunc, &FactIn,
+                         &FromEndsumTab](const llvm::Instruction *InnerRowKey,
+                                         const llvm::Value *InnerColumnKey,
+                                         const auto & /*InnerValue*/) {
         if (auto const &FactOut =
                 llvm::dyn_cast<llvm::Argument>(InnerColumnKey)) {
           FromEndsumTab.addElement(
               FlowFunc, FactIn->getArgNo(),
               Parameter{static_cast<uint16_t>(FactOut->getArgNo())});
         } else {
-          // TODO
-
-          if (auto const &Inst = FlowFunc->begin()->getTerminator()) {
+          const auto BBIterator = FlowFunc->begin();
+          while (BBIterator != FlowFunc->end()) {
+            // range based for loop to iterate over basicblocks
+            // for (const auto BBIterator : FlowFunc->getBasicBlockList()) {
+            // -> no public method to retrieve BasicBlocks
+            if (auto const &RetInst =
+                    llvm::dyn_cast<llvm::ReturnInst>(BBIterator)) {
+              if (FactOut->getType() == RetInst.getType()) {
+                FromEndsumTab.addElement(FlowFunc, FactIn->getArgNo(),
+                                         ReturnValue{});
+              }
+            }
+            BBIterator++;
+          }
+          /*if (auto const &Inst = FlowFunc->begin()->getTerminator()) {
             if (auto const &RetInst = llvm::dyn_cast<llvm::ReturnInst>(Inst)) {
+              // compare FactOut and RetInst value
               FromEndsumTab.addElement(FlowFunc, FactIn->getArgNo(),
                                        ReturnValue{});
             }
-          }
+          }*/
         }
       });
     }
