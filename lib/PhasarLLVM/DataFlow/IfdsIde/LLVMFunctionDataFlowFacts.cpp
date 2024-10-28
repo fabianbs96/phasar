@@ -42,11 +42,7 @@ psr::library_summary::LLVMFunctionDataFlowFacts::convertFromEndsummaryTab(
               FlowFunc, FactIn->getArgNo(),
               Parameter{static_cast<uint16_t>(FactOut->getArgNo())});
         } else {
-          const auto BBIterator = FlowFunc->begin();
-          while (BBIterator != FlowFunc->end()) {
-            // range based for loop to iterate over basicblocks
-            // for (const auto BBIterator : FlowFunc->getBasicBlockList()) {
-            // -> no public method to retrieve BasicBlocks
+          for (const auto &BBIterator : *FlowFunc) {
             if (auto const &RetInst =
                     llvm::dyn_cast<llvm::ReturnInst>(BBIterator)) {
               if (FactOut->getType() == RetInst.getType()) {
