@@ -2,8 +2,11 @@
 
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
+#include "phasar/Utils/Table.h"
 
 #include "llvm/IR/Instructions.h"
+
+#include <llvm-14/llvm/IR/Instruction.h>
 
 using namespace psr;
 using namespace psr::library_summary;
@@ -24,43 +27,36 @@ library_summary::readFromFDFF(const FunctionDataFlowFacts &Fdff,
 
 LLVMFunctionDataFlowFacts
 psr::library_summary::LLVMFunctionDataFlowFacts::convertFromEndsummaryTab(
-    IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver) {
-  auto const &SolverEST = Solver.getEndsummaryTab();
+    const Table<llvm::Instruction *, llvm::Value *,
+                Table<llvm::Instruction *, llvm::Value *,
+                      EdgeFunction<BinaryDomain>>> &EST) {
   LLVMFunctionDataFlowFacts FromEndsumTab;
-  SolverEST.foreachCell([&FromEndsumTab](const llvm::Instruction *RowKey,
-                                         const llvm::Value *ColumnKey,
-                                         const auto &Value) {
+  EST.foreachCell([&FromEndsumTab](const llvm::Instruction *RowKey,
+                                   const llvm::Value *ColumnKey,
+                                   const auto &Value) {
     if (auto const &FactIn = llvm::dyn_cast<llvm::Argument>(ColumnKey)) {
-      const llvm::Function *FlowFunc = FactIn->getParent();
-      Value.foreachCell([FlowFunc, &FactIn,
-                         &FromEndsumTab](const llvm::Instruction *InnerRowKey,
+      const llvm::Function *Fun = FactIn->getParent();
+      Value.foreachCell(
+          [Fun, &FactIn, &FromEndsumTab](const llvm::Instruction *InnerRowKey,
                                          const llvm::Value *InnerColumnKey,
                                          const auto & /*InnerValue*/) {
-        if (auto const &FactOut =
-                llvm::dyn_cast<llvm::Argument>(InnerColumnKey)) {
-          FromEndsumTab.addElement(
-              FlowFunc, FactIn->getArgNo(),
-              Parameter{static_cast<uint16_t>(FactOut->getArgNo())});
-        } else {
-          for (const auto &BBIterator : *FlowFunc) {
-            if (auto const &RetInst =
-                    llvm::dyn_cast<llvm::ReturnInst>(BBIterator)) {
-              if (FactOut->getType() == RetInst.getType()) {
-                FromEndsumTab.addElement(FlowFunc, FactIn->getArgNo(),
-                                         ReturnValue{});
+            if (auto const &FactOut =
+                    llvm::dyn_cast<llvm::Argument>(InnerColumnKey)) {
+              FromEndsumTab.addElement(
+                  Fun, FactIn->getArgNo(),
+                  Parameter{static_cast<uint16_t>(FactOut->getArgNo())});
+            } else {
+              for (const auto &BBIterator : *Fun) {
+                if (auto const &RetInst = llvm::dyn_cast<llvm::ReturnInst>(
+                        BBIterator->getTerminator())) {
+                  if (FactOut == RetInst.ReturnValue()) {
+                    FromEndsumTab.addElement(Fun, FactIn->getArgNo(),
+                                             ReturnValue{});
+                  }
+                }
               }
             }
-            BBIterator++;
-          }
-          /*if (auto const &Inst = FlowFunc->begin()->getTerminator()) {
-            if (auto const &RetInst = llvm::dyn_cast<llvm::ReturnInst>(Inst)) {
-              // compare FactOut and RetInst value
-              FromEndsumTab.addElement(FlowFunc, FactIn->getArgNo(),
-                                       ReturnValue{});
-            }
-          }*/
-        }
-      });
+          });
     }
   });
   return FromEndsumTab;

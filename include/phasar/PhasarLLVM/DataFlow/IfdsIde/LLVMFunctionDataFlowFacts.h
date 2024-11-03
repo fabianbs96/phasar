@@ -71,7 +71,9 @@ public:
   readFromFDFF(const FunctionDataFlowFacts &Fdff, const LLVMProjectIRDB &Irdb);
 
   LLVMFunctionDataFlowFacts
-  convertFromEndsummaryTab(IFDSSolver<LLVMIFDSAnalysisDomainDefault> &Solver);
+  convertFromEndsummaryTab(const Table<llvm::Instruction *, llvm::Value *,
+                                       Table<llvm::Instruction *, llvm::Value *,
+                                             EdgeFunction<BinaryDomain>>> &EST);
 
 private:
   std::unordered_map<const llvm::Function *, ParamaterMappingTy> LLVMFdff;

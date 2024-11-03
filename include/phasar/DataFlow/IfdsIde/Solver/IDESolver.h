@@ -338,6 +338,11 @@ public:
     return EndsummaryTab;
   }
 
+  const Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>> &
+  getEndsummaryTab() const {
+    return EndsummaryTab;
+  }
+
 protected:
   /// Lines 13-20 of the algorithm; processing a call site in the caller's
   /// context.
