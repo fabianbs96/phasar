@@ -1,6 +1,9 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFunctionDataFlowFacts.h"
 
+#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
+#include "phasar/Utils/Table.h"
 
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"

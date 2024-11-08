@@ -1,15 +1,18 @@
-#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
-#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
-#include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/Utils/DefaultValue.h"
-#include "phasar/Utils/Table.h"
 
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Function.h"
 
 #include <unordered_map>
 #include <vector>
+
+namespace psr {
+class LLVMProjectIRDB;
+enum class BinaryDomain;
+template <typename R, typename C, typename V> class Table;
+template <typename L> class EdgeFunction;
+} // namespace psr
 
 namespace psr::library_summary {
 
