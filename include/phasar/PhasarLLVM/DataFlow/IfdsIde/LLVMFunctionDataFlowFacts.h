@@ -1,8 +1,9 @@
-#include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
+#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/Utils/DefaultValue.h"
+#include "phasar/Utils/Table.h"
 
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Function.h"
@@ -70,10 +71,12 @@ public:
   friend LLVMFunctionDataFlowFacts
   readFromFDFF(const FunctionDataFlowFacts &Fdff, const LLVMProjectIRDB &Irdb);
 
-  LLVMFunctionDataFlowFacts
-  convertFromEndsummaryTab(const Table<llvm::Instruction *, llvm::Value *,
-                                       Table<llvm::Instruction *, llvm::Value *,
-                                             EdgeFunction<BinaryDomain>>> &EST);
+  using DefaultIFDSEndSummaryTabTy = Table<
+      llvm::Instruction *, llvm::Value *,
+      Table<llvm::Instruction *, llvm::Value *, EdgeFunction<BinaryDomain>>>;
+
+  static LLVMFunctionDataFlowFacts
+  fromEndsummaryTab(const DefaultIFDSEndSummaryTabTy &EST);
 
 private:
   std::unordered_map<const llvm::Function *, ParamaterMappingTy> LLVMFdff;
