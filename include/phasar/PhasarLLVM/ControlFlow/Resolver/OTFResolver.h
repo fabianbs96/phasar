@@ -48,6 +48,8 @@ public:
   void handlePossibleTargets(const llvm::CallBase *CallSite,
                              FunctionSetTy &CalleeTargets) override;
 
+  bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
+
   FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
 
   FunctionSetTy resolveFunctionPointer(const llvm::CallBase *CallSite) override;

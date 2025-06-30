@@ -34,11 +34,16 @@ public:
   CHAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
               const DIBasedTypeHierarchy *TH);
 
+  CHAResolver(CHAResolver &&) noexcept = default;
+  CHAResolver &operator=(CHAResolver &&) noexcept = default;
+
   // Deleting an incomplete type (LLVMTypeHierarchy) is UB, so instantiate the
   // dtor in CHAResolver.cpp
   ~CHAResolver() override;
 
   FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
+
+  bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
 
   [[nodiscard]] std::string str() const override;
 

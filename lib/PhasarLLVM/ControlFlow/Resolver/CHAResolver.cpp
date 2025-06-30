@@ -43,43 +43,39 @@ CHAResolver::CHAResolver(const LLVMProjectIRDB *IRDB,
 
 CHAResolver::~CHAResolver() = default;
 
-auto CHAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
-  PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: ");
-  // Leading to SEGFAULT in Unittests. Error only when run in Debug mode
-  // << llvmIRToString(CallSite));
+bool CHAResolver::resolve(const llvm::CallBase *Call,
+                          FunctionSetTy &PossibleTargets) {
 
-  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  auto RetrievedVtableIndex = getVFTIndex(Call);
   if (!RetrievedVtableIndex.has_value()) {
-    // An error occured
-    PHASAR_LOG_LEVEL(DEBUG,
-                     "Error with resolveVirtualCall : impossible to retrieve "
-                     "the vtable index\n"
-                         // Leading to SEGFAULT in Unittests. Error only when
-                         // run in Debug mode
-                         // << llvmIRToString(CallSite)
-                         << "\n");
-    return {};
+    return false;
   }
 
   auto VtableIndex = RetrievedVtableIndex.value();
 
   PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
-  const auto *ReceiverTy = getReceiverType(CallSite);
+  const auto *ReceiverTy = getReceiverType(Call);
 
   // also insert all possible subtypes vtable entries
   auto FallbackTys = TH->getSubTypes(ReceiverTy);
 
-  FunctionSetTy PossibleCallees;
-
   for (const auto &FallbackTy : FallbackTys) {
     const auto *Target =
-        getNonPureVirtualVFTEntry(FallbackTy, VtableIndex, CallSite);
+        getNonPureVirtualVFTEntry(FallbackTy, VtableIndex, Call);
     if (Target) {
-      PossibleCallees.insert(Target);
+      PossibleTargets.insert(Target);
     }
   }
+  return !PossibleTargets.empty();
+}
+
+auto CHAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
+    -> FunctionSetTy {
+  PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: ");
+
+  FunctionSetTy PossibleCallees;
+  resolve(CallSite, PossibleCallees);
   return PossibleCallees;
 }
 

@@ -36,7 +36,12 @@ public:
   RTAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
               const DIBasedTypeHierarchy *TH);
 
+  RTAResolver(RTAResolver &&) noexcept = default;
+  RTAResolver &operator=(RTAResolver &&) noexcept = default;
+
   ~RTAResolver() override = default;
+
+  bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
 
   FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
 

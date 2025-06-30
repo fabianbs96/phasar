@@ -43,29 +43,20 @@ RTAResolver::RTAResolver(const LLVMProjectIRDB *IRDB,
   resolveAllocatedCompositeTypes();
 }
 
-auto RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
+bool RTAResolver::resolve(const llvm::CallBase *Call,
+                          FunctionSetTy &PossibleTargets) {
+  PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: " << llvmIRToString(Call));
 
-  FunctionSetTy PossibleCallTargets;
-
-  PHASAR_LOG_LEVEL(DEBUG,
-                   "Call virtual function: " << llvmIRToString(CallSite));
-
-  auto RetrievedVtableIndex = getVFTIndex(CallSite);
+  auto RetrievedVtableIndex = getVFTIndex(Call);
   if (!RetrievedVtableIndex.has_value()) {
-    // An error occured
-    PHASAR_LOG_LEVEL(DEBUG,
-                     "Error with resolveVirtualCall : impossible to retrieve "
-                     "the vtable index\n"
-                         << llvmIRToString(CallSite) << "\n");
-    return {};
+    return false;
   }
 
   auto VtableIndex = RetrievedVtableIndex.value();
 
   PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
-  const auto *ReceiverType = getReceiverType(CallSite);
+  const auto *ReceiverType = getReceiverType(Call);
 
   // also insert all possible subtypes vtable entries
   auto ReachableTypes = TH->getSubTypes(ReceiverType);
@@ -75,15 +66,23 @@ auto RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
   for (const auto *PossibleType : AllocatedCompositeTypes) {
     if (ReachableTypes.find(PossibleType) != EndIt) {
       const auto *Target =
-          getNonPureVirtualVFTEntry(PossibleType, VtableIndex, CallSite);
+          getNonPureVirtualVFTEntry(PossibleType, VtableIndex, Call);
       if (Target) {
-        PossibleCallTargets.insert(Target);
+        PossibleTargets.insert(Target);
       }
     }
   }
 
-  if (PossibleCallTargets.empty()) {
-    return CHAResolver::resolveVirtualCall(CallSite);
+  return !PossibleTargets.empty();
+}
+
+auto RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
+    -> FunctionSetTy {
+
+  FunctionSetTy PossibleCallTargets;
+
+  if (!resolve(CallSite, PossibleCallTargets)) {
+    CHAResolver::resolve(CallSite, PossibleCallTargets);
   }
 
   return PossibleCallTargets;
