@@ -1,4 +1,4 @@
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverBase.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
 
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/CHAResolver.h"
@@ -20,9 +20,6 @@ GenericResolver psr::createDefaultResolverPipeline(
     CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
     const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
     LLVMAliasInfoRef PT) {
-  // TODO: combine DirectCallResolver + [concrete resolver based on Ty] +
-  // SoundyFallbackResolver
-
   assert(IRDB != nullptr);
   assert(VTP != nullptr);
 
@@ -42,8 +39,9 @@ GenericResolver psr::createDefaultResolverPipeline(
         "The VTA callgraph algorithm is not implemented yet");
   case CallGraphAnalysisType::OTF:
     assert(PT);
-    return wrap(DirectCallResolver{} | OTFResolver(IRDB, VTP, PT) |
-                SoundyFallbackResolver{IRDB});
+    // Not adding the SoundyFallbackResolver, because OTFResolver incrementally
+    // adds alias-information to make itself more sound
+    return wrap(DirectCallResolver{} | OTFResolver(IRDB, VTP, PT));
   case CallGraphAnalysisType::Invalid:
     llvm::report_fatal_error("Invalid callgraph algorithm specified");
   }

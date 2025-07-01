@@ -24,15 +24,14 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverBase.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Utils/LLVMBasedContainerConfig.h"
-#include "phasar/Utils/MaybeUniquePtr.h"
 #include "phasar/Utils/Soundness.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -77,11 +76,11 @@ public:
                          LLVMAliasInfoRef PT = nullptr,
                          Soundness S = Soundness::Soundy,
                          bool IncludeGlobals = true);
-  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
                          llvm::ArrayRef<std::string> EntryPoints = {},
                          Soundness S = Soundness::Soundy,
                          bool IncludeGlobals = true);
-  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
                          LLVMVFTableProvider VTP,
                          llvm::ArrayRef<std::string> EntryPoints = {},
                          Soundness S = Soundness::Soundy,
@@ -160,7 +159,7 @@ private:
   [[nodiscard]] llvm::Function *buildCRuntimeGlobalCtorsDtorsModel(
       LLVMProjectIRDB &IRDB, llvm::ArrayRef<llvm::Function *> UserEntryPoints);
 
-  void initialize(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+  void initialize(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
                   llvm::ArrayRef<std::string> EntryPoints, Soundness S,
                   bool IncludeGlobals);
 

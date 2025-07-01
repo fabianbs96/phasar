@@ -11,6 +11,7 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCALLGRAPHBUILDER_H
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverBase.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/Utils/Soundness.h"
 
@@ -19,7 +20,6 @@ class LLVMProjectIRDB;
 enum class CallGraphAnalysisType;
 class DIBasedTypeHierarchy;
 class LLVMVFTableProvider;
-class Resolver;
 
 [[nodiscard]] LLVMBasedCallGraph
 buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB, CallGraphAnalysisType CGType,
@@ -29,7 +29,8 @@ buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                         Soundness S = Soundness::Soundy);
 
 [[nodiscard]] LLVMBasedCallGraph
-buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB, Resolver &CGResolver,
+buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB,
+                        GenericResolverRef CGResolver,
                         llvm::ArrayRef<const llvm::Function *> EntryPoints,
                         Soundness S = Soundness::Soundy);
 
@@ -40,10 +41,9 @@ buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB, CallGraphAnalysisType CGType,
                         LLVMAliasInfoRef PT = nullptr,
                         Soundness S = Soundness::Soundy);
 
-[[nodiscard]] LLVMBasedCallGraph
-buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB, Resolver &CGResolver,
-                        llvm::ArrayRef<std::string> EntryPoints,
-                        Soundness S = Soundness::Soundy);
+[[nodiscard]] LLVMBasedCallGraph buildLLVMBasedCallGraph(
+    const LLVMProjectIRDB &IRDB, GenericResolverRef CGResolver,
+    llvm::ArrayRef<std::string> EntryPoints, Soundness S = Soundness::Soundy);
 } // namespace psr
 
 #endif // PHASAR_PHASARLLVM_CONTROLFLOW_LLVMBASEDCALLGRAPHBUILDER_H

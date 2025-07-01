@@ -16,7 +16,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
@@ -33,7 +33,8 @@
 
 namespace psr {
 
-void LLVMBasedICFG::initialize(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+void LLVMBasedICFG::initialize(LLVMProjectIRDB *IRDB,
+                               GenericResolverRef CGResolver,
                                llvm::ArrayRef<std::string> EntryPoints,
                                Soundness S, bool IncludeGlobals) {
   if (IncludeGlobals) {
@@ -59,11 +60,12 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
     PT = PTOwn.asRef();
   }
 
-  auto CGRes = Resolver::create(CGType, IRDB, &VTP, TH, PT);
-  initialize(IRDB, *CGRes, EntryPoints, S, IncludeGlobals);
+  auto CGRes = createDefaultResolverPipeline(CGType, IRDB, &VTP, TH, PT);
+  initialize(IRDB, CGRes, EntryPoints, S, IncludeGlobals);
 }
 
-LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
+                             GenericResolverRef CGResolver,
                              llvm::ArrayRef<std::string> EntryPoints,
                              Soundness S, bool IncludeGlobals)
     : IRDB(IRDB), VTP(*IRDB) {
@@ -72,7 +74,8 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
   initialize(IRDB, CGResolver, EntryPoints, S, IncludeGlobals);
 }
 
-LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB, Resolver &CGResolver,
+LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
+                             GenericResolverRef CGResolver,
                              LLVMVFTableProvider VTP,
                              llvm::ArrayRef<std::string> EntryPoints,
                              Soundness S, bool IncludeGlobals)

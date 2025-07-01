@@ -41,6 +41,8 @@ CHAResolver::CHAResolver(const LLVMProjectIRDB *IRDB,
   }
 }
 
+CHAResolver::CHAResolver(CHAResolver &&) noexcept = default;
+CHAResolver &CHAResolver::operator=(CHAResolver &&) noexcept = default;
 CHAResolver::~CHAResolver() = default;
 
 bool CHAResolver::resolve(const llvm::CallBase *Call,

@@ -17,7 +17,6 @@
 
 #include <optional>
 #include <string>
-#include <type_traits>
 
 #if __cpp_concepts >= 201907L
 #include <concepts>
@@ -50,18 +49,44 @@ concept IResolver =
 #else
 
 namespace detail {
-template <typename T, typename = bool>
-struct IResolverImpl : std::false_type {};
-template <typename T>
-struct IResolverImpl<T, decltype(std::declval<T &>().resolve(
-                            std::declval<const llvm::CallBase *>(),
-                            std::declval<resolver::FunctionSetTy &>()))>
-    : std::true_type {};
+PSR_DECLARE_HAS_MEMBER_FN(resolve, std::declval<const llvm::CallBase *>(),
+                          std::declval<resolver::FunctionSetTy &>());
+
 } // namespace detail
 
-template <typename T> PSR_CONCEPT IResolver = detail::IResolverImpl<T>::value;
+template <typename T> PSR_CONCEPT IResolver = detail::has_resolve_v<T>;
 
 #endif
+
+namespace detail {
+PSR_DECLARE_HAS_MEMBER_FN(handlePossibleTargets,
+                          std::declval<const llvm::CallBase *>(),
+                          std::declval<resolver::FunctionSetTy &>());
+PSR_DECLARE_HAS_MEMBER_FN(mutatesHelperAnalysisInformation);
+} // namespace detail
+
+namespace resolver {
+template <typename ResolverT>
+constexpr bool mutatesHelperAnalysisInformation(const ResolverT &Res) noexcept {
+  if constexpr (detail::has_mutatesHelperAnalysisInformation_v<
+                    const ResolverT>) {
+    return Res.mutatesHelperAnalysisInformation();
+  } else {
+    // Sound fallback
+    return detail::has_handlePossibleTargets_v<ResolverT>;
+  }
+}
+
+template <typename ResolverT>
+constexpr void handlePossibleTargets(ResolverT &Res,
+                                     const llvm::CallBase *CallSite,
+                                     FunctionSetTy &CalleeTargets) noexcept {
+  if constexpr (detail::has_handlePossibleTargets_v<ResolverT>) {
+    Res.handlePossibleTargets(CallSite, CalleeTargets);
+  }
+  // else do nothing
+}
+} // namespace resolver
 
 /// Assuming that `CallSite` is a virtual call through a vtable, retrieves the
 /// index in the vtable of the virtual function called.

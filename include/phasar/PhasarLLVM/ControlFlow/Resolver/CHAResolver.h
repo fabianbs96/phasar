@@ -34,8 +34,8 @@ public:
   CHAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
               const DIBasedTypeHierarchy *TH);
 
-  CHAResolver(CHAResolver &&) noexcept = default;
-  CHAResolver &operator=(CHAResolver &&) noexcept = default;
+  CHAResolver(CHAResolver &&) noexcept;
+  CHAResolver &operator=(CHAResolver &&) noexcept;
 
   // Deleting an incomplete type (LLVMTypeHierarchy) is UB, so instantiate the
   // dtor in CHAResolver.cpp

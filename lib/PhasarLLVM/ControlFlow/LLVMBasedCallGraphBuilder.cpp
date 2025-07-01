@@ -3,11 +3,13 @@
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/Logger.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Soundness.h"
 #include "phasar/Utils/Utilities.h"
@@ -23,7 +25,7 @@ namespace {
 using namespace psr;
 struct Builder {
   const LLVMProjectIRDB *IRDB = nullptr;
-  Resolver *Res = nullptr;
+  GenericResolverRef Res;
   CallGraphBuilder<const llvm::Instruction *, const llvm::Function *>
       CGBuilder{};
   llvm::DenseSet<const llvm::Function *> VisitedFunctions{};
@@ -60,12 +62,10 @@ void Builder::initWorkList(
 }
 
 auto Builder::buildCallGraph(Soundness S) -> LLVMBasedCallGraph {
-  PHASAR_LOG_LEVEL_CAT(INFO, "LLVMBasedICFG",
-                       "Starting CallGraphAnalysisType: " << Res->str());
   VisitedFunctions.reserve(IRDB->getNumFunctions());
 
   bool RequiresIndirectCallsFixpoint =
-      S != psr::Soundness::Unsound && Res->mutatesHelperAnalysisInformation();
+      S != psr::Soundness::Unsound && Res.mutatesHelperAnalysisInformation();
 
   bool FixpointReached;
 
@@ -85,12 +85,14 @@ auto Builder::buildCallGraph(Soundness S) -> LLVMBasedCallGraph {
       }
     }
   } while (!FixpointReached);
-  for (const auto &[IndirectCall, Targets] : IndirectCalls) {
-    if (Targets == 0) {
-      PHASAR_LOG_LEVEL(WARNING, "No callees found for callsite "
-                                    << llvmIRToString(IndirectCall));
+  IF_LOG_LEVEL_ENABLED(WARNING, {
+    for (const auto &[IndirectCall, Targets] : IndirectCalls) {
+      if (Targets == 0) {
+        PHASAR_LOG_LEVEL(WARNING, "No callees found for callsite "
+                                      << llvmIRToString(IndirectCall));
+      }
     }
-  }
+  });
 
   PAMM_GET_INSTANCE;
   REG_COUNTER("CG Functions", CGBuilder.viewCallGraph().getNumVertexFunctions(),
@@ -103,7 +105,7 @@ auto Builder::buildCallGraph(Soundness S) -> LLVMBasedCallGraph {
 }
 
 static bool fillPossibleTargets(
-    Resolver::FunctionSetTy &PossibleTargets, Resolver &Res,
+    resolver::FunctionSetTy &PossibleTargets, GenericResolverRef Res,
     const llvm::CallBase *CS,
     llvm::DenseMap<const llvm::Instruction *, unsigned int> &IndirectCalls) {
   if (const auto *StaticCallee = llvm::dyn_cast<llvm::Function>(
@@ -111,8 +113,8 @@ static bool fillPossibleTargets(
     PossibleTargets.insert(StaticCallee);
 
     PHASAR_LOG_LEVEL_CAT(DEBUG, "LLVMBasedICFG",
-                         "Found static call-site: "
-                             << "  " << llvmIRToString(CS));
+                         "Found static call-site: " << "  "
+                                                    << llvmIRToString(CS));
     return true;
   }
 
@@ -122,10 +124,10 @@ static bool fillPossibleTargets(
 
   // the function call must be resolved dynamically
   PHASAR_LOG_LEVEL_CAT(DEBUG, "LLVMBasedICFG",
-                       "Found dynamic call-site: "
-                           << "  " << llvmIRToString(CS));
+                       "Found dynamic call-site: " << "  "
+                                                   << llvmIRToString(CS));
 
-  PossibleTargets = Res.resolveIndirectCall(CS);
+  Res.resolve(CS, PossibleTargets);
 
   IndirectCalls[CS] = PossibleTargets.size();
   return false;
@@ -141,8 +143,6 @@ bool Builder::processFunction(const llvm::Function *F) {
     return true;
   }
 
-  assert(Res != nullptr);
-
   // add a node for function F to the call graph (if not present already)
   std::ignore = CGBuilder.addFunctionVertex(F);
 
@@ -153,21 +153,17 @@ bool Builder::processFunction(const llvm::Function *F) {
   for (const auto &I : llvm::instructions(F)) {
     const auto *CS = llvm::dyn_cast<llvm::CallBase>(&I);
     if (!CS) {
-      Res->otherInst(&I);
       continue;
     }
 
-    Res->preCall(&I);
-    scope_exit PostCall = [&] { Res->postCall(&I); };
-
     FixpointReached &=
-        fillPossibleTargets(PossibleTargets, *Res, CS, IndirectCalls);
+        fillPossibleTargets(PossibleTargets, Res, CS, IndirectCalls);
 
     PHASAR_LOG_LEVEL_CAT(DEBUG, "LLVMBasedICFG",
                          "Found " << PossibleTargets.size()
                                   << " possible target(s)");
 
-    Res->handlePossibleTargets(CS, PossibleTargets);
+    Res.handlePossibleTargets(CS, PossibleTargets);
 
     auto *CallSiteId = CGBuilder.addInstructionVertex(CS);
 
@@ -203,12 +199,10 @@ bool Builder::constructDynamicCall(const llvm::Instruction *CS) {
                        "Looking into dynamic call-site: ");
   PHASAR_LOG_LEVEL_CAT(DEBUG, "LLVMBasedICFG", "  " << llvmIRToString(CS));
 
-  Res->preCall(CallSite);
-  scope_exit PostCall = [&] { Res->postCall(CallSite); };
-
   // call the resolve routine
 
-  auto PossibleTargets = Res->resolveIndirectCall(CallSite);
+  resolver::FunctionSetTy PossibleTargets;
+  Res.resolve(CallSite, PossibleTargets);
 
   assert(IndirectCalls.count(CallSite));
   auto &NumIndCalls = IndirectCalls[CallSite];
@@ -228,7 +222,8 @@ bool Builder::constructDynamicCall(const llvm::Instruction *CS) {
     PossibleTargets.erase(Tgt);
   }
 
-  Res->handlePossibleTargets(CallSite, PossibleTargets);
+  Res.handlePossibleTargets(CallSite, PossibleTargets);
+
   // Insert possible target inside the graph and add the link with
   // the current function
   for (const auto *PossibleTarget : PossibleTargets) {
@@ -241,10 +236,10 @@ bool Builder::constructDynamicCall(const llvm::Instruction *CS) {
 } // namespace
 
 auto psr::buildLLVMBasedCallGraph(
-    const LLVMProjectIRDB &IRDB, Resolver &CGResolver,
+    const LLVMProjectIRDB &IRDB, GenericResolverRef CGResolver,
     llvm::ArrayRef<const llvm::Function *> EntryPoints, Soundness S)
     -> LLVMBasedCallGraph {
-  Builder B{&IRDB, &CGResolver};
+  Builder B{&IRDB, CGResolver};
 
   B.initWorkList(EntryPoints);
 
@@ -275,8 +270,8 @@ auto psr::buildLLVMBasedCallGraph(
     PT = PTOwn.asRef();
   }
 
-  auto Res = Resolver::create(CGType, &IRDB, &VTP, &TH);
-  return buildLLVMBasedCallGraph(IRDB, *Res, EntryPoints, S);
+  auto Res = createDefaultResolverPipeline(CGType, &IRDB, &VTP, &TH);
+  return buildLLVMBasedCallGraph(IRDB, Res, EntryPoints, S);
 }
 
 auto psr::buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB,
@@ -290,7 +285,7 @@ auto psr::buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB,
 }
 
 auto psr::buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB,
-                                  Resolver &CGResolver,
+                                  GenericResolverRef CGResolver,
                                   llvm::ArrayRef<std::string> EntryPoints,
                                   Soundness S) -> LLVMBasedCallGraph {
   auto EntryPointFns = getEntryFunctions(IRDB, EntryPoints);
