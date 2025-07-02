@@ -48,7 +48,7 @@ protected:
   }
 
 public:
-  using FunctionSetTy = resolver::FunctionSetTy;
+  using FunctionSetTy = LLVMResolverTraits::FunctionSetTy;
 
   Resolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP);
 

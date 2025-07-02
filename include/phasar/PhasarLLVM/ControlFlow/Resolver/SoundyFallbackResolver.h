@@ -26,7 +26,7 @@ public:
   }
 
   bool resolve(const llvm::CallBase *Call,
-               resolver::FunctionSetTy &PossibleTargets);
+               LLVMResolverTraits::FunctionSetTy &PossibleTargets);
 
 private:
   const LLVMProjectIRDB *IRDB{};

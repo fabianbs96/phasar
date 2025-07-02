@@ -15,7 +15,6 @@
 #include <cassert>
 #include <functional>
 #include <memory>
-#include <type_traits>
 
 namespace llvm {
 class Instruction;
@@ -35,14 +34,15 @@ class GenericResolver;
 /// function resolve(const llvm::CallBase *, FunctionSetTy &)->bool;
 class [[gsl::Pointer]] GenericResolverRef {
 public:
-  using FunctionSetTy = resolver::FunctionSetTy;
+  using FunctionSetTy = LLVMResolverTraits::FunctionSetTy;
 
   /// Create a type-erased reference from a pointer to a concrete resolver
   ///
   /// \pre Requires that the provided pointer is non-null and refers to a valid
   /// resolver
   template <typename ConcreteResolverT,
-            std::enable_if_t<IResolver<ConcreteResolverT>, int> = 0>
+            std::enable_if_t<LLVMResolverTraits::IResolver<ConcreteResolverT>,
+                             int> = 0>
   constexpr GenericResolverRef(ConcreteResolverT *Res) noexcept
       : Data(Res), VT(&VTableFor<ConcreteResolverT>) {
     assert(Res != nullptr);
@@ -51,7 +51,8 @@ public:
   /// Create a type-erased reference from a std::reference_wrapper to a concrete
   /// resolver
   template <typename ConcreteResolverT,
-            std::enable_if_t<IResolver<ConcreteResolverT>, int> = 0>
+            std::enable_if_t<LLVMResolverTraits::IResolver<ConcreteResolverT>,
+                             int> = 0>
   constexpr GenericResolverRef(
       std::reference_wrapper<ConcreteResolverT> Res) noexcept
       : Data(&Res.get()), VT(&VTableFor<ConcreteResolverT>) {
@@ -62,7 +63,7 @@ public:
   /// models a non-owning reference.
   template <typename ConcreteResolverT,
             std::enable_if_t<
-                IResolver<ConcreteResolverT> &&
+                LLVMResolverTraits::IResolver<ConcreteResolverT> &&
                     !std::is_base_of_v<GenericResolverRef, ConcreteResolverT>,
                 int> = 0>
   constexpr GenericResolverRef(ConcreteResolverT &Res) noexcept = delete;
@@ -78,7 +79,7 @@ public:
   /// written.
   /// \returns True, if the call could be resolved, false otherwise.
   bool resolve(const llvm::CallBase *Call,
-               resolver::FunctionSetTy &PossibleTargets) {
+               LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
     assert(VT != nullptr);
     return VT->Resolve(Data, Call, PossibleTargets);
   }
@@ -135,7 +136,7 @@ private:
 
   template <typename ConcreteResolverT>
   static bool mutatesHelperAnalysisInformationThunk(const void *Data) noexcept {
-    return resolver::mutatesHelperAnalysisInformation(
+    return LLVMResolverTraits::mutatesHelperAnalysisInformation(
         *static_cast<const ConcreteResolverT *>(Data));
   }
 
@@ -143,8 +144,8 @@ private:
   static void handlePossibleTargetsThunk(void *Data,
                                          const llvm::CallBase *CallSite,
                                          FunctionSetTy &CalleeTargets) {
-    resolver::handlePossibleTargets(*static_cast<ConcreteResolverT *>(Data),
-                                    CallSite, CalleeTargets);
+    LLVMResolverTraits::handlePossibleTargets(
+        *static_cast<ConcreteResolverT *>(Data), CallSite, CalleeTargets);
   }
 
   template <typename ConcreteResolverT>
@@ -171,7 +172,8 @@ public:
   /// Create a type-erased GenericResolver from a std::unique_ptr to a concrete
   /// resolver.
   template <typename ConcreteResolverT,
-            std::enable_if_t<IResolver<ConcreteResolverT>, int> = 0>
+            std::enable_if_t<LLVMResolverTraits::IResolver<ConcreteResolverT>,
+                             int> = 0>
   GenericResolver(std::unique_ptr<ConcreteResolverT> Res) noexcept
       : GenericResolverRef(Res.release()) {}
 

@@ -23,7 +23,7 @@ namespace psr {
 struct DirectCallResolver {
 
   bool resolve(const llvm::CallBase *Call,
-               resolver::FunctionSetTy &PossibleTargets) {
+               LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
     const auto *CalledOp =
         Call->getCalledOperand()->stripPointerCastsAndAliases();
     if (const auto *Target = llvm::dyn_cast<llvm::Function>(CalledOp)) {

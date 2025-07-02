@@ -8,8 +8,9 @@
 
 using namespace psr;
 
-bool SoundyFallbackResolver::resolve(const llvm::CallBase *Call,
-                                     resolver::FunctionSetTy &PossibleTargets) {
+bool SoundyFallbackResolver::resolve(
+    const llvm::CallBase *Call,
+    LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
   // TODO: Update with #785
 
   // we may wish to optimise this function

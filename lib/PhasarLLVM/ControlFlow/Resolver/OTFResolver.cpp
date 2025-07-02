@@ -66,9 +66,10 @@ void OTFResolver::handlePossibleTargets(const llvm::CallBase *CallSite,
   }
 }
 
-static bool resolveVirtualCallImpl(const llvm::CallBase *Call,
-                                   resolver::FunctionSetTy &PossibleTargets,
-                                   LLVMAliasInfoRef PT) {
+static bool
+resolveVirtualCallImpl(const llvm::CallBase *Call,
+                       LLVMResolverTraits::FunctionSetTy &PossibleTargets,
+                       LLVMAliasInfoRef PT) {
 
   // TODO: Apply changes from #785 here
 
@@ -115,9 +116,10 @@ static bool resolveVirtualCallImpl(const llvm::CallBase *Call,
   return !PossibleTargets.empty();
 }
 
-static bool resolveFunctionPointerImpl(const llvm::CallBase *Call,
-                                       resolver::FunctionSetTy &PossibleTargets,
-                                       LLVMAliasInfoRef PT) {
+static bool
+resolveFunctionPointerImpl(const llvm::CallBase *Call,
+                           LLVMResolverTraits::FunctionSetTy &PossibleTargets,
+                           LLVMAliasInfoRef PT) {
   if (!Call->getCalledOperand()) {
     return {};
   }

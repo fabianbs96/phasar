@@ -16,7 +16,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/Casting.h"
 
 namespace llvm {
 class Function;
@@ -58,6 +60,13 @@ protected:
   bool IgnoreDbgInstructions = true;
 
   [[nodiscard]] f_t getFunctionOfImpl(n_t Inst) const noexcept;
+  [[nodiscard]] f_t getStaticCalleeOrNullImpl(n_t CallSite) const {
+    if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(CallSite)) {
+      return llvm::dyn_cast<llvm::Function>(
+          Call->getCalledOperand()->stripPointerCastsAndAliases());
+    }
+    return nullptr;
+  }
   [[nodiscard]] llvm::SmallVector<n_t, 2> getPredsOfImpl(n_t Inst) const;
   [[nodiscard]] llvm::SmallVector<n_t, 2> getSuccsOfImpl(n_t Inst) const;
   [[nodiscard]] std::vector<std::pair<n_t, n_t>>

@@ -376,7 +376,12 @@ if (PHASAR_ENABLE_WARNINGS)
   if (MSVC)
     string(APPEND CMAKE_CXX_FLAGS " /W4")
   else()
-    string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wno-unused-parameter -Werror=return-type -Werror=delete-incomplete")
+    # Add all common warnings, but ignore the especially annoying ones:
+    # - unused-parameter: When implementing generic interfaces, we have *a lot* of unused params
+    # - duplicate-decl-specifier: Annoying, when using multiple macros on a function, e.g. PSR_CXX20_CONSTEXPR and LLVM_ATTRIBUTE_ALWAYS_INLINE
+    #
+    # On the other hand, treat the most bugprone warnings as errors (more to be added)
+    string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -Wno-unused-parameter -Wno-duplicate-decl-specifier -Werror=return-type -Werror=delete-incomplete")
   endif()
 endif (PHASAR_ENABLE_WARNINGS)
 

@@ -12,6 +12,7 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/CRTPUtils.h"
+#include "phasar/Utils/Nullable.h"
 #include "phasar/Utils/TypeTraits.h"
 
 namespace psr {
@@ -37,6 +38,12 @@ public:
   [[nodiscard]] f_t getFunctionOf(ByConstRef<n_t> Inst) const noexcept {
     return self().getFunctionOfImpl(Inst);
   }
+
+  [[nodiscard]] constexpr Nullable<f_t>
+  getStaticCalleeOrNull(ByConstRef<n_t> CallSite) const {
+    return self().getStaticCalleeOrNullImpl(CallSite);
+  }
+
   /// Returns an iterable range of all predecessor instructions of Inst in the
   /// CFG
   [[nodiscard]] decltype(auto) getPredsOf(ByConstRef<n_t> Inst) const {
@@ -134,6 +141,12 @@ public:
   }
   void print(ByConstRef<f_t> Fun, llvm::raw_ostream &OS) const {
     self().printImpl(Fun, OS);
+  }
+
+private:
+  [[nodiscard]] constexpr Nullable<f_t>
+  getStaticCalleeOrNullImpl(ByConstRef<n_t> /*CallSite*/) const {
+    return {};
   }
 };
 
