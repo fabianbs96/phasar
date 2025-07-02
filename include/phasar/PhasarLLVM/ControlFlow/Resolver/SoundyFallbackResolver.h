@@ -17,6 +17,8 @@
 namespace psr {
 class LLVMProjectIRDB;
 
+/// A simple resolver that is meant as soundy fallback for the (hopefully rare)
+/// case that a more precise resolver fails to resolve a particular call-site
 class SoundyFallbackResolver {
 public:
   constexpr SoundyFallbackResolver(const LLVMProjectIRDB *IRDB) : IRDB(IRDB) {

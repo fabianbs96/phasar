@@ -4,7 +4,6 @@
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
@@ -149,7 +148,7 @@ bool Builder::processFunction(const llvm::Function *F) {
   bool FixpointReached = true;
 
   // iterate all instructions of the current function
-  Resolver::FunctionSetTy PossibleTargets;
+  resolver::FunctionSetTy PossibleTargets;
   for (const auto &I : llvm::instructions(F)) {
     const auto *CS = llvm::dyn_cast<llvm::CallBase>(&I);
     if (!CS) {
@@ -270,7 +269,7 @@ auto psr::buildLLVMBasedCallGraph(
     PT = PTOwn.asRef();
   }
 
-  auto Res = createDefaultResolverPipeline(CGType, &IRDB, &VTP, &TH);
+  auto Res = createDefaultResolverPipeline(CGType, &IRDB, &VTP, &TH, PT);
   return buildLLVMBasedCallGraph(IRDB, Res, EntryPoints, S);
 }
 

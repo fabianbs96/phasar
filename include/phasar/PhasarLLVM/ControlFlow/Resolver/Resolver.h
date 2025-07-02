@@ -29,6 +29,10 @@ namespace psr {
 ///
 /// Create a specific resolver by making a new class, inheriting this resolver
 /// class and implementing the virtual functions as needed.
+///
+/// \deprecated Use GenericResolver and GenericResolverRef instead, as they
+/// allow for resolver composition to form (custom) resolver pipelines.
+///
 class Resolver {
 protected:
   const LLVMProjectIRDB *IRDB;
@@ -74,11 +78,12 @@ public:
     // Conservatively returns true. Override if possible
     return true;
   }
-  static std::unique_ptr<Resolver> create(CallGraphAnalysisType Ty,
-                                          const LLVMProjectIRDB *IRDB,
-                                          const LLVMVFTableProvider *VTP,
-                                          const DIBasedTypeHierarchy *TH,
-                                          LLVMAliasInfoRef PT = nullptr);
+
+  [[deprecated("Use psr::createDefaultResolverPipeline() instead")]]
+  static std::unique_ptr<Resolver>
+  create(CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
+         const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
+         LLVMAliasInfoRef PT = nullptr);
 };
 } // namespace psr
 

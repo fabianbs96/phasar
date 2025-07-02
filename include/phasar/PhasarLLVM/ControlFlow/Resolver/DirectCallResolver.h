@@ -17,6 +17,9 @@
 #include "llvm/Support/Casting.h"
 
 namespace psr {
+/// Simple resolver that only handles direct calls and does not attempt to
+/// resolve indirect calls (e.g., a C++ virtual call, or a call through a
+/// function pointer)
 struct DirectCallResolver {
 
   bool resolve(const llvm::CallBase *Call,

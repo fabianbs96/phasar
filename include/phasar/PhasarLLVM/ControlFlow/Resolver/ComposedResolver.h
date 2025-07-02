@@ -15,10 +15,14 @@
 #include <type_traits>
 
 namespace psr {
+
+/// \brief A resolver that composes the two given resolvers
 template <typename Res1T, typename Res2T> struct ComposedResolver {
   [[no_unique_address]] Res1T Res1;
   [[no_unique_address]] Res2T Res2;
 
+  /// Tries to resolve the given call with the first resolver, and uses the
+  /// second resolver as fallback, if the first returns false.
   constexpr bool resolve(const llvm::CallBase *Call,
                          resolver::FunctionSetTy &PossibleTargets) {
     if (Res1.resolve(Call, PossibleTargets)) {
@@ -28,12 +32,16 @@ template <typename Res1T, typename Res2T> struct ComposedResolver {
     return Res2.resolve(Call, PossibleTargets);
   }
 
+  /// True, iff any of the both contained resolvers may mutate helper analysis
+  /// information.
   [[nodiscard]] constexpr bool
   mutatesHelperAnalysisInformation() const noexcept {
     return resolver::mutatesHelperAnalysisInformation(Res1) ||
            resolver::mutatesHelperAnalysisInformation(Res2);
   }
 
+  /// Asks both contained resolvers to modify helper analysis information, if
+  /// possible/necessary
   constexpr void handlePossibleTargets(const llvm::CallBase *CallSite,
                                        resolver::FunctionSetTy &CalleeTargets) {
     resolver::handlePossibleTargets(Res1, CallSite, CalleeTargets);
@@ -41,7 +49,20 @@ template <typename Res1T, typename Res2T> struct ComposedResolver {
   }
 };
 
+/// Inline namespace that makes it possible to
+/// '`using namespace psr::composed_resolver;`' to pull-in the operator|
+/// without polluting the own namespace with the rest of the psr namespace.
 inline namespace composed_resolver {
+
+// clang-format off
+/// Utility to make it possible to compose two resolvers with the pipe (|)
+/// operator.
+///
+/// USAGE:
+/// \code
+/// auto Res = DirectCallResolver{} | RTAResolver{IRDB, VTP, TH} | SoundyFallbackResolver{IRDB};
+/// \endcode
+// clang-format on
 template <typename R1, typename R2>
 constexpr
 #if __cpp_concepts >= 201907L
