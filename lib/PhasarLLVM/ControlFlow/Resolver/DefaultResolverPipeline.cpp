@@ -28,7 +28,7 @@ LLVMGenericResolver psr::createDefaultResolverPipeline(
                 SoundyFallbackResolver{IRDB});
   case CallGraphAnalysisType::RTA:
     return wrap(DirectCallResolver{} | RTAResolver(IRDB, VTP, TH) |
-                SoundyFallbackResolver{IRDB});
+                CHAResolver(IRDB, VTP, TH) | SoundyFallbackResolver{IRDB});
   case CallGraphAnalysisType::VTA:
     llvm::report_fatal_error(
         "The VTA callgraph algorithm is not implemented yet");
