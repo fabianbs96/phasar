@@ -146,11 +146,9 @@ bool psr::isVirtualCall(const llvm::Instruction *Inst,
 
 namespace psr {
 
-Resolver::Resolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP)
-    : IRDB(IRDB), VTP(VTP) {
-  assert(IRDB != nullptr);
-  assert(VTP != nullptr);
-}
+Resolver::Resolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+                   NonNullPtr<const LLVMVFTableProvider> VTP)
+    : IRDB(IRDB), VTP(VTP) {}
 
 void Resolver::preCall(const llvm::Instruction *Inst) {}
 
@@ -161,7 +159,7 @@ void Resolver::postCall(const llvm::Instruction *Inst) {}
 
 auto Resolver::resolveIndirectCall(const llvm::CallBase *CallSite)
     -> FunctionSetTy {
-  if (VTP && isVirtualCall(CallSite, *VTP)) {
+  if (isVirtualCall(CallSite, *VTP)) {
     return resolveVirtualCall(CallSite);
   }
   return resolveFunctionPointer(CallSite);

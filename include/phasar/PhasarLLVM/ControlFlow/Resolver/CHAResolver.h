@@ -19,6 +19,7 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/Utils/MaybeUniquePtr.h"
+#include "phasar/Utils/NonNullPtr.h"
 
 namespace llvm {
 class CallBase;
@@ -31,11 +32,15 @@ class DIBasedTypeHierarchy;
 /// to C++ virtual functions. Requires debug information.
 class CHAResolver : public Resolver {
 public:
-  CHAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
+  CHAResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+              NonNullPtr<const LLVMVFTableProvider> VTP,
               const DIBasedTypeHierarchy *TH);
 
   CHAResolver(CHAResolver &&) noexcept;
   CHAResolver &operator=(CHAResolver &&) noexcept;
+
+  CHAResolver(const CHAResolver &) = delete;
+  CHAResolver &operator=(const CHAResolver &) = delete;
 
   // Deleting an incomplete type (LLVMTypeHierarchy) is UB, so instantiate the
   // dtor in CHAResolver.cpp

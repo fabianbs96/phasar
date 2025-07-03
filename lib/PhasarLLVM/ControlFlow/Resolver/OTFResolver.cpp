@@ -31,8 +31,9 @@
 
 using namespace psr;
 
-OTFResolver::OTFResolver(const LLVMProjectIRDB *IRDB,
-                         const LLVMVFTableProvider *VTP, LLVMAliasInfoRef PT)
+OTFResolver::OTFResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+                         NonNullPtr<const LLVMVFTableProvider> VTP,
+                         LLVMAliasInfoRef PT)
     : Resolver(IRDB, VTP), PT(PT) {}
 
 void OTFResolver::handlePossibleTargets(const llvm::CallBase *CallSite,
@@ -213,7 +214,7 @@ resolveFunctionPointerImpl(const llvm::CallBase *Call,
 
 bool OTFResolver::resolve(const llvm::CallBase *Call,
                           FunctionSetTy &PossibleTargets) {
-  if (VTP && isVirtualCall(Call, *VTP)) {
+  if (isVirtualCall(Call, *VTP)) {
     return resolveVirtualCallImpl(Call, PossibleTargets, PT);
   }
   return resolveFunctionPointerImpl(Call, PossibleTargets, PT);

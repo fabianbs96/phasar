@@ -12,6 +12,7 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverBase.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/Utils/NonNullPtr.h"
 
 namespace psr {
 class LLVMProjectIRDB;
@@ -34,8 +35,8 @@ enum class CallGraphAnalysisType;
 /// \returns A resolver pipeline that reflects the requested
 /// CallGraphAnalysisType.
 [[nodiscard]] LLVMGenericResolver createDefaultResolverPipeline(
-    CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
-    const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
+    CallGraphAnalysisType Ty, NonNullPtr<const LLVMProjectIRDB> IRDB,
+    NonNullPtr<const LLVMVFTableProvider> VTP, const DIBasedTypeHierarchy *TH,
     LLVMAliasInfoRef PT = nullptr);
 } // namespace psr
 

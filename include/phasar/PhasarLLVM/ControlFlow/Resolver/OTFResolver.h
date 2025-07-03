@@ -40,8 +40,8 @@ class DIBasedTypeHierarchy;
 /// virtual calls
 class OTFResolver : public Resolver {
 public:
-  OTFResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
-              LLVMAliasInfoRef PT);
+  OTFResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+              NonNullPtr<const LLVMVFTableProvider> VTP, LLVMAliasInfoRef PT);
 
   ~OTFResolver() override = default;
 

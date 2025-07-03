@@ -21,19 +21,15 @@
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
 
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/Module.h"
 
 #include <memory>
 
 using namespace std;
 using namespace psr;
 
-CHAResolver::CHAResolver(const LLVMProjectIRDB *IRDB,
-                         const LLVMVFTableProvider *VTP,
+CHAResolver::CHAResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+                         NonNullPtr<const LLVMVFTableProvider> VTP,
                          const DIBasedTypeHierarchy *TH)
     : Resolver(IRDB, VTP), TH(TH) {
   if (!TH) {

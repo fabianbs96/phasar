@@ -19,6 +19,7 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/Utils/NonNullPtr.h"
 
 #include <memory>
 #include <string>
@@ -35,15 +36,12 @@ namespace psr {
 ///
 class Resolver {
 protected:
-  const LLVMProjectIRDB *IRDB;
-  const LLVMVFTableProvider *VTP;
+  NonNullPtr<const LLVMProjectIRDB> IRDB;
+  NonNullPtr<const LLVMVFTableProvider> VTP;
 
   const llvm::Function *
   getNonPureVirtualVFTEntry(const llvm::DIType *T, unsigned Idx,
                             const llvm::CallBase *CallSite) {
-    if (!VTP) {
-      return nullptr;
-    }
     return psr::getNonPureVirtualVFTEntry(T, Idx, CallSite, *VTP);
   }
 
@@ -52,7 +50,8 @@ public:
   using n_t = const llvm::CallBase *;
   using f_t = const llvm::Function *;
 
-  Resolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP);
+  Resolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+           NonNullPtr<const LLVMVFTableProvider> VTP);
 
   virtual ~Resolver() = default;
 

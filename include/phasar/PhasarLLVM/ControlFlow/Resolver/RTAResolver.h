@@ -22,7 +22,6 @@
 #include <vector>
 
 namespace llvm {
-class CallBase;
 class DICompositeType;
 } // namespace llvm
 
@@ -33,13 +32,9 @@ class DIBasedTypeHierarchy;
 /// to C++ virtual functions. Requires debug information.
 class RTAResolver : public CHAResolver {
 public:
-  RTAResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
+  RTAResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+              NonNullPtr<const LLVMVFTableProvider> VTP,
               const DIBasedTypeHierarchy *TH);
-
-  RTAResolver(RTAResolver &&) noexcept = default;
-  RTAResolver &operator=(RTAResolver &&) noexcept = default;
-
-  ~RTAResolver() override = default;
 
   bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
 

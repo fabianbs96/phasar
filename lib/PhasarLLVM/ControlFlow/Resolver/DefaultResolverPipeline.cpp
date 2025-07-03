@@ -17,21 +17,16 @@ template <typename ResT> LLVMGenericResolver wrap(ResT &&Res) {
 }
 
 LLVMGenericResolver psr::createDefaultResolverPipeline(
-    CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
-    const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
+    CallGraphAnalysisType Ty, NonNullPtr<const LLVMProjectIRDB> IRDB,
+    NonNullPtr<const LLVMVFTableProvider> VTP, const DIBasedTypeHierarchy *TH,
     LLVMAliasInfoRef PT) {
-  assert(IRDB != nullptr);
-  assert(VTP != nullptr);
-
   switch (Ty) {
   case CallGraphAnalysisType::NORESOLVE:
-    return std::make_unique<NOResolver>(IRDB, VTP);
+    return std::make_unique<NOResolver>(IRDB.get(), VTP.get());
   case CallGraphAnalysisType::CHA:
-    assert(TH != nullptr);
     return wrap(DirectCallResolver{} | CHAResolver(IRDB, VTP, TH) |
                 SoundyFallbackResolver{IRDB});
   case CallGraphAnalysisType::RTA:
-    assert(TH != nullptr);
     return wrap(DirectCallResolver{} | RTAResolver(IRDB, VTP, TH) |
                 SoundyFallbackResolver{IRDB});
   case CallGraphAnalysisType::VTA:

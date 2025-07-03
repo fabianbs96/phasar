@@ -21,7 +21,8 @@ namespace psr {
 /// \brief A resolver that doesn't resolve indirect- and virtual calls
 class NOResolver final : public Resolver {
 public:
-  NOResolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP);
+  NOResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
+             NonNullPtr<const LLVMVFTableProvider> VTP);
 
   ~NOResolver() override = default;
 

@@ -11,6 +11,7 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_RESOLVER_SOUNDYFALLBACKRESOLVER_H
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
+#include "phasar/Utils/NonNullPtr.h"
 
 #include <cassert>
 
@@ -19,20 +20,14 @@ class LLVMProjectIRDB;
 
 /// A simple resolver that is meant as soundy fallback for the (hopefully rare)
 /// case that a more precise resolver fails to resolve a particular call-site
-class SoundyFallbackResolver {
-public:
+struct SoundyFallbackResolver {
   using n_t = const llvm::CallBase *;
   using f_t = const llvm::Function *;
 
-  constexpr SoundyFallbackResolver(const LLVMProjectIRDB *IRDB) : IRDB(IRDB) {
-    assert(IRDB != nullptr);
-  }
+  NonNullPtr<const LLVMProjectIRDB> IRDB;
 
   bool resolve(const llvm::CallBase *Call,
                LLVMResolverTraits::FunctionSetTy &PossibleTargets);
-
-private:
-  const LLVMProjectIRDB *IRDB{};
 };
 } // namespace psr
 
