@@ -1,8 +1,8 @@
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
 
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
+#include "phasar/ControlFlow/Resolver/ComposedResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/CHAResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/ComposedResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/DirectCallResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/NOResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/OTFResolver.h"
@@ -12,11 +12,11 @@
 
 using namespace psr;
 
-template <typename ResT> GenericResolver wrap(ResT &&Res) {
+template <typename ResT> LLVMGenericResolver wrap(ResT &&Res) {
   return std::make_unique<std::decay_t<ResT>>(PSR_FWD(Res));
 }
 
-GenericResolver psr::createDefaultResolverPipeline(
+LLVMGenericResolver psr::createDefaultResolverPipeline(
     CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
     const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
     LLVMAliasInfoRef PT) {

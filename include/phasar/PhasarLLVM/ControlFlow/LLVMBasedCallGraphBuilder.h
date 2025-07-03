@@ -59,7 +59,7 @@ buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB, CallGraphAnalysisType CGType,
 /// i.e, a more sound call-graph may have more spurious call-edges.
 [[nodiscard]] LLVMBasedCallGraph
 buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB,
-                        GenericResolverRef CGResolver,
+                        LLVMGenericResolverRef CGResolver,
                         llvm::ArrayRef<const llvm::Function *> EntryPoints,
                         Soundness S = Soundness::Soundy);
 
@@ -100,7 +100,7 @@ buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB, CallGraphAnalysisType CGType,
 /// usually have negative impact on the precision of the resulting call-graph,
 /// i.e, a more sound call-graph may have more spurious call-edges.
 [[nodiscard]] LLVMBasedCallGraph buildLLVMBasedCallGraph(
-    const LLVMProjectIRDB &IRDB, GenericResolverRef CGResolver,
+    const LLVMProjectIRDB &IRDB, LLVMGenericResolverRef CGResolver,
     llvm::ArrayRef<std::string> EntryPoints, Soundness S = Soundness::Soundy);
 } // namespace psr
 

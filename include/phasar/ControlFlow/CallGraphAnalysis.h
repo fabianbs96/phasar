@@ -12,7 +12,7 @@
 
 #include "phasar/ControlFlow/CFGBase.h"
 #include "phasar/ControlFlow/CallGraph.h"
-#include "phasar/ControlFlow/Resolver.h"
+#include "phasar/ControlFlow/Resolver/Resolver.h"
 #include "phasar/DB/ProjectIRDBBase.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/NonNullPtr.h"
@@ -22,19 +22,21 @@
 
 namespace psr {
 
-template <typename DB, typename CFG, typename ResolverT, typename N, typename F>
+template <typename DB, typename CFG, typename ResolverT>
 class CallGraphAnalysis {
 public:
-  using Traits = ResolverTraits<N, F>;
+  using Traits = ResolverTraitsFor<ResolverT>;
+  using n_t = typename ResolverT::n_t;
+  using f_t = typename ResolverT::f_t;
 
   explicit CallGraphAnalysis(NonNullPtr<const ProjectIRDBBase<DB>> IRDB,
                              NonNullPtr<const CFGBase<CFG>> CF, ResolverT Res,
-                             llvm::ArrayRef<F> EntryPointFns)
+                             llvm::ArrayRef<f_t> EntryPointFns)
       : IRDB(IRDB), CF(CF), Res(std::move(Res)) {
     initWorkList(EntryPointFns);
   }
 
-  [[nodiscard]] CallGraph<N, F> solve(Soundness S = Soundness::Soundy) {
+  [[nodiscard]] CallGraph<n_t, f_t> solve(Soundness S = Soundness::Soundy) {
     VisitedFunctions.reserve(IRDB->getNumFunctions());
 
     bool RequiresIndirectCallsFixpoint =
@@ -45,7 +47,7 @@ public:
     do {
       FixpointReached = true;
       while (!FunctionWL.empty()) {
-        F Fun = FunctionWL.pop_back_val();
+        f_t Fun = FunctionWL.pop_back_val();
         FixpointReached &= processFunction(Fun);
       }
 
@@ -78,7 +80,7 @@ public:
   }
 
 private:
-  void initWorkList(llvm::ArrayRef<F> EntryPointFns) {
+  void initWorkList(llvm::ArrayRef<f_t> EntryPointFns) {
     auto NumFuns = IRDB->getNumFunctions();
     FunctionWL.reserve(NumFuns);
     FunctionWL.append(EntryPointFns.begin(), EntryPointFns.end());
@@ -87,7 +89,7 @@ private:
   }
 
   bool fillPossibleTargets(typename Traits::FunctionSetTy &PossibleTargets,
-                           ByConstRef<N> CS) {
+                           ByConstRef<n_t> CS) {
     if (const auto *StaticCallee = CF->getStaticCalleeOrNull(CS)) {
       PossibleTargets.insert(StaticCallee);
 
@@ -110,7 +112,7 @@ private:
     return false;
   }
 
-  bool processFunction(ByConstRef<F> Fun) {
+  bool processFunction(ByConstRef<f_t> Fun) {
     PHASAR_LOG_LEVEL_CAT(DEBUG, "CallGraphAnalysis",
                          "Walking in function: " << Fun->getName());
     if (Fun->isDeclaration() || !VisitedFunctions.insert(Fun).second) {
@@ -155,7 +157,7 @@ private:
     return FixpointReached;
   }
 
-  bool constructDynamicCall(ByConstRef<N> CS) {
+  bool constructDynamicCall(ByConstRef<n_t> CS) {
     if (!CF->isCallSite(CS)) {
       llvm::report_fatal_error("[constructDynamicCall]: No call: " +
                                llvm::Twine(NToString(CS)));
@@ -213,17 +215,23 @@ private:
   NonNullPtr<const CFGBase<CFG>> CF;
   ResolverT Res;
 
-  CallGraphBuilder<N, F> CGBuilder{};
+  CallGraphBuilder<n_t, f_t> CGBuilder{};
 
-  llvm::DenseSet<F> VisitedFunctions{};
+  llvm::DenseSet<f_t> VisitedFunctions{};
 
   // The worklist for direct callee resolution.
-  llvm::SmallVector<F, 0> FunctionWL{};
+  llvm::SmallVector<f_t, 0> FunctionWL{};
 
   // Map indirect calls to the number of possible targets found for it. Fixpoint
   // is not reached when more targets are found.
-  llvm::DenseMap<N, unsigned> IndirectCalls{};
+  llvm::DenseMap<n_t, unsigned> IndirectCalls{};
 };
+
+template <typename DB, typename CFG, typename ResolverT>
+CallGraphAnalysis(const ProjectIRDBBase<DB> *IRDB, const CFGBase<CFG> *CF,
+                  ResolverT Res,
+                  llvm::ArrayRef<typename ResolverT::f_t> EntryPointFns)
+    -> CallGraphAnalysis<DB, CFG, ResolverT>;
 } // namespace psr
 
 #endif // PHASAR_CONTROLFLOW_CALLGRAPHANALYSIS_H

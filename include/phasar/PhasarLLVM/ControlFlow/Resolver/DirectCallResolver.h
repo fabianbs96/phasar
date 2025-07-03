@@ -21,6 +21,8 @@ namespace psr {
 /// resolve indirect calls (e.g., a C++ virtual call, or a call through a
 /// function pointer)
 struct DirectCallResolver {
+  using n_t = const llvm::CallBase *;
+  using f_t = const llvm::Function *;
 
   bool resolve(const llvm::CallBase *Call,
                LLVMResolverTraits::FunctionSetTy &PossibleTargets) {

@@ -76,11 +76,13 @@ public:
                          LLVMAliasInfoRef PT = nullptr,
                          Soundness S = Soundness::Soundy,
                          bool IncludeGlobals = true);
-  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB,
+                         LLVMGenericResolverRef CGResolver,
                          llvm::ArrayRef<std::string> EntryPoints = {},
                          Soundness S = Soundness::Soundy,
                          bool IncludeGlobals = true);
-  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
+  explicit LLVMBasedICFG(LLVMProjectIRDB *IRDB,
+                         LLVMGenericResolverRef CGResolver,
                          LLVMVFTableProvider VTP,
                          llvm::ArrayRef<std::string> EntryPoints = {},
                          Soundness S = Soundness::Soundy,
@@ -159,7 +161,7 @@ private:
   [[nodiscard]] llvm::Function *buildCRuntimeGlobalCtorsDtorsModel(
       LLVMProjectIRDB &IRDB, llvm::ArrayRef<llvm::Function *> UserEntryPoints);
 
-  void initialize(LLVMProjectIRDB *IRDB, GenericResolverRef CGResolver,
+  void initialize(LLVMProjectIRDB *IRDB, LLVMGenericResolverRef CGResolver,
                   llvm::ArrayRef<std::string> EntryPoints, Soundness S,
                   bool IncludeGlobals);
 

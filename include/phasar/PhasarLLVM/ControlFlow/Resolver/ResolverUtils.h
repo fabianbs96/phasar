@@ -10,15 +10,11 @@
 #ifndef PHASAR_PHASARLLVM_CONTROLFLOW_RESOLVER_RESOLVERUTILS_H
 #define PHASAR_PHASARLLVM_CONTROLFLOW_RESOLVER_RESOLVERUTILS_H
 
-#include "phasar/ControlFlow/Resolver.h"
+#include "phasar/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 
 #include <optional>
 #include <string>
-
-#if __cpp_concepts >= 201907L
-#include <concepts>
-#endif
 
 namespace llvm {
 class Instruction;

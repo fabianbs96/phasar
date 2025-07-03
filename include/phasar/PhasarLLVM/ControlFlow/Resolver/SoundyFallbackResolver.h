@@ -21,6 +21,9 @@ class LLVMProjectIRDB;
 /// case that a more precise resolver fails to resolve a particular call-site
 class SoundyFallbackResolver {
 public:
+  using n_t = const llvm::CallBase *;
+  using f_t = const llvm::Function *;
+
   constexpr SoundyFallbackResolver(const LLVMProjectIRDB *IRDB) : IRDB(IRDB) {
     assert(IRDB != nullptr);
   }

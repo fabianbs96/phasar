@@ -33,7 +33,7 @@ enum class CallGraphAnalysisType;
 /// information, i.e., for OTF.
 /// \returns A resolver pipeline that reflects the requested
 /// CallGraphAnalysisType.
-[[nodiscard]] GenericResolver createDefaultResolverPipeline(
+[[nodiscard]] LLVMGenericResolver createDefaultResolverPipeline(
     CallGraphAnalysisType Ty, const LLVMProjectIRDB *IRDB,
     const LLVMVFTableProvider *VTP, const DIBasedTypeHierarchy *TH,
     LLVMAliasInfoRef PT = nullptr);

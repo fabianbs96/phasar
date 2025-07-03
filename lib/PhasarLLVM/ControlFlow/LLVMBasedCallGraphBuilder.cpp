@@ -7,6 +7,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverBase.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMTypeHierarchy.h"
@@ -25,10 +26,13 @@ using namespace psr;
 
 namespace {
 struct ResolverWrapper {
-  GenericResolverRef BaseResolver;
+  LLVMGenericResolverRef BaseResolver;
 
-  bool resolve(const llvm::Instruction *Call,
-               LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
+  using n_t = const llvm::Instruction *;
+  using f_t = const llvm::Function *;
+  using FunctionSetTy = LLVMResolverTraits::FunctionSetTy;
+
+  bool resolve(n_t Call, FunctionSetTy &PossibleTargets) {
     return BaseResolver.resolve(llvm::cast<llvm::CallBase>(Call),
                                 PossibleTargets);
   }
@@ -37,8 +41,7 @@ struct ResolverWrapper {
     return BaseResolver.mutatesHelperAnalysisInformation();
   }
 
-  void handlePossibleTargets(const llvm::Instruction *CallSite,
-                             LLVMResolverTraits::FunctionSetTy &CalleeTargets) {
+  void handlePossibleTargets(n_t CallSite, FunctionSetTy &CalleeTargets) {
     return BaseResolver.handlePossibleTargets(
         llvm::cast<llvm::CallBase>(CallSite), CalleeTargets);
   }
@@ -47,7 +50,7 @@ struct ResolverWrapper {
 } // namespace
 
 auto psr::buildLLVMBasedCallGraph(
-    const LLVMProjectIRDB &IRDB, GenericResolverRef CGResolver,
+    const LLVMProjectIRDB &IRDB, LLVMGenericResolverRef CGResolver,
     llvm::ArrayRef<const llvm::Function *> EntryPoints, Soundness S)
     -> LLVMBasedCallGraph {
 
@@ -64,9 +67,8 @@ auto psr::buildLLVMBasedCallGraph(
   };
 
   LLVMBasedCFG CF;
-  CallGraphAnalysis<LLVMProjectIRDB, LLVMBasedCFG, ResolverWrapper,
-                    const llvm::Instruction *, const llvm::Function *>
-      CGAnalysis(&IRDB, &CF, ResolverWrapper{CGResolver}, EntryPoints);
+  CallGraphAnalysis CGAnalysis(&IRDB, &CF, ResolverWrapper{CGResolver},
+                               EntryPoints);
 
   return CGAnalysis.solve(S);
 }
@@ -98,7 +100,7 @@ auto psr::buildLLVMBasedCallGraph(LLVMProjectIRDB &IRDB,
 }
 
 auto psr::buildLLVMBasedCallGraph(const LLVMProjectIRDB &IRDB,
-                                  GenericResolverRef CGResolver,
+                                  LLVMGenericResolverRef CGResolver,
                                   llvm::ArrayRef<std::string> EntryPoints,
                                   Soundness S) -> LLVMBasedCallGraph {
   auto EntryPointFns = getEntryFunctions(IRDB, EntryPoints);

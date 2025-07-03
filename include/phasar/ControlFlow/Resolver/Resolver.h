@@ -14,6 +14,8 @@
 
 #include "llvm/ADT/DenseSet.h"
 
+#include <type_traits>
+
 #if __cpp_concepts >= 201907L
 #include <concepts>
 #endif
@@ -28,18 +30,6 @@ template <typename N, typename F> struct ResolverTraits {
   PSR_DECLARE_HAS_MEMBER_FN(handlePossibleTargets, std::declval<N>(),
                             std::declval<FunctionSetTy &>());
   PSR_DECLARE_HAS_MEMBER_FN(mutatesHelperAnalysisInformation);
-
-#if __cpp_concepts >= 201907L
-  template <typename T>
-  concept IResolver = requires(T &Res, FunctionSetTy &FSet, N CB) {
-    { Res.resolve(CB, FSet) } -> std::convertible_to<bool>;
-  };
-
-#else
-
-  template <typename T> PSR_CONCEPT IResolver = has_resolve_v<T>;
-
-#endif
 
   template <typename ResolverT>
   static constexpr bool
@@ -62,6 +52,41 @@ template <typename N, typename F> struct ResolverTraits {
     // else do nothing
   }
 };
+
+template <typename T>
+using ResolverTraitsFor = ResolverTraits<typename T::n_t, typename T::f_t>;
+
+#if __cpp_concepts >= 201907L
+template <typename T>
+concept IResolver =
+    requires(T &Res, typename ResolverTraitsFor<T>::FunctionSetTy &FSet,
+             typename T::n_t CB) {
+      typename T::n_t;
+      typename T::f_t;
+      { Res.resolve(CB, FSet) } -> std::convertible_to<bool>;
+    };
+
+template <typename T, typename N, typename F>
+concept IResolverNF = IResolver<T> && std::same_as<typename T::n_t, N> &&
+                      std::same_as<typename T::f_t, F>;
+
+#else
+
+template <typename T, typename N, typename F>
+PSR_CONCEPT IResolverNF = ResolverTraits<N, F>::template has_resolve_v<T>;
+
+namespace detail {
+template <typename T, typename = void>
+struct IResolverImpl : std::false_type {};
+template <typename T>
+struct IResolverImpl<
+    T, std::enable_if_t<ResolverTraitsFor<T>::template has_resolve_v<T>>>
+    : std::true_type {};
+} // namespace detail
+
+template <typename T> PSR_CONCEPT IResolver = detail::IResolverImpl<T>::value;
+
+#endif
 
 } // namespace psr
 

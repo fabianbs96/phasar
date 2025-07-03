@@ -17,6 +17,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/DefaultResolverPipeline.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
@@ -34,7 +35,7 @@
 namespace psr {
 
 void LLVMBasedICFG::initialize(LLVMProjectIRDB *IRDB,
-                               GenericResolverRef CGResolver,
+                               LLVMGenericResolverRef CGResolver,
                                llvm::ArrayRef<std::string> EntryPoints,
                                Soundness S, bool IncludeGlobals) {
   if (IncludeGlobals) {
@@ -65,7 +66,7 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
 }
 
 LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
-                             GenericResolverRef CGResolver,
+                             LLVMGenericResolverRef CGResolver,
                              llvm::ArrayRef<std::string> EntryPoints,
                              Soundness S, bool IncludeGlobals)
     : IRDB(IRDB), VTP(*IRDB) {
@@ -75,7 +76,7 @@ LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
 }
 
 LLVMBasedICFG::LLVMBasedICFG(LLVMProjectIRDB *IRDB,
-                             GenericResolverRef CGResolver,
+                             LLVMGenericResolverRef CGResolver,
                              LLVMVFTableProvider VTP,
                              llvm::ArrayRef<std::string> EntryPoints,
                              Soundness S, bool IncludeGlobals)

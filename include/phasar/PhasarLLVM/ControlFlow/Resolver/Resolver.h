@@ -49,6 +49,8 @@ protected:
 
 public:
   using FunctionSetTy = LLVMResolverTraits::FunctionSetTy;
+  using n_t = const llvm::CallBase *;
+  using f_t = const llvm::Function *;
 
   Resolver(const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP);
 
