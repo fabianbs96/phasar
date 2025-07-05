@@ -10,6 +10,7 @@
 #ifndef PHASAR_UTILS_UTILITIES_H_
 #define PHASAR_UTILS_UTILITIES_H_
 
+#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -74,12 +75,12 @@ std::set<std::set<T>> computePowerSet(const std::set<T> &S) {
 /// Dest and Src and stores the result back in Dest.
 ///
 /// This function should work on all types of sets as long as they provide the
-/// type value_type specifying, which type their elements have.
+/// type value_type, specifying which type their elements have.
 /// By-reference iteration is required, but the elements do not have any
 /// requirements, although the performance is probably higher for small
 /// elements that are trivially copyable.
 template <typename ContainerTy, typename OtherContainerTy>
-std::enable_if_t<!has_erase_iterator_v<ContainerTy>>
+inline std::enable_if_t<!has_erase_iterator_v<ContainerTy>>
 intersectWith(ContainerTy &Dest, const OtherContainerTy &Src) {
   static_assert(std::is_same_v<typename ContainerTy::value_type,
                                typename OtherContainerTy::value_type>,
@@ -125,17 +126,40 @@ intersectWith(ContainerTy &Dest, const OtherContainerTy &Src) {
 }
 
 template <typename ContainerTy, typename OtherContainerTy>
-std::enable_if_t<has_erase_iterator_v<ContainerTy>>
+inline std::enable_if_t<has_erase_iterator_v<ContainerTy>>
 intersectWith(ContainerTy &Dest, const OtherContainerTy &Src) {
   static_assert(std::is_same_v<typename ContainerTy::value_type,
                                typename OtherContainerTy::value_type>,
                 "The containers Src and Dest must be compatible");
 
   for (auto It = Dest.begin(), End = Dest.end(); It != End;) {
-    if (Src.count(*It)) {
-      ++It;
+    if constexpr (std::is_void_v<decltype(Dest.erase(It))>) {
+      auto OldIt = It++;
+      if (!Src.count(*OldIt)) {
+        Dest.erase(OldIt);
+      }
     } else {
-      It = Dest.erase(It);
+
+      if (Src.count(*It)) {
+        ++It;
+      } else {
+        It = Dest.erase(It);
+      }
+    }
+  }
+}
+
+template <typename ContainerTy, typename IntoIter>
+inline void intersectInto(const ContainerTy &Src1,
+                          const type_identity_t<ContainerTy> &Src2,
+                          IntoIter Into) {
+  bool LeftIsSmaller = Src1.size() < Src2.size();
+  const auto &Smaller = LeftIsSmaller ? Src1 : Src2;
+  const auto &Larger = LeftIsSmaller ? Src2 : Src1;
+
+  for (const auto &Elem : Smaller) {
+    if (Larger.count(Elem)) {
+      *Into++ = Elem;
     }
   }
 }
@@ -151,10 +175,11 @@ struct StringIDLess {
 template <typename Fn> class scope_exit { // NOLINT
 public:
   template <typename FFn, typename = decltype(std::declval<FFn>()())>
-  scope_exit(FFn &&F) noexcept(std::is_nothrow_constructible_v<Fn, FFn &&>)
+  constexpr scope_exit(FFn &&F) noexcept(
+      std::is_nothrow_constructible_v<Fn, FFn &&>)
       : F(std::forward<FFn>(F)) {}
 
-  ~scope_exit() noexcept { F(); }
+  PSR_CXX20_CONSTEXPR ~scope_exit() noexcept { F(); }
 
   scope_exit(const scope_exit &) = delete;
   scope_exit(scope_exit &&) = delete;
