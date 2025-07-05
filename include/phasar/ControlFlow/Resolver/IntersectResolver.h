@@ -56,6 +56,8 @@ struct IntersectResolver {
       psr::intersectInto(Temp1, Temp2,
                          std::inserter(PossibleTargets, PossibleTargets.end()));
     }
+
+    return !PossibleTargets.empty();
   }
 
   /// True, iff any of the both contained resolvers may mutate helper analysis
