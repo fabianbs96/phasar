@@ -32,6 +32,7 @@
 #include "phasar/Utils/InitPhasar.h"
 #include "phasar/Utils/IotaIterator.h"
 #include "phasar/Utils/JoinLattice.h"
+#include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/MaybeUniquePtr.h"
 #include "phasar/Utils/NullAnalysisPrinter.h"

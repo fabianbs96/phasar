@@ -27,6 +27,7 @@ using psr::DOTConfig;
 using psr::DOTEdge;
 using psr::DOTNode;
 using psr::getDefaultValue;
+using psr::Logger;
 using psr::minimizeGraph;
 using psr::Warning;
 using psr::operator<;
