@@ -39,9 +39,7 @@ public:
   template <typename ConcreteResolverT,
             std::enable_if_t<IResolverNF<ConcreteResolverT, n_t, f_t>, int> = 0>
   constexpr GenericResolverRef(ConcreteResolverT *Res) noexcept
-      : Data(Res), VT(&VTableFor<ConcreteResolverT>) {
-    assert(Res != nullptr);
-  }
+      : GenericResolverRef(Res, std::true_type{}) {}
 
   /// Create a type-erased reference from a std::reference_wrapper to a concrete
   /// resolver
@@ -66,7 +64,8 @@ public:
   /// Prevent dangling references
   constexpr GenericResolverRef(GenericResolver<N, F> &&) noexcept = delete;
 
-  /// Tries to resolve the given (indirect) Call.
+  /// Tries to resolve the given (indirect) Call, storing the possible callee
+  /// targets in PossibleTargets.
   ///
   /// \param Call The call to resolve. Implementations can assume that this
   /// parameter is non-null and points to a valid llvm::CallBase
@@ -118,8 +117,17 @@ private:
     void (*Destroy)(const void *) noexcept;
   };
 
-  constexpr GenericResolverRef(void *Data, const VTable *VT) noexcept
-      : Data(Data), VT(VT) {}
+  template <typename ConcreteResolverT, bool ExpectNonNullRes>
+  constexpr GenericResolverRef(
+      ConcreteResolverT *Res,
+      std::bool_constant<ExpectNonNullRes> /*unused*/) noexcept
+      : Data(Res), VT(&VTableFor<ConcreteResolverT>) {
+    if constexpr (ExpectNonNullRes) {
+      assert(Res != nullptr);
+    } else if (!Res) {
+      VT = nullptr;
+    }
+  }
 
   template <typename ConcreteResolverT>
   static bool resolveThunk(void *Data, ByConstRef<n_t> Call,
@@ -171,10 +179,9 @@ public:
   /// Create a type-erased GenericResolver from a std::unique_ptr to a concrete
   /// resolver.
   template <typename ConcreteResolverT,
-            std::enable_if_t<Traits::template has_resolve_v<ConcreteResolverT>,
-                             int> = 0>
+            std::enable_if_t<IResolverNF<ConcreteResolverT, n_t, f_t>, int> = 0>
   GenericResolver(std::unique_ptr<ConcreteResolverT> Res) noexcept
-      : GenericResolverRef<N, F>(Res.release()) {}
+      : GenericResolverRef<N, F>(Res.release(), std::false_type{}) {}
 
   ~GenericResolver() {
     if (this->VT) {
@@ -209,6 +216,8 @@ public:
   ///
   /// \attention You must make sure that this owning GenericResolver outlives
   /// all uses of the returned GenericResolverRef.
+  /// \pre This GenericResolver has not been moved from and was initialized with
+  /// a non-null (unique-)pointer
   [[nodiscard]] constexpr GenericResolverRef<N, F> get() & noexcept {
     return static_cast<GenericResolverRef<N, F>>(*this);
   }
