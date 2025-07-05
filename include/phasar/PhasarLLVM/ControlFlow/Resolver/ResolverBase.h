@@ -22,6 +22,9 @@ class DIType;
 } // namespace llvm
 
 namespace psr {
+using LLVMResolverTraits =
+    ResolverTraits<const llvm::CallBase *, const llvm::Function *>;
+
 using LLVMGenericResolverRef =
     GenericResolverRef<const llvm::CallBase *, const llvm::Function *>;
 

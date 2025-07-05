@@ -1,5 +1,5 @@
+#include "phasar/ControlFlow.h"
 #include "phasar/PhasarLLVM/ControlFlow.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/DB.h"
 #include "phasar/PhasarLLVM/TypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils.h"
@@ -35,14 +35,19 @@ int main(int Argc, char *Argv[]) {
   // functions. Here, we select the Rapid Type Analysis that requires a
   // type-hierarchy as input.
   //
-  // You can also write your own resolver by creating a class that inherits from
-  // the psr::Resolver interface.
-  psr::RTAResolver Resolver(&IRDB, &VTP, &TH);
+  // You can also write your own resolver by creating a class that provides a
+  // function resolve(const llvm::CallBase *, LLVMResolverTraits::FunctionSetTy
+  // &)->bool.
+  //
+  // Optionally, you can chain (arbitrarily many) resolvers together to
+  // implement a robust fallback mechanism
+  auto Resolver =
+      psr::RTAResolver(&IRDB, &VTP, &TH) | psr::SoundyFallbackResolver{&IRDB};
 
   // You must specify at least one function as entry-point. The
   // LLVMBasedICFG will only consider those functions for the call-graph
   // that are reachable from at least on eof the entry-points.
-  auto CG = psr::buildLLVMBasedCallGraph(IRDB, Resolver, {"main"});
+  auto CG = psr::buildLLVMBasedCallGraph(IRDB, &Resolver, {"main"});
 
   // Iterate over all call-sites:
   for (const auto *Call : CG.getAllVertexCallSites()) {
