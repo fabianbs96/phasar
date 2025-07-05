@@ -79,14 +79,16 @@ inline namespace composed_resolver {
 /// auto Res = DirectCallResolver{} | RTAResolver{IRDB, VTP, TH} | SoundyFallbackResolver{IRDB};
 /// \endcode
 // clang-format on
-template <typename R1, typename R2>
-constexpr
+
 #if __cpp_concepts >= 201907L
-    requires(IResolver<R1> &&IResolver<R2>) ComposedResolver<R1, R2>
+template <IResolver R1, IResolver R2>
+constexpr ComposedResolver<R1, R2>
 #else
-    std::enable_if_t<IResolver<R1> && IResolver<R2>, ComposedResolver<R1, R2>>
+template <typename R1, typename R2>
+constexpr std::enable_if_t<IResolver<R1> && IResolver<R2>,
+                           ComposedResolver<R1, R2>>
 #endif
-    operator|(R1 Res1, R2 Res2) {
+operator|(R1 Res1, R2 Res2) {
   return {std::move(Res1), std::move(Res2)};
 }
 } // namespace composed_resolver

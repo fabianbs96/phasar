@@ -26,7 +26,7 @@
       _Tp, std::void_t<decltype(std::declval<_Tp>().FName(__VA_ARGS__))>>      \
       : std::true_type {};                                                     \
   template <typename _Tp>                                                      \
-  PSR_CONCEPT has_##TraitName##_v = has_##TraitName<_Tp>::value
+  static constexpr bool has_##TraitName##_v = has_##TraitName<_Tp>::value
 
 #define PSR_DECLARE_HAS_STATIC_MEMBER_FN_OVERLOAD(TraitName, FName, ...)       \
   template <typename _Tp, typename Enable = void>                              \
@@ -36,7 +36,7 @@
       _Tp, std::void_t<decltype(std::remove_cv_t<_Tp>::FName(__VA_ARGS__))>>   \
       : std::true_type {};                                                     \
   template <typename _Tp>                                                      \
-  PSR_CONCEPT has_##TraitName##_v = has_##TraitName<_Tp>::value
+  static constexpr bool has_##TraitName##_v = has_##TraitName<_Tp>::value
 
 #define PSR_DECLARE_HAS_MEMBER_FN(FName, ...)                                  \
   PSR_DECLARE_HAS_MEMBER_FN_OVERLOAD(FName, FName, ##__VA_ARGS__)
@@ -49,7 +49,8 @@
   template <typename _Tp>                                                      \
   struct has_##FName<_Tp, std::void_t<decltype(std::declval<_Tp>().FName)>>    \
       : std::true_type {};                                                     \
-  template <typename _Tp> PSR_CONCEPT has_##FName##_v = has_##FName<_Tp>::value
+  template <typename _Tp>                                                      \
+  static constexpr bool has_##FName##_v = has_##FName<_Tp>::value
 
 #define PSR_DECLARE_HAS_MEMBER_TYPE(FName)                                     \
   template <typename _Tp, typename Enable = void>                              \
@@ -57,7 +58,8 @@
   template <typename _Tp>                                                      \
   struct has_##FName<_Tp, std::void_t<typename std::remove_cv_t<_Tp>::FName>>  \
       : std::true_type {};                                                     \
-  template <typename _Tp> PSR_CONCEPT has_##FName##_v = has_##FName<_Tp>::value
+  template <typename _Tp>                                                      \
+  static constexpr bool has_##FName##_v = has_##FName<_Tp>::value
 
 #define PSR_DECLARE_HAS_NONMEMBER_FN_OVERLOAD(TraitName, FName, ...)           \
   template <typename _Tp, typename Enable = void>                              \
@@ -67,7 +69,7 @@
       _Tp, std::void_t<decltype(FName(std::declval<_Tp>(), ##__VA_ARGS__))>>   \
       : std::true_type {};                                                     \
   template <typename _Tp>                                                      \
-  PSR_CONCEPT has_##TraitName##_v = has_##TraitName<_Tp>::value
+  static constexpr bool has_##TraitName##_v = has_##TraitName<_Tp>::value
 
 #define PSR_DECLARE_HAS_NONMEMBER_FN(FName, ...)                               \
   PSR_DECLARE_HAS_NONMEMBER_FN_OVERLOAD(FName, FName, ##__VA_ARGS__)
