@@ -1,7 +1,6 @@
 module;
 
-#include "phasar/TypeHierarchy/TypeHierarchy.h"
-#include "phasar/TypeHierarchy/VFTable.h"
+#include "phasar/TypeHierarchy.h"
 
 export module phasar.typehierarchy;
 

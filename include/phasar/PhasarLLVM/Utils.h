@@ -17,5 +17,7 @@
 #include "phasar/PhasarLLVM/Utils/LLVMCXXShorthands.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/PhasarLLVM/Utils/LLVMSourceManager.h"
+#include "phasar/PhasarLLVM/Utils/SourceMgrPrinter.h"
 
 #endif // PHASAR_PHASARLLVM_UTILS_H

@@ -1,8 +1,6 @@
 module;
 
-#include "phasar/DB/Hexastore.h"
-#include "phasar/DB/ProjectIRDBBase.h"
-#include "phasar/DB/Queries.h"
+#include "phasar/DB.h"
 
 export module phasar.db;
 

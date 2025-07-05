@@ -12,6 +12,7 @@
 
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfigBase.h"
+#include "phasar/PhasarLLVM/TaintConfig/TaintConfigData.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfigUtilities.h"
 
 #endif // PHASAR_PHASARLLVM_TAINTCONFIG_H

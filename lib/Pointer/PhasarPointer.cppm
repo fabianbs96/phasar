@@ -1,12 +1,6 @@
 module;
 
-#include "phasar/Pointer/AliasAnalysisType.h"
-#include "phasar/Pointer/AliasInfo.h"
-#include "phasar/Pointer/AliasInfoBase.h"
-#include "phasar/Pointer/AliasInfoTraits.h"
-#include "phasar/Pointer/AliasResult.h"
-#include "phasar/Pointer/AliasSetOwner.h"
-#include "phasar/Pointer/PointsToInfo.h"
+#include "phasar/Pointer.h"
 
 export module phasar.pointer;
 

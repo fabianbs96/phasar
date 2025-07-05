@@ -1,17 +1,5 @@
 module;
-
-#include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedBackwardICFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/CHAResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/NOResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/OTFResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/RTAResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedCFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedCFGProvider.h"
-#include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFG.h"
-#include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFGView.h"
+#include "phasar/PhasarLLVM/ControlFlow.h"
 
 export module phasar.llvm.controlflow;
 
@@ -19,6 +7,8 @@ export namespace psr {
 using psr::buildLLVMBasedCallGraph;
 using psr::CFGTraits;
 using psr::CHAResolver;
+using psr::createDefaultResolverPipeline;
+using psr::DirectCallResolver;
 using psr::getEntryFunctions;
 using psr::getEntryFunctionsMut;
 using psr::getNonPureVirtualVFTEntry;
@@ -35,11 +25,14 @@ using psr::LLVMBasedBackwardICFG;
 using psr::LLVMBasedCallGraph;
 using psr::LLVMBasedCFG;
 using psr::LLVMBasedICFG;
+using psr::LLVMGenericResolver;
+using psr::LLVMGenericResolverRef;
 using psr::LLVMVFTableProvider;
 using psr::NOResolver;
 using psr::OTFResolver;
 using psr::Resolver;
 using psr::RTAResolver;
+using psr::SoundyFallbackResolver;
 using psr::SparseLLVMBasedCFG;
 using psr::SparseLLVMBasedCFGProvider;
 using psr::SparseLLVMBasedICFG;

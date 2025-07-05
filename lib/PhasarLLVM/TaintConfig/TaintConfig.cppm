@@ -1,9 +1,6 @@
 module;
 
-#include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
-#include "phasar/PhasarLLVM/TaintConfig/TaintConfigBase.h"
-#include "phasar/PhasarLLVM/TaintConfig/TaintConfigData.h"
-#include "phasar/PhasarLLVM/TaintConfig/TaintConfigUtilities.h"
+#include "phasar/PhasarLLVM/TaintConfig.h"
 
 export module phasar.llvm.taintconfig;
 

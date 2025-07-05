@@ -1,16 +1,6 @@
 module;
 
-#include "phasar/Config/phasar-config.h"
-#include "phasar/PhasarLLVM/Pointer/AliasAnalysisView.h"
-#include "phasar/PhasarLLVM/Pointer/FilteredLLVMAliasSet.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMAliasSetData.h"
-#include "phasar/PhasarLLVM/Pointer/LLVMPointsToUtils.h"
-
-#ifdef PHASAR_USE_SVF
-#include "phasar/PhasarLLVM/Pointer/SVF/SVFPointsToSet.h"
-#endif
+#include "phasar/PhasarLLVM/Pointer.h"
 
 export module phasar.llvm.pointer;
 

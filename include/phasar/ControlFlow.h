@@ -15,6 +15,12 @@
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/ControlFlow/CallGraphBase.h"
 #include "phasar/ControlFlow/ICFGBase.h"
+#include "phasar/ControlFlow/Resolver/ComposedResolver.h"
+#include "phasar/ControlFlow/Resolver/GenericResolver.h"
+#include "phasar/ControlFlow/Resolver/IntersectResolver.h"
+#include "phasar/ControlFlow/Resolver/UnionResolver.h"
+#include "phasar/ControlFlow/SparseCFGBase.h"
+#include "phasar/ControlFlow/SparseCFGProvider.h"
 #include "phasar/ControlFlow/SpecialMemberFunctionType.h"
 
 #endif // PHASAR_CONTROLFLOW_H

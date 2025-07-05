@@ -1,14 +1,6 @@
 module;
 
-#include "phasar/PhasarLLVM/Utils/Annotation.h"
-#include "phasar/PhasarLLVM/Utils/BasicBlockOrdering.h"
-#include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
-#include "phasar/PhasarLLVM/Utils/LLVMBasedContainerConfig.h"
-#include "phasar/PhasarLLVM/Utils/LLVMCXXShorthands.h"
-#include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
-#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
-#include "phasar/PhasarLLVM/Utils/LLVMSourceManager.h"
-#include "phasar/PhasarLLVM/Utils/SourceMgrPrinter.h"
+#include "phasar/PhasarLLVM/Utils.h"
 
 export module phasar.llvm.utils;
 

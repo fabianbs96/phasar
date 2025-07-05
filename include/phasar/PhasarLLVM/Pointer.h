@@ -10,10 +10,16 @@
 #ifndef PHASAR_PHASARLLVM_POINTER_H
 #define PHASAR_PHASARLLVM_POINTER_H
 
+#include "phasar/Config/phasar-config.h" // For PHASAR_USE_SVF
 #include "phasar/PhasarLLVM/Pointer/AliasAnalysisView.h"
 #include "phasar/PhasarLLVM/Pointer/FilteredLLVMAliasSet.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasSetData.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToUtils.h"
+
+#ifdef PHASAR_USE_SVF
+#include "phasar/PhasarLLVM/Pointer/SVF/SVFPointsToSet.h"
+#endif
 
 #endif // PHASAR_PHASARLLVM_POINTER_H
