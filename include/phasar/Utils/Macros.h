@@ -85,5 +85,23 @@
 #else
 #define PSR_CXX23_CONSTEXPR inline
 #endif
+#if __cpp_constinit >= 201907L
+#define PSR_CONSTINIT constinit
+#elif __clang__
+#define PSR_CONSTINIT [[clang::require_constant_initialization]]
+#else
+#define PSR_CONSTINIT
+#endif
+
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(attribute_deprecated_with_message)
+#define PSR_DEPRECATED(MSG, REPLACEMENT)                                       \
+  __attribute__((deprecated(MSG, REPLACEMENT)))
+#else
+#define PSR_DEPRECATED(MSG, REPLACEMENT) [[deprecated(MSG)]]
+#endif
 
 #endif // PHASAR_UTILS_MACROS_H

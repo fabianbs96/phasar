@@ -18,6 +18,7 @@
 
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/DIBasedTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/AllocatedTypes.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
 
@@ -26,8 +27,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 
-using namespace std;
 using namespace psr;
 
 RTAResolver::RTAResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
@@ -59,9 +60,10 @@ bool RTAResolver::resolve(const llvm::CallBase *Call,
   auto EndIt = ReachableTypes.end();
   for (const auto *PossibleType : AllocatedCompositeTypes) {
     if (ReachableTypes.find(PossibleType) != EndIt) {
-      const auto *Target =
-          getNonPureVirtualVFTEntry(PossibleType, VtableIndex, Call);
-      if (Target) {
+
+      const auto *Target = getNonPureVirtualVFTEntry(PossibleType, VtableIndex,
+                                                     Call, ReceiverType);
+      if (Target && psr::isConsistentCall(Call, Target)) {
         PossibleTargets.insert(Target);
       }
     }
@@ -70,32 +72,20 @@ bool RTAResolver::resolve(const llvm::CallBase *Call,
   return !PossibleTargets.empty();
 }
 
-auto RTAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
+void RTAResolver::resolveVirtualCall(FunctionSetTy &PossibleTargets,
+                                     const llvm::CallBase *CallSite) {
 
-  FunctionSetTy PossibleCallTargets;
-
-  if (!resolve(CallSite, PossibleCallTargets)) {
-    CHAResolver::resolve(CallSite, PossibleCallTargets);
+  if (!resolve(CallSite, PossibleTargets)) {
+    CHAResolver::resolve(CallSite, PossibleTargets);
   }
-
-  return PossibleCallTargets;
 }
 
 std::string RTAResolver::str() const { return "RTA"; }
 
-/// More or less copied from GeneralStatisticsAnalysis
 void RTAResolver::resolveAllocatedCompositeTypes() {
   if (!AllocatedCompositeTypes.empty()) {
     return;
   }
 
-  llvm::DebugInfoFinder DIF;
-  DIF.processModule(*IRDB->getModule());
-
-  for (const auto *Ty : DIF.types()) {
-    if (const auto *CompTy = llvm::dyn_cast<llvm::DICompositeType>(Ty)) {
-      AllocatedCompositeTypes.push_back(CompTy);
-    }
-  }
+  AllocatedCompositeTypes = collectAllocatedTypes(*IRDB->getModule());
 }

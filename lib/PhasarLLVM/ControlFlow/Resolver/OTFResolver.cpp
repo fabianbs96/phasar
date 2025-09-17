@@ -36,6 +36,55 @@ OTFResolver::OTFResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
                          LLVMAliasInfoRef PT)
     : Resolver(IRDB, VTP), PT(PT) {}
 
+static std::vector<std::pair<const llvm::Value *, const llvm::Value *>>
+getActualFormalPointerPairs(const llvm::CallBase *CallSite,
+                            const llvm::Function *CalleeTarget) {
+  std::vector<std::pair<const llvm::Value *, const llvm::Value *>> Pairs;
+  Pairs.reserve(CallSite->arg_size());
+  // ordinary case
+
+  unsigned Idx = 0;
+  for (; Idx < CallSite->arg_size() && Idx < CalleeTarget->arg_size(); ++Idx) {
+    // only collect pointer typed pairs
+    if (CallSite->getArgOperand(Idx)->getType()->isPointerTy() &&
+        CalleeTarget->getArg(Idx)->getType()->isPointerTy()) {
+      Pairs.emplace_back(CallSite->getArgOperand(Idx),
+                         CalleeTarget->getArg(Idx));
+    }
+  }
+
+  if (CalleeTarget->isVarArg()) {
+    // in case of vararg, we can pair-up incoming pointer parameters with the
+    // vararg pack of the callee target. the vararg pack will alias
+    // (intra-procedurally) with any pointer values loaded from the pack
+    const llvm::AllocaInst *VarArgs = nullptr;
+
+    for (const auto &I : llvm::instructions(CalleeTarget)) {
+      if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(&I)) {
+        if (const auto *AT =
+                llvm::dyn_cast<llvm::ArrayType>(Alloca->getAllocatedType())) {
+          if (const auto *ST =
+                  llvm::dyn_cast<llvm::StructType>(AT->getArrayElementType())) {
+            if (ST->hasName() && ST->getName() == "struct.__va_list_tag") {
+              VarArgs = Alloca;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (VarArgs) {
+      for (; Idx < CallSite->arg_size(); ++Idx) {
+        if (CallSite->getArgOperand(Idx)->getType()->isPointerTy()) {
+          Pairs.emplace_back(CallSite->getArgOperand(Idx), VarArgs);
+        }
+      }
+    }
+  }
+  return Pairs;
+}
+
 void OTFResolver::handlePossibleTargets(const llvm::CallBase *CallSite,
                                         FunctionSetTy &CalleeTargets) {
   // if we have no inter-procedural points-to information, use call-graph
@@ -72,11 +121,9 @@ resolveVirtualCallImpl(const llvm::CallBase *Call,
                        LLVMResolverTraits::FunctionSetTy &PossibleTargets,
                        LLVMAliasInfoRef PT) {
 
-  // TODO: Apply changes from #785 here
-
   PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: " << llvmIRToString(Call));
 
-  auto RetrievedVtableIndex = getVFTIndex(Call);
+  auto RetrievedVtableIndex = getVFTIndexAndVT(Call);
   if (!RetrievedVtableIndex.has_value()) {
     // An error occured
     PHASAR_LOG_LEVEL(DEBUG,
@@ -86,11 +133,12 @@ resolveVirtualCallImpl(const llvm::CallBase *Call,
     return false;
   }
 
-  auto VtableIndex = RetrievedVtableIndex.value();
+  auto [VtablePtr, VtableIndex] = RetrievedVtableIndex.value();
 
   PHASAR_LOG_LEVEL(DEBUG, "Virtual function table entry is: " << VtableIndex);
 
-  auto PTS = PT.getAliasSet(Call->getCalledOperand(), Call);
+  auto PTS = PT.getAliasSet(VtablePtr, Call);
+
   for (const auto *P : *PTS) {
     if (const auto *PGV = llvm::dyn_cast<llvm::GlobalVariable>(P)) {
       if (PGV->hasName() &&
@@ -122,7 +170,7 @@ resolveFunctionPointerImpl(const llvm::CallBase *Call,
                            LLVMResolverTraits::FunctionSetTy &PossibleTargets,
                            LLVMAliasInfoRef PT) {
   if (!Call->getCalledOperand()) {
-    return {};
+    return false;
   }
 
   auto PTS = PT.getAliasSet(Call->getCalledOperand(), Call);
@@ -220,90 +268,14 @@ bool OTFResolver::resolve(const llvm::CallBase *Call,
   return resolveFunctionPointerImpl(Call, PossibleTargets, PT);
 }
 
-auto OTFResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
-  FunctionSetTy PossibleCallTargets;
-  resolveVirtualCallImpl(CallSite, PossibleCallTargets, PT);
-  return PossibleCallTargets;
+void OTFResolver::resolveVirtualCall(FunctionSetTy &PossibleTargets,
+                                     const llvm::CallBase *CallSite) {
+  resolveVirtualCallImpl(CallSite, PossibleTargets, PT);
 }
 
-auto OTFResolver::resolveFunctionPointer(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
-  FunctionSetTy Callees;
-  resolveFunctionPointerImpl(CallSite, Callees, PT);
-  return Callees;
-}
-
-std::set<const llvm::Type *>
-OTFResolver::getReachableTypes(const LLVMAliasInfo::AliasSetTy &Values) {
-  std::set<const llvm::Type *> Types;
-  // an allocation site can either be an AllocaInst or a call to an
-  // allocating function
-  for (const auto *V : Values) {
-    if (const auto *Alloc = llvm::dyn_cast<llvm::AllocaInst>(V)) {
-      Types.insert(Alloc->getAllocatedType());
-    } else {
-      // usually if an allocating function is called, it is immediately
-      // bit-casted
-      // to the desired allocated value and hence we can determine it from
-      // the destination type of that cast instruction.
-      for (const auto *User : V->users()) {
-        if (const auto *Cast = llvm::dyn_cast<llvm::BitCastInst>(User)) {
-          Types.insert(Cast->getDestTy());
-        }
-      }
-    }
-  }
-  return Types;
-}
-
-std::vector<std::pair<const llvm::Value *, const llvm::Value *>>
-OTFResolver::getActualFormalPointerPairs(const llvm::CallBase *CallSite,
-                                         const llvm::Function *CalleeTarget) {
-  std::vector<std::pair<const llvm::Value *, const llvm::Value *>> Pairs;
-  Pairs.reserve(CallSite->arg_size());
-  // ordinary case
-
-  unsigned Idx = 0;
-  for (; Idx < CallSite->arg_size() && Idx < CalleeTarget->arg_size(); ++Idx) {
-    // only collect pointer typed pairs
-    if (CallSite->getArgOperand(Idx)->getType()->isPointerTy() &&
-        CalleeTarget->getArg(Idx)->getType()->isPointerTy()) {
-      Pairs.emplace_back(CallSite->getArgOperand(Idx),
-                         CalleeTarget->getArg(Idx));
-    }
-  }
-
-  if (CalleeTarget->isVarArg()) {
-    // in case of vararg, we can pair-up incoming pointer parameters with the
-    // vararg pack of the callee target. the vararg pack will alias
-    // (intra-procedurally) with any pointer values loaded from the pack
-    const llvm::AllocaInst *VarArgs = nullptr;
-
-    for (const auto &I : llvm::instructions(CalleeTarget)) {
-      if (const auto *Alloca = llvm::dyn_cast<llvm::AllocaInst>(&I)) {
-        if (const auto *AT =
-                llvm::dyn_cast<llvm::ArrayType>(Alloca->getAllocatedType())) {
-          if (const auto *ST =
-                  llvm::dyn_cast<llvm::StructType>(AT->getArrayElementType())) {
-            if (ST->hasName() && ST->getName() == "struct.__va_list_tag") {
-              VarArgs = Alloca;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (VarArgs) {
-      for (; Idx < CallSite->arg_size(); ++Idx) {
-        if (CallSite->getArgOperand(Idx)->getType()->isPointerTy()) {
-          Pairs.emplace_back(CallSite->getArgOperand(Idx), VarArgs);
-        }
-      }
-    }
-  }
-  return Pairs;
+void OTFResolver::resolveFunctionPointer(FunctionSetTy &PossibleTargets,
+                                         const llvm::CallBase *CallSite) {
+  resolveFunctionPointerImpl(CallSite, PossibleTargets, PT);
 }
 
 std::string OTFResolver::str() const { return "OTF"; }

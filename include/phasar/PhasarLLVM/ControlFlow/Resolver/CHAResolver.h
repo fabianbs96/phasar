@@ -21,10 +21,6 @@
 #include "phasar/Utils/MaybeUniquePtr.h"
 #include "phasar/Utils/NonNullPtr.h"
 
-namespace llvm {
-class CallBase;
-} // namespace llvm
-
 namespace psr {
 class DIBasedTypeHierarchy;
 
@@ -46,7 +42,8 @@ public:
   // dtor in CHAResolver.cpp
   ~CHAResolver() override;
 
-  FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
+  void resolveVirtualCall(FunctionSetTy &PossibleTargets,
+                          const llvm::CallBase *CallSite) override;
 
   bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
 

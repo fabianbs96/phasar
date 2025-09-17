@@ -37,6 +37,11 @@ using LLVMResolverTraits =
 [[nodiscard]] std::optional<unsigned>
 getVFTIndex(const llvm::CallBase *CallSite);
 
+
+/// Similar to getVFTIndex(), but also returns a pointer to the vtable
+[[nodiscard]] std::optional<std::pair<const llvm::Value *, uint64_t>>
+getVFTIndexAndVT(const llvm::CallBase *CallSite);
+
 /// Assuming that `CallSite` is a call to a non-static member function,
 /// retrieves the type of the receiver. Returns nullptr, if the receiver-type
 /// could not be extracted
@@ -45,10 +50,9 @@ getReceiverType(const llvm::CallBase *CallSite);
 
 /// Assuming that `CallSite` is a virtual call, where `Idx` is retrieved through
 /// `getVFTIndex()` and `T` through `getReceiverType()`
-[[nodiscard]] const llvm::Function *
-getNonPureVirtualVFTEntry(const llvm::DIType *T, unsigned Idx,
-                          const llvm::CallBase *CallSite,
-                          const psr::LLVMVFTableProvider &VTP);
+[[nodiscard]] const llvm::Function *getNonPureVirtualVFTEntry(
+    const llvm::DIType *T, unsigned Idx, const llvm::CallBase *CallSite,
+    const psr::LLVMVFTableProvider &VTP, const llvm::DIType *ReceiverType);
 
 [[nodiscard]] std::string getReceiverTypeName(const llvm::CallBase *CallSite);
 

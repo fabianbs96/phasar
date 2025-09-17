@@ -25,7 +25,6 @@
 
 #include <memory>
 
-using namespace std;
 using namespace psr;
 
 CHAResolver::CHAResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
@@ -60,7 +59,7 @@ bool CHAResolver::resolve(const llvm::CallBase *Call,
 
   for (const auto &FallbackTy : FallbackTys) {
     const auto *Target =
-        getNonPureVirtualVFTEntry(FallbackTy, VtableIndex, Call);
+        getNonPureVirtualVFTEntry(FallbackTy, VtableIndex, Call, ReceiverTy);
     if (Target) {
       PossibleTargets.insert(Target);
     }
@@ -68,13 +67,11 @@ bool CHAResolver::resolve(const llvm::CallBase *Call,
   return !PossibleTargets.empty();
 }
 
-auto CHAResolver::resolveVirtualCall(const llvm::CallBase *CallSite)
-    -> FunctionSetTy {
+void CHAResolver::resolveVirtualCall(FunctionSetTy &PossibleTargets,
+                                     const llvm::CallBase *CallSite) {
   PHASAR_LOG_LEVEL(DEBUG, "Call virtual function: ");
 
-  FunctionSetTy PossibleCallees;
-  resolve(CallSite, PossibleCallees);
-  return PossibleCallees;
+  resolve(CallSite, PossibleTargets);
 }
 
 std::string CHAResolver::str() const { return "CHA"; }

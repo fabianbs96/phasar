@@ -26,7 +26,6 @@ class DICompositeType;
 } // namespace llvm
 
 namespace psr {
-class DIBasedTypeHierarchy;
 
 /// \brief A resolver that performs Rapid Type Analysis to resolve calls
 /// to C++ virtual functions. Requires debug information.
@@ -38,7 +37,8 @@ public:
 
   bool resolve(const llvm::CallBase *Call, FunctionSetTy &PossibleTargets);
 
-  FunctionSetTy resolveVirtualCall(const llvm::CallBase *CallSite) override;
+  void resolveVirtualCall(FunctionSetTy &PossibleTargets,
+                          const llvm::CallBase *CallSite) override;
 
   [[nodiscard]] std::string str() const override;
 
