@@ -11,7 +11,7 @@
 #define PHASAR_PHASARLLVM_CONTROLFLOW_RESOLVER_SOUNDYFALLBACKRESOLVER_H
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
-#include "phasar/Utils/NonNullPtr.h"
+#include "phasar/PhasarLLVM/Utils/AddressTakenFunctions.h"
 
 #include <cassert>
 
@@ -24,7 +24,9 @@ struct SoundyFallbackResolver {
   using n_t = const llvm::CallBase *;
   using f_t = const llvm::Function *;
 
-  NonNullPtr<const LLVMProjectIRDB> IRDB;
+  SoundyFallbackResolver(const LLVMProjectIRDB &IRDB);
+
+  AddressTakenFunctions ATF{};
 
   bool resolve(const llvm::CallBase *Call,
                LLVMResolverTraits::FunctionSetTy &PossibleTargets);

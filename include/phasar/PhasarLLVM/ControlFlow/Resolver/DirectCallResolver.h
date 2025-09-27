@@ -26,14 +26,19 @@ struct DirectCallResolver {
 
   bool resolve(const llvm::CallBase *Call,
                LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
-    const auto *CalledOp =
-        Call->getCalledOperand()->stripPointerCastsAndAliases();
-    if (const auto *Target = llvm::dyn_cast<llvm::Function>(CalledOp)) {
+    if (const auto *Target = getStaticCallTargetOrNull(Call)) {
       PossibleTargets.insert(Target);
       return true;
     }
 
     return false;
+  }
+
+  [[nodiscard]] static const llvm::Function *
+  getStaticCallTargetOrNull(const llvm::CallBase *Call) {
+    const auto *CalledOp =
+        Call->getCalledOperand()->stripPointerCastsAndAliases();
+    return llvm::dyn_cast<llvm::Function>(CalledOp);
   }
 };
 } // namespace psr

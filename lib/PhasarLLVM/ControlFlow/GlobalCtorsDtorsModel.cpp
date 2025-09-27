@@ -18,6 +18,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 
 #include <functional>
 
@@ -216,14 +217,14 @@ static std::pair<llvm::Function *, bool> buildCRuntimeGlobalDtorsModel(
     llvm::Module &M,
     const std::multimap<size_t, llvm::Function *, std::greater<>>
         &GlobalDtors) {
-  if (GlobalDtors.size() == 1) {
-    return {GlobalDtors.begin()->second, false};
-  }
 
+  // Make the global dtor caller accept an i32 exit code, such that we can swap
+  // calls to std::exit with it!
   auto &CTX = M.getContext();
   auto *Cleanup = llvm::cast<llvm::Function>(
       M.getOrInsertFunction(GlobalCtorsDtorsModel::DtorModelName,
-                            llvm::Type::getVoidTy(CTX))
+                            llvm::Type::getVoidTy(CTX),
+                            llvm::Type::getInt32Ty(CTX))
           .getCallee());
 
   auto *EntryBB = llvm::BasicBlock::Create(CTX, "entry", Cleanup);
@@ -253,6 +254,7 @@ llvm::Function *GlobalCtorsDtorsModel::buildModel(
     IRDB.insertFunction(RegisteredDtorCaller);
   }
 
+  // Note: RegisteredDtorCaller is now part of the GlobalDtors map!
   auto [GlobalCleanupFn, Inserted] =
       buildCRuntimeGlobalDtorsModel(M, GlobalDtors);
   if (Inserted) {
@@ -287,40 +289,48 @@ llvm::Function *GlobalCtorsDtorsModel::buildModel(
 
   assert(!UserEntryPoints.empty());
 
-  auto CallUEntry =
-      [&, GlobalCleanupFn{GlobalCleanupFn}](llvm::Function *UEntry) { // NOLINT
-        switch (UEntry->arg_size()) {
-        case 0:
-          IRB.CreateCall(UEntry);
-          break;
-        case 2:
-          if (UEntry->getName() != "main") {
-            PHASAR_LOG_LEVEL(
-                WARNING,
-                "WARNING: The only entrypoint, where parameters are "
-                "supported, is 'main'.\nAutomated global support for library "
-                "analysis (entry-points=__ALL__) is not yet supported.");
+  auto CallUEntry = [&,
+                     GlobalCleanupFn{GlobalCleanupFn}](llvm::Function *UEntry) {
+    llvm::CallInst *MainCall{};
+    switch (UEntry->arg_size()) {
+    case 0:
+      MainCall = IRB.CreateCall(UEntry);
+      break;
+    case 2:
+      if (UEntry->getName() != "main") {
+        PHASAR_LOG_LEVEL(
+            WARNING,
+            "WARNING: The only entrypoint, where parameters are "
+            "supported, is 'main'.\nAutomated global support for library "
+            "analysis (entry-points=__ALL__) is not yet supported.");
 
-            break;
-          }
+        break;
+      }
 
+      MainCall =
           IRB.CreateCall(UEntry, {GlobModel->getArg(0), GlobModel->getArg(1)});
-          break;
-        default:
-          PHASAR_LOG_LEVEL(
-              WARNING,
-              "WARNING: Entrypoints with parameters are not supported, "
-              "except for argc and argv in main.\nAutomated global support for "
-              "library analysis (entry-points=__ALL__) is not yet supported.");
+      break;
+    default:
+      PHASAR_LOG_LEVEL(
+          WARNING,
+          "WARNING: Entrypoints with parameters are not supported, "
+          "except for argc and argv in main.\nAutomated global support for "
+          "library analysis (entry-points=__ALL__) is not yet supported.");
 
-          break;
-        }
+      break;
+    }
 
-        if (UEntry->getName() == "main") {
-          ///  After the main function, we must call all global destructors...
-          IRB.CreateCall(GlobalCleanupFn);
-        }
-      };
+    if (UEntry->getName() == "main") {
+      ///  After the main function, we must call all global destructors...
+
+      llvm::Value *ExitCode = MainCall;
+      if (!MainCall || !MainCall->getType()->isIntegerTy(32)) {
+        ExitCode = llvm::ConstantInt::get(llvm::Type::getInt32Ty(CTX), 0);
+      }
+
+      IRB.CreateCall(GlobalCleanupFn, {ExitCode});
+    }
+  };
 
   if (UserEntryPoints.size() == 1) {
     auto *MainFn = *UserEntryPoints.begin();
@@ -380,9 +390,8 @@ bool GlobalCtorsDtorsModel::isPhasarGenerated(
   if (F.hasName()) {
     llvm::StringRef FunctionName = F.getName();
     return llvm::StringSwitch<bool>(FunctionName)
-        .Cases(ModelName, DtorModelName, DtorsCallerName, UserEntrySelectorName,
-               true)
-        .Default(false);
+        .Cases(ModelName, DtorModelName, UserEntrySelectorName, true)
+        .Default(FunctionName.startswith(DtorsCallerName));
   }
 
   return false;

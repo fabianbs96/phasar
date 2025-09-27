@@ -32,11 +32,6 @@ void AnalysisController::emitRequestedHelperAnalysisResults() {
   auto EmitterOptions = this->EmitterOptions;
   auto &HA = *this->HA;
 
-  if (EmitterOptions & AnalysisControllerEmitterOptions::EmitIR) {
-    WithResultFileOrStdout("/psr-preprocess-ir.ll", [&HA](auto &OS) {
-      HA.getProjectIRDB().emitPreprocessedIR(OS);
-    });
-  }
   if (EmitterOptions & AnalysisControllerEmitterOptions::EmitTHAsText) {
     WithResultFileOrStdout(
         "/psr-th.txt", [&HA](auto &OS) { HA.getTypeHierarchy().print(OS); });
@@ -72,6 +67,14 @@ void AnalysisController::emitRequestedHelperAnalysisResults() {
   if (EmitterOptions & AnalysisControllerEmitterOptions::EmitCGAsJson) {
     WithResultFileOrStdout("/psr-cg.json",
                            [&HA](auto &OS) { HA.getICFG().printAsJson(OS); });
+  }
+
+  if (EmitterOptions & AnalysisControllerEmitterOptions::EmitIR) {
+    // Emit the IR *after* potentially contructing the CG, to make the injected
+    // global-ctors/dtors model part of the IR dump!
+    WithResultFileOrStdout("/psr-preprocess-ir.ll", [&HA](auto &OS) {
+      HA.getProjectIRDB().emitPreprocessedIR(OS);
+    });
   }
 
   if (EmitterOptions &

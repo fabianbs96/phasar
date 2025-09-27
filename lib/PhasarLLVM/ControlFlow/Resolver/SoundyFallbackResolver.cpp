@@ -8,6 +8,9 @@
 
 using namespace psr;
 
+SoundyFallbackResolver::SoundyFallbackResolver(const LLVMProjectIRDB &IRDB)
+    : ATF(IRDB) {}
+
 bool SoundyFallbackResolver::resolve(
     const llvm::CallBase *Call,
     LLVMResolverTraits::FunctionSetTy &PossibleTargets) {
@@ -18,8 +21,8 @@ bool SoundyFallbackResolver::resolve(
   // matches the call-site's signature as a callee target
   PHASAR_LOG_LEVEL(DEBUG, "Call function pointer: " << llvmIRToString(Call));
 
-  for (const auto *F : IRDB->getAllFunctions()) {
-    if (F->hasAddressTaken() && isConsistentCall(Call, F)) {
+  for (const auto *F : ATF) {
+    if (isConsistentCall(Call, F)) {
       PossibleTargets.insert(F);
     }
   }

@@ -29,8 +29,6 @@ public:
   OTFResolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
               NonNullPtr<const LLVMVFTableProvider> VTP, LLVMAliasInfoRef PT);
 
-  ~OTFResolver() override = default;
-
   void handlePossibleTargets(const llvm::CallBase *CallSite,
                              FunctionSetTy &CalleeTargets) override;
 

@@ -14,6 +14,8 @@
 #include "phasar/Utils/CRTPUtils.h"
 #include "phasar/Utils/TypeTraits.h"
 
+#include "llvm/ADT/STLExtras.h"
+
 namespace psr {
 template <typename T> struct CGTraits {
   // using n_t
@@ -49,6 +51,15 @@ public:
     static_assert(
         is_iterable_over_v<decltype(self().getCallersOfImpl(Fun)), n_t>);
     return self().getCallersOfImpl(Fun);
+  }
+
+  /// Implements the new IResolver interface to allow any CallGraph be used in
+  /// place of a Resolver
+  template <typename ContainerT>
+  bool resolve(ByConstRef<n_t> Call, ContainerT &PossibleTargets) const {
+    auto &&Callees = getCalleesOfCallAt(Call);
+    PossibleTargets.insert(llvm::adl_begin(Callees), llvm::adl_end(Callees));
+    return !PossibleTargets.empty();
   }
 };
 } // namespace psr

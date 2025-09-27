@@ -70,8 +70,10 @@ protected:
     llvm::DominatorTree Dom(*F);
 
     for (auto [First, Second] : FixedOrdering) {
-      EXPECT_TRUE(CSByCalleeName.count(First));
-      EXPECT_TRUE(CSByCalleeName.count(Second));
+      EXPECT_TRUE(CSByCalleeName.count(First))
+          << "First in ordering not found: " << First.str();
+      EXPECT_TRUE(CSByCalleeName.count(Second))
+          << "Second in ordering not found: " << Second.str();
 
       if (CSByCalleeName.count(First) && CSByCalleeName.count(Second)) {
         EXPECT_TRUE(
@@ -142,11 +144,9 @@ TEST_F(LLVMBasedICFGGlobCtorDtorTest, DtorTest1) {
 
   // GlobalCtor->print(llvm::outs());
 
-  ensureFunctionOrdering(
-      GlobalCtor, ICFG,
-      {{"_GLOBAL__sub_I_globals_dtor_1.cpp", "main"},
-       {"main", GlobalCtorsDtorsModel::DtorsCallerName.str() +
-                    ".globals_dtor_1_cpp.ll"}});
+  ensureFunctionOrdering(GlobalCtor, ICFG,
+                         {{"_GLOBAL__sub_I_globals_dtor_1.cpp", "main"},
+                          {"main", GlobalCtorsDtorsModel::DtorModelName}});
 
   auto *GlobalDtor = IRDB.getFunction(
       GlobalCtorsDtorsModel::DtorsCallerName.str() + ".globals_dtor_1_cpp.ll");

@@ -47,9 +47,7 @@ public:
             std::enable_if_t<IResolverNF<ConcreteResolverT, n_t, f_t>, int> = 0>
   constexpr GenericResolverRef(
       std::reference_wrapper<ConcreteResolverT> Res) noexcept
-      : Data(&Res.get()), VT(&VTableFor<ConcreteResolverT>) {
-    assert(Res != nullptr);
-  }
+      : Data(&Res.get()), VT(&VTableFor<ConcreteResolverT>) {}
 
   /// Prevent implicit casting from references to emphasize that this class
   /// models a non-owning reference.

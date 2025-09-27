@@ -24,6 +24,7 @@
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/RTAResolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/DIBasedTypeHierarchy.h"
+#include "phasar/PhasarLLVM/Utils/AddressTakenFunctions.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
@@ -35,7 +36,6 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -172,60 +172,6 @@ bool psr::isVirtualCall(const llvm::Instruction *Inst,
   return getVFTIndex(CallSite) >= 0;
 }
 
-// Derived from LLVM's llvm::Function::hasAddressTaken()
-static bool isAddressTakenImpl(const llvm::Value *F) {
-  if (!F) {
-    return false;
-  }
-
-  for (const auto &Use : F->uses()) {
-    const auto *User = Use.getUser();
-
-    if (llvm::isa<llvm::GlobalAlias>(User)) {
-      if (isAddressTakenImpl(User)) {
-        return true;
-      }
-
-      continue;
-    }
-
-    if (const auto *Glob = llvm::dyn_cast<llvm::GlobalVariable>(User)) {
-      if (Glob->getName() == "llvm.compiler.used" ||
-          Glob->getName() == "llvm.used") {
-        continue;
-      }
-
-      return true;
-    }
-
-    const auto *Call = llvm::dyn_cast<llvm::CallBase>(User);
-    if (!Call) {
-      return true;
-    }
-
-    if (Call->isDebugOrPseudoInst()) {
-      continue;
-    }
-
-    const auto *Intrinsic = llvm::dyn_cast<llvm::IntrinsicInst>(Call);
-    if (Intrinsic && Intrinsic->isAssumeLikeIntrinsic()) {
-      continue;
-    }
-
-    if (Call->isCallee(&Use)) {
-      continue;
-    }
-
-    return true;
-  }
-
-  return false;
-}
-
-bool psr::isAddressTakenFunction(const llvm::Function *F) {
-  return isAddressTakenImpl(F);
-}
-
 Resolver::Resolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
                    NonNullPtr<const LLVMVFTableProvider> VTP)
     : IRDB(IRDB), VTP(VTP) {}
@@ -249,19 +195,12 @@ auto Resolver::resolveIndirectCall(const llvm::CallBase *CallSite)
   return PossibleTargets;
 }
 
-llvm::ArrayRef<const llvm::Function *> Resolver::getAddressTakenFunctions() {
-  if (!AddressTakenFunctions) {
-    auto &ATF = AddressTakenFunctions.emplace();
-    // XXX: Find better heuristic
-    ATF.reserve(IRDB->getNumFunctions() / 2);
-    for (const auto *F : IRDB->getAllFunctions()) {
-      if (isAddressTakenFunction(F)) {
-        ATF.push_back(F);
-      }
-    }
+const AddressTakenFunctions &Resolver::getAddressTakenFunctions() {
+  if (ATF.isNone()) {
+    ATF = AddressTakenFunctions(*IRDB);
   }
 
-  return *AddressTakenFunctions;
+  return ATF;
 }
 
 void Resolver::resolveFunctionPointer(FunctionSetTy &PossibleTargets,

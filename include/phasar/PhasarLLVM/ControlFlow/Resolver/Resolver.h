@@ -19,21 +19,13 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/ResolverUtils.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/PhasarLLVM/Utils/AddressTakenFunctions.h"
 #include "phasar/Utils/NonNullPtr.h"
-
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/DerivedTypes.h"
 
 #include <memory>
 #include <string>
 
 namespace psr {
-
-/// A variant of F->hasAddressTaken() that is better suited for our use cases.
-///
-/// Especially, it filteres out global aliases.
-[[nodiscard]] bool isAddressTakenFunction(const llvm::Function *F);
 
 /// \brief A base class for call-target resolvers. Used to build call graphs.
 ///
@@ -53,6 +45,12 @@ public:
            NonNullPtr<const LLVMVFTableProvider> VTP);
 
   virtual ~Resolver() = default;
+
+  Resolver(Resolver &&) = default;
+  Resolver &operator=(Resolver &&) = default;
+
+  Resolver(const Resolver &) = delete;
+  Resolver &operator=(const Resolver &) = delete;
 
   [[deprecated("With the removal of DTAResolver, this is not used "
                "anymore")]] virtual void
@@ -83,8 +81,7 @@ public:
     return true;
   }
 
-  [[nodiscard]] llvm::ArrayRef<const llvm::Function *>
-  getAddressTakenFunctions();
+  [[nodiscard]] const AddressTakenFunctions &getAddressTakenFunctions();
 
   [[deprecated("Use psr::createDefaultResolverPipeline() "
                "instead")]] [[nodiscard]] static std::unique_ptr<Resolver>
@@ -108,8 +105,7 @@ protected:
 
   NonNullPtr<const LLVMProjectIRDB> IRDB;
   NonNullPtr<const LLVMVFTableProvider> VTP;
-  std::optional<llvm::SmallVector<const llvm::Function *, 0>>
-      AddressTakenFunctions{};
+  AddressTakenFunctions ATF{};
 };
 } // namespace psr
 
