@@ -10,11 +10,8 @@
 #ifndef PHASAR_PHASARLLVM_UTILS_ADDRESSTAKENFUNCTIONS_H
 #define PHASAR_PHASARLLVM_UTILS_ADDRESSTAKENFUNCTIONS_H
 
-#include "phasar/Utils/Fn.h"
-
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/TrailingObjects.h"
-
-#include <memory>
 
 namespace llvm {
 class Function;
@@ -55,14 +52,32 @@ public:
 
 private:
   struct DataT final : llvm::TrailingObjects<DataT, const llvm::Function *> {
-    DataT(size_t NumATF) : NumAddressTakenFunctions(NumATF) {}
+    DataT(uint32_t NumATF) : NumAddressTakenFunctions(NumATF) {}
 
-    size_t NumAddressTakenFunctions{};
+    DataT(const DataT &) = delete;
+    DataT &operator=(const DataT &) = delete;
+    ~DataT() = default;
+
+    void destroyData() const noexcept;
+
+    // Implementing the llvm::RefCountedBase interface:
+
+    void Retain() const { // NOLINT
+      ++RefCount;
+    }
+    void Release() const { // NOLINT
+      assert(RefCount > 0 && "Reference count is already zero.");
+      if (--RefCount == 0) {
+        destroyData();
+      }
+    }
+
+    // ---
+    mutable uint32_t RefCount{};
+    uint32_t NumAddressTakenFunctions{};
   };
 
-  static void destroyData(const DataT *Data) noexcept;
-
-  std::unique_ptr<const DataT, fn_t<destroyData>> Data{};
+  llvm::IntrusiveRefCntPtr<const DataT> Data{};
 };
 } // namespace psr
 

@@ -77,18 +77,18 @@ AddressTakenFunctions::AddressTakenFunctions(const LLVMProjectIRDB &IRDB) {
   }
 
   auto NumATF = ATF.size();
+  assert(NumATF <= UINT32_MAX);
   auto NumBytes = DataT::totalSizeToAlloc<value_type>(NumATF);
   auto *RawBytes = ::operator new(NumBytes, std::align_val_t{alignof(DataT)});
 
   auto *DataObj = new (RawBytes) DataT(NumATF);
-  Data.reset(DataObj);
+  Data = DataObj;
 
   memcpy(DataObj->getTrailingObjects<value_type>(), ATF.data(),
          NumATF * sizeof(value_type));
 }
 
-void AddressTakenFunctions::destroyData(const DataT *Data) noexcept {
-  if (Data) {
-    ::operator delete((void *)Data, std::align_val_t{alignof(DataT)});
-  }
+void AddressTakenFunctions::DataT::destroyData() const noexcept {
+  // All contained data is POD, so no further destructing needed
+  ::operator delete((void *)this, std::align_val_t{alignof(DataT)});
 }

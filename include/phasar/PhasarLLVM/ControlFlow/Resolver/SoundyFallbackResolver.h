@@ -26,6 +26,11 @@ struct SoundyFallbackResolver {
 
   SoundyFallbackResolver(const LLVMProjectIRDB &IRDB);
 
+  SoundyFallbackResolver(AddressTakenFunctions ATF) noexcept
+      : ATF(std::move(ATF)) {
+    assert(!ATF.isNone());
+  }
+
   AddressTakenFunctions ATF{};
 
   bool resolve(const llvm::CallBase *Call,
