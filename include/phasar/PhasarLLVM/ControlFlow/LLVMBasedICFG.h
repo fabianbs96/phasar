@@ -49,6 +49,9 @@ class LLVMBasedICFG : public LLVMBasedCFG, public ICFGBase<LLVMBasedICFG> {
   friend ICFGBase;
 
 public:
+  using typename ICFGBase::f_t;
+  using typename ICFGBase::n_t;
+
   // For backward compatibility
   static constexpr llvm::StringLiteral GlobalCRuntimeModelName =
       GlobalCtorsDtorsModel::ModelName;
