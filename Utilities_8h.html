@@ -29,7 +29,7 @@ MathJax.Hub.Config({
  <tr id="projectrow">
   <td id="projectlogo"><img alt="Logo" src="Phasar_Logo.png"/></td>
   <td id="projectalign">
-   <div id="projectname">PhASAR<span id="projectnumber">&#160;2503@development</span>
+   <div id="projectname">PhASAR<span id="projectnumber">&#160;2510@development</span>
    </div>
    <div id="projectbrief">A LLVM-based Static Analysis Framework</div>
   </td>
@@ -163,9 +163,9 @@ Functions</h2></td></tr>
 <tr class="memitem:acadcb979da59ae8725c522bd4a5e5d07" id="r_acadcb979da59ae8725c522bd4a5e5d07"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">typename</a> T , <a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">typename</a>  = std::enable_if_t&lt;is_llvm_printable_v&lt;T&gt;&gt;&gt; </td></tr>
 <tr class="memitem:acadcb979da59ae8725c522bd4a5e5d07"><td class="memTemplItemLeft" align="right" valign="top">llvm::raw_ostream &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacepsr.html#acadcb979da59ae8725c522bd4a5e5d07">psr::operator&lt;&lt;</a> (llvm::raw_ostream &amp;OS, <a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">const</a> std::optional&lt; T &gt; &amp;<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">Opt</a>)</td></tr>
 <tr class="separator:acadcb979da59ae8725c522bd4a5e5d07"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab92f6183ac44941cf08b0e602540c474" id="r_ab92f6183ac44941cf08b0e602540c474"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">typename</a> T &gt; </td></tr>
-<tr class="memitem:ab92f6183ac44941cf08b0e602540c474"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">LLVM_ATTRIBUTE_ALWAYS_INLINE</a> T &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacepsr.html#ab92f6183ac44941cf08b0e602540c474">psr::assertNotNull</a> (T &amp;Value)</td></tr>
-<tr class="separator:ab92f6183ac44941cf08b0e602540c474"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3480666db5fbbc337d978074737c3e1c" id="r_a3480666db5fbbc337d978074737c3e1c"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">typename</a> T &gt; </td></tr>
+<tr class="memitem:a3480666db5fbbc337d978074737c3e1c"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">LLVM_ATTRIBUTE_ALWAYS_INLINE</a> std::enable_if_t&lt;!std::is_pointer_v&lt; T &gt;, T &amp; &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacepsr.html#a3480666db5fbbc337d978074737c3e1c">psr::assertNotNull</a> (T &amp;Value)</td></tr>
+<tr class="separator:a3480666db5fbbc337d978074737c3e1c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9a07d4208b76fa4e5ed4bc02302f9d49" id="r_a9a07d4208b76fa4e5ed4bc02302f9d49"><td class="memTemplParams" colspan="2">template&lt;<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">typename</a> T &gt; </td></tr>
 <tr class="memitem:a9a07d4208b76fa4e5ed4bc02302f9d49"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">LLVM_ATTRIBUTE_ALWAYS_INLINE</a> <a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">const</a> T &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespacepsr.html#a9a07d4208b76fa4e5ed4bc02302f9d49">psr::assertNotNull</a> (<a class="el" href="namespacepsr.html#ab1fa2b63d3a5ab4934961480f678afea">const</a> std::optional&lt; T &gt; &amp;Value)</td></tr>
 <tr class="separator:a9a07d4208b76fa4e5ed4bc02302f9d49"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -182,7 +182,7 @@ Functions</h2></td></tr>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Oct 15 2025 17:39:42 for PhASAR by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
+Generated on Fri Oct 24 2025 16:56:46 for PhASAR by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8
 </small></address>
 </body>
 </html>
