@@ -27,9 +27,10 @@ if (NOT PHASAR_IN_TREE)
   project (phasar
     LANGUAGES C CXX
     DESCRIPTION "A LLVM-based static analysis framework."
+    VERSION 2510
   )
 endif ()
-set(PHASAR_VERSION 2503)
+set(PHASAR_VERSION ${PROJECT_VERSION})
 
 # NOTE: When we require cmake >= 3.21, we can use PROJECT_IS_TOP_LEVEL instead
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -77,6 +78,8 @@ string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -fno-omit-frame-pointer")
 string(APPEND CMAKE_CXX_FLAGS_RELEASE "")
 
 option(CMAKE_VISIBILITY_INLINES_HIDDEN "Hide inlined functions from the DSO table (default ON)" ON)
+
+option(PHASAR_BUILD_MODULES "Build C++20 modules for phasar" OFF)
 
 include(CheckCXXCompilerFlag)
 
@@ -282,7 +285,7 @@ if (NOT PHASAR_IN_TREE)
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG v1.16.0
+        GIT_TAG v1.17.0
     )
     FetchContent_MakeAvailable(googletest)
   endif()

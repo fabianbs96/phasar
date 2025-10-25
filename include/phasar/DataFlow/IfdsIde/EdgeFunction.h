@@ -442,19 +442,30 @@ public:
             typename = std::enable_if_t<
                 !std::is_same_v<EdgeFunction, std::decay_t<ConcreteEF>> &&
                 IsEdgeFunction<ConcreteEF>>>
-  [[nodiscard]] friend bool operator==(EdgeFunctionRef<ConcreteEF> LHS,
-                                       const EdgeFunction &RHS) noexcept {
-    if (!RHS.template isa<ConcreteEF>()) {
+  [[nodiscard]] bool equals(EdgeFunctionRef<ConcreteEF> Other) const noexcept {
+    // NOTE: Workaround issue in g++ that does not allow transitive friends: If
+    // putting this code in the operator== below, we cannot access
+    // Other.Instance, although it is friended...
+    if (!isa<ConcreteEF>()) {
       return false;
     }
-    if (LHS.Instance == RHS.EF) {
+    if (Other.Instance == EF) {
       return true;
     }
     if constexpr (IsEqualityComparable<ConcreteEF>) {
-      return *LHS == *getPtr<ConcreteEF>(RHS.EF);
+      return *Other == *getPtr<ConcreteEF>(EF);
     } else {
       return true;
     }
+  }
+
+  template <typename ConcreteEF,
+            typename = std::enable_if_t<
+                !std::is_same_v<EdgeFunction, std::decay_t<ConcreteEF>> &&
+                IsEdgeFunction<ConcreteEF>>>
+  [[nodiscard]] friend bool operator==(EdgeFunctionRef<ConcreteEF> LHS,
+                                       const EdgeFunction &RHS) noexcept {
+    return RHS.equals(LHS);
   }
 
   template <typename ConcreteEF,
@@ -827,8 +838,7 @@ template <typename L> struct DenseMapInfo<psr::EdgeFunction<L>> {
 
 // LLVM is currently overhauling its casting system. Use the new variant once
 // possible!
-// Note: The new variant (With CastInfo) is not tested yet!
-#if LLVM_MAJOR < 15
+#if LLVM_VERSION_MAJOR < 15
 
 template <typename To, typename L>
 struct isa_impl_cl<To, const psr::EdgeFunction<L>> {
@@ -876,7 +886,7 @@ cast_or_null(const psr::EdgeFunction<L> &EF) noexcept { // NOLINT
 template <typename To, typename L>
 struct CastIsPossible<To, psr::EdgeFunction<L>> {
   static inline bool isPossible(const psr::EdgeFunction<L> &EF) noexcept {
-    return EF->template isa<To>();
+    return EF.template isa<To>();
   }
 };
 

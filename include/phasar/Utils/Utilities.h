@@ -251,7 +251,8 @@ auto remove_by_index(Container &Cont, const Indices &Idx) {
 
 /// See <https://en.cppreference.com/w/cpp/utility/forward_like>
 template <class T, class U>
-[[nodiscard]] constexpr auto &&forward_like(U &&X) noexcept { // NOLINT
+[[nodiscard]] LLVM_ATTRIBUTE_ALWAYS_INLINE constexpr auto &&
+forward_like(U &&X) noexcept { // NOLINT
   // NOLINTNEXTLINE
   constexpr bool is_adding_const = std::is_const_v<std::remove_reference_t<T>>;
   if constexpr (std::is_lvalue_reference_v<T &&>) {
@@ -287,7 +288,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
   return OS;
 }
 
-template <typename T> LLVM_ATTRIBUTE_ALWAYS_INLINE T &assertNotNull(T &Value) {
+template <typename T>
+LLVM_ATTRIBUTE_ALWAYS_INLINE std::enable_if_t<!std::is_pointer_v<T>, T &>
+assertNotNull(T &Value) {
   return Value;
 }
 
