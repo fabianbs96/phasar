@@ -12,10 +12,14 @@ using psr::FunctionAliasView;
 using psr::isInterestingPointer;
 using psr::LLVMAliasInfo;
 using psr::LLVMAliasInfoRef;
+using psr::LLVMAliasIteratorRef;
 using psr::LLVMAliasSet;
 using psr::LLVMAliasSetData;
+using psr::LLVMPointsToIterator;
+using psr::LLVMPointsToIteratorRef;
 
 #ifdef PHASAR_USE_SVF
+using psr::createLLVMSVFPointsToIterator;
 using psr::createSVFDDAPointsToInfo;
 using psr::createSVFVFSPointsToInfo;
 using psr::SVFBasedPointsToInfo;
