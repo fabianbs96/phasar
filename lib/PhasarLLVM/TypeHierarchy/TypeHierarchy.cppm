@@ -7,7 +7,6 @@ export module phasar.llvm.typehierarchy;
 export namespace psr {
 using psr::DIBasedTypeHierarchy;
 using psr::DIBasedTypeHierarchyData;
-using psr::LLVMTypeHierarchyData;
 using psr::LLVMVFTable;
 using psr::LLVMVFTableData;
 } // namespace psr

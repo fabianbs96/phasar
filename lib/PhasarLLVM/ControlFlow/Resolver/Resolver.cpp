@@ -176,12 +176,8 @@ Resolver::Resolver(NonNullPtr<const LLVMProjectIRDB> IRDB,
                    NonNullPtr<const LLVMVFTableProvider> VTP)
     : IRDB(IRDB), VTP(VTP) {}
 
-void Resolver::preCall(const llvm::Instruction *Inst) {}
-
 void Resolver::handlePossibleTargets(const llvm::CallBase *CallSite,
                                      FunctionSetTy &PossibleTargets) {}
-
-void Resolver::postCall(const llvm::Instruction *Inst) {}
 
 auto Resolver::resolveIndirectCall(const llvm::CallBase *CallSite)
     -> FunctionSetTy {
@@ -217,8 +213,6 @@ void Resolver::resolveFunctionPointer(FunctionSetTy &PossibleTargets,
     }
   }
 }
-
-void Resolver::otherInst(const llvm::Instruction *Inst) {}
 
 std::unique_ptr<Resolver> Resolver::create(CallGraphAnalysisType Ty,
                                            const LLVMProjectIRDB *IRDB,
