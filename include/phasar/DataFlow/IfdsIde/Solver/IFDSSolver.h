@@ -50,7 +50,8 @@ public:
                 std::is_base_of_v<IfdsDomainTy, AnalysisDomainTy>>>
   IFDSSolver(IFDSTabulationProblem<IfdsDomainTy, Container> &IFDSProblem,
              const I *ICF)
-      : IDESolver<WithBinaryValueDomain<AnalysisDomainTy>>(IFDSProblem, ICF) {}
+      : IDESolver<WithBinaryValueDomain<AnalysisDomainTy>, Container>(
+            IFDSProblem, ICF) {}
   template <typename IfdsDomainTy, typename I,
             typename = std::enable_if_t<
                 std::is_base_of_v<IfdsDomainTy, AnalysisDomainTy>>>
