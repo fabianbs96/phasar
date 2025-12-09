@@ -15,6 +15,8 @@
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 
+#include "boost/container/flat_set.hpp"
+
 #include <map>
 #include <set>
 #include <string>
@@ -37,8 +39,9 @@ class LLVMTaintConfig;
  * @see TaintConfiguration on how to specify your own
  * taint-sensitive source and sink functions.
  */
-class IFDSTaintAnalysis
-    : public IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault> {
+class IFDSTaintAnalysis : public IFDSTabulationProblem<
+                              LLVMIFDSAnalysisDomainDefault,
+                              boost::container::flat_set<const llvm::Value *>> {
 
 public:
   // Setup the configuration type

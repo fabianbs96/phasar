@@ -327,7 +327,9 @@ auto IFDSTaintAnalysis::getCallFlowFunction(n_t CallSite, f_t DestFun)
   }
 
   // Map the actual into the formal parameters
-  return mapFactsToCallee(CS, DestFun);
+  return mapFactsToCallee<const llvm::Value *,
+                          boost::container::flat_set<const llvm::Value *>>(
+      CS, DestFun);
 }
 
 auto IFDSTaintAnalysis::getRetFlowFunction(n_t CallSite, f_t /*CalleeFun*/,
@@ -337,7 +339,8 @@ auto IFDSTaintAnalysis::getRetFlowFunction(n_t CallSite, f_t /*CalleeFun*/,
   // We must check if the return value and formal parameter are tainted, if so
   // we must taint all user's of the function call. We are only interested in
   // formal parameters of pointer/reference type.
-  return mapFactsToCaller(
+  return mapFactsToCaller<const llvm::Value *,
+                          boost::container::flat_set<const llvm::Value *>>(
       llvm::cast<llvm::CallBase>(CallSite), ExitStmt,
       [](d_t Formal, d_t Source) {
         return Formal == Source && Formal->getType()->isPointerTy();
@@ -360,9 +363,11 @@ auto IFDSTaintAnalysis::getCallToRetFlowFunction(n_t CallSite,
   bool HasDeclOnly = llvm::any_of(
       Callees, [](const auto *DestFun) { return DestFun->isDeclaration(); });
 
-  return mapFactsAlongsideCallSite(CS, [HasDeclOnly](d_t Arg) {
-    return HasDeclOnly || !Arg->getType()->isPointerTy();
-  });
+  return mapFactsAlongsideCallSite<
+      const llvm::Value *, boost::container::flat_set<const llvm::Value *>>(
+      CS, [HasDeclOnly](d_t Arg) {
+        return HasDeclOnly || !Arg->getType()->isPointerTy();
+      });
 }
 
 auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
@@ -411,7 +416,7 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
       const auto &DestFunFacts = Llvmfdff.getFactsForFunction(DestFun);
       return lambdaFlow([CallSite, DestFun,
                          &DestFunFacts](d_t Source) -> container_type {
-        std::set<d_t> Facts;
+        boost::container::flat_set<d_t> Facts;
         const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
         for (const auto &[Arg, DestParam] :
              llvm::zip(CS->args(), DestFun->args())) {
