@@ -14,8 +14,7 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFunctionDataFlowFacts.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
-
-#include "boost/container/flat_set.hpp"
+#include "phasar/Utils/SmallArraySet.h"
 
 #include <map>
 #include <set>
@@ -39,9 +38,9 @@ class LLVMTaintConfig;
  * @see TaintConfiguration on how to specify your own
  * taint-sensitive source and sink functions.
  */
-class IFDSTaintAnalysis : public IFDSTabulationProblem<
-                              LLVMIFDSAnalysisDomainDefault,
-                              boost::container::flat_set<const llvm::Value *>> {
+class IFDSTaintAnalysis
+    : public IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault,
+                                   SmallArraySet<const llvm::Value *>> {
 
 public:
   // Setup the configuration type

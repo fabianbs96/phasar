@@ -45,6 +45,8 @@ public:
     Arr.append(IList.begin(), IList.end());
   }
 
+  llvm::SmallVector<T, N> Arr;
+
   void reserve(size_t NumElems) { Arr.reserve(NumElems); }
 
   template <typename TT = T>
@@ -82,8 +84,9 @@ public:
     Arr.erase(std::unique(Arr.begin(), Arr.end()), Arr.end());
   }
 
-private:
-  llvm::SmallVector<T, N> Arr;
+  bool operator<(const SmallArraySet<T, N> &Other) const {
+    return Arr < Other.Arr;
+  }
 };
 
 } // namespace psr

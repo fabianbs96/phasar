@@ -7,6 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "phasar/Utils/SmallArraySet.h"
+
 #include "phasar.h"
 
 #include <filesystem>
@@ -33,13 +35,6 @@ int main(int Argc, const char **Argv) {
   }
 
   if (const auto *F = HA.getProjectIRDB().getFunctionDefinition("main")) {
-    // print type hierarchy
-    HA.getTypeHierarchy().print();
-    // print points-to information
-    HA.getAliasInfo().print();
-    // print inter-procedural control-flow graph
-    HA.getICFG().print();
-
     // IFDS template parametrization test
     llvm::outs() << "Testing IFDS:\n";
 
@@ -51,10 +46,9 @@ int main(int Argc, const char **Argv) {
     //                           SmallArraySet<const llvm::Value *>>(
     //     TaintProblem, &HA.getICFG());
     IFDSSolver S = IFDSSolver<LLVMIFDSAnalysisDomainDefault,
-                              boost::container::flat_set<const llvm::Value *>>(
+                              SmallArraySet<const llvm::Value *>>(
         TaintProblem, &HA.getICFG());
     auto IFDSResults = S.solve();
-    IFDSResults.dumpResults(HA.getICFG());
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }
