@@ -7,7 +7,9 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "phasar/Utils/ChronoUtils.h"
 #include "phasar/Utils/SmallArraySet.h"
+#include "phasar/Utils/Timer.h"
 
 #include "phasar.h"
 
@@ -48,6 +50,10 @@ int main(int Argc, const char **Argv) {
     IFDSSolver S = IFDSSolver<LLVMIFDSAnalysisDomainDefault,
                               SmallArraySet<const llvm::Value *>>(
         TaintProblem, &HA.getICFG());
+
+    Timer TimeSolve = Timer([](psr::hms ElapsedTime) {
+      llvm::errs() << "IFDSResults ElapsedTime: " << ElapsedTime << "\n";
+    });
     auto IFDSResults = S.solve();
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";

@@ -327,8 +327,7 @@ auto IFDSTaintAnalysis::getCallFlowFunction(n_t CallSite, f_t DestFun)
   }
 
   // Map the actual into the formal parameters
-  return mapFactsToCallee<const llvm::Value *,
-                          SmallArraySet<const llvm::Value *>>(CS, DestFun);
+  return mapFactsToCallee<d_t, SmallArraySet<d_t>>(CS, DestFun);
 }
 
 auto IFDSTaintAnalysis::getRetFlowFunction(n_t CallSite, f_t /*CalleeFun*/,
@@ -338,8 +337,7 @@ auto IFDSTaintAnalysis::getRetFlowFunction(n_t CallSite, f_t /*CalleeFun*/,
   // We must check if the return value and formal parameter are tainted, if so
   // we must taint all user's of the function call. We are only interested in
   // formal parameters of pointer/reference type.
-  return mapFactsToCaller<const llvm::Value *,
-                          SmallArraySet<const llvm::Value *>>(
+  return mapFactsToCaller<d_t, SmallArraySet<d_t>>(
       llvm::cast<llvm::CallBase>(CallSite), ExitStmt,
       [](d_t Formal, d_t Source) {
         return Formal == Source && Formal->getType()->isPointerTy();
@@ -362,8 +360,7 @@ auto IFDSTaintAnalysis::getCallToRetFlowFunction(n_t CallSite,
   bool HasDeclOnly = llvm::any_of(
       Callees, [](const auto *DestFun) { return DestFun->isDeclaration(); });
 
-  return mapFactsAlongsideCallSite<const llvm::Value *,
-                                   SmallArraySet<const llvm::Value *>>(
+  return mapFactsAlongsideCallSite<const llvm::Value *, SmallArraySet<d_t>>(
       CS, [HasDeclOnly](d_t Arg) {
         return HasDeclOnly || !Arg->getType()->isPointerTy();
       });

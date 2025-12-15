@@ -45,8 +45,6 @@ public:
     Arr.append(IList.begin(), IList.end());
   }
 
-  llvm::SmallVector<T, N> Arr;
-
   void reserve(size_t NumElems) { Arr.reserve(NumElems); }
 
   template <typename TT = T>
@@ -54,9 +52,17 @@ public:
     Arr.emplace_back(PSR_FWD(Elem));
   }
 
+  template <typename TT = T>
+  std::enable_if_t<std::is_constructible_v<T, TT>, iterator>
+  insert(iterator /*Iter*/, TT &&Elem) {
+    Arr.emplace_back(PSR_FWD(Elem));
+    return begin() + size() - 1;
+  }
+
   template <typename IterT>
   auto insert(IterT From, IterT To)
-      -> decltype(this->Arr.append(std::move(From), std::move(To))) {
+      -> decltype(std::declval<llvm::SmallVector<T, N> &>().append(
+          std::move(From), std::move(To))) {
     Arr.append(std::move(From), std::move(To));
   }
 
@@ -87,6 +93,9 @@ public:
   bool operator<(const SmallArraySet<T, N> &Other) const {
     return Arr < Other.Arr;
   }
+
+private:
+  llvm::SmallVector<T, N> Arr;
 };
 
 } // namespace psr
