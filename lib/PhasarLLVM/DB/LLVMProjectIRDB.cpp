@@ -16,6 +16,7 @@
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/WithColor.h"
 
 #include <charconv>
 #include <memory>
@@ -23,6 +24,7 @@
 
 namespace psr {
 
+[[deprecated]]
 static void setOpaquePointersForCtx(llvm::LLVMContext &Ctx, bool Enable) {
 #if LLVM_VERSION_MAJOR >= 15 && LLVM_VERSION_MAJOR < 17
   if (!Enable) {
@@ -113,46 +115,42 @@ LLVMProjectIRDB::getParsedIRModuleOrErr(const llvm::Twine &IRFileName,
   return getParsedIRModuleOrErr(*FileOrErr.get(), Ctx);
 }
 
-std::unique_ptr<llvm::Module>
-LLVMProjectIRDB::getParsedIRModuleOrNull(llvm::MemoryBufferRef IRFileContent,
-                                         llvm::LLVMContext &Ctx) noexcept {
-
-  auto Mod = getParsedIRModuleOrErr(IRFileContent, Ctx);
-  if (Mod) {
-    return std::move(*Mod);
-  }
-
-  return nullptr;
-}
-
-std::unique_ptr<llvm::Module>
-LLVMProjectIRDB::getParsedIRModuleOrNull(const llvm::Twine &IRFileName,
-                                         llvm::LLVMContext &Ctx) noexcept {
-  auto Mod = getParsedIRModuleOrErr(IRFileName, Ctx);
-  if (Mod) {
-    return std::move(*Mod);
-  }
-
-  return nullptr;
-}
-
 llvm::ErrorOr<LLVMProjectIRDB>
-LLVMProjectIRDB::load(const llvm::Twine &IRFileName,
-                      bool EnableOpaquePointers) {
-  auto FileOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(IRFileName, /*IsText=*/true);
-  if (!FileOrErr) {
-    return FileOrErr.getError();
-  }
-
+LLVMProjectIRDB::load(const llvm::Twine &IRFileName) {
   auto Ctx = std::make_unique<llvm::LLVMContext>();
-
-  auto M = getParsedIRModuleOrErr(**FileOrErr, *Ctx);
+  auto M = getParsedIRModuleOrErr(IRFileName, *Ctx);
   if (!M) {
     return M.getError();
   }
 
-  return LLVMProjectIRDB(std::move(*M), std::move(Ctx), EnableOpaquePointers);
+  return LLVMProjectIRDB(std::move(*M), std::move(Ctx));
+}
+
+LLVMProjectIRDB LLVMProjectIRDB::loadOrExit(const llvm::Twine &IRFileName,
+                                            int ErrorExitCode) {
+  auto Ret = load(IRFileName);
+  if (!Ret) {
+    llvm::WithColor::error()
+        << "Could not load LLVM-" << LLVM_VERSION_MAJOR << " IR file "
+        << IRFileName << ": " << Ret.getError().message() << '\n';
+    std::exit(ErrorExitCode);
+  }
+
+  return std::move(*Ret);
+}
+
+LLVMProjectIRDB::LLVMProjectIRDB(const llvm::Twine &IRFileName)
+    : Ctx(new llvm::LLVMContext()) {
+  auto M = getParsedIRModuleOrErr(IRFileName, *Ctx);
+
+  if (!M) {
+    return;
+  }
+
+  auto *NonConst = M->get();
+  Mod = std::move(M.get());
+  ModulesToSlotTracker::setMSTForModule(Mod.get());
+  preprocessModule(NonConst);
 }
 
 LLVMProjectIRDB::LLVMProjectIRDB(const llvm::Twine &IRFileName,
@@ -162,6 +160,9 @@ LLVMProjectIRDB::LLVMProjectIRDB(const llvm::Twine &IRFileName,
   auto M = getParsedIRModuleOrErr(IRFileName, *Ctx);
 
   if (!M) {
+    llvm::WithColor::error()
+        << "Could not load LLVM-" << LLVM_VERSION_MAJOR << " IR file "
+        << IRFileName << ": " << M.getError().message() << '\n';
     return;
   }
 
@@ -258,12 +259,27 @@ LLVMProjectIRDB::LLVMProjectIRDB(std::unique_ptr<llvm::Module> Mod,
   this->Ctx = std::move(Ctx);
 }
 
+LLVMProjectIRDB::LLVMProjectIRDB(llvm::MemoryBufferRef Buf)
+    : Ctx(new llvm::LLVMContext()) {
+  auto M = getParsedIRModuleOrErr(Buf, *Ctx);
+  if (!M) {
+    return;
+  }
+
+  auto *NonConst = M->get();
+  Mod = std::move(M.get());
+  ModulesToSlotTracker::setMSTForModule(Mod.get());
+  preprocessModule(NonConst);
+}
 LLVMProjectIRDB::LLVMProjectIRDB(llvm::MemoryBufferRef Buf,
                                  bool EnableOpaquePointers)
     : Ctx(new llvm::LLVMContext()) {
   setOpaquePointersForCtx(*Ctx, EnableOpaquePointers);
   auto M = getParsedIRModuleOrErr(Buf, *Ctx);
   if (!M) {
+    llvm::WithColor::error() << "Could not load " << LLVM_VERSION_MAJOR
+                             << " IR buffer: " << Buf.getBufferIdentifier()
+                             << ": " << M.getError().message() << '\n';
     return;
   }
 

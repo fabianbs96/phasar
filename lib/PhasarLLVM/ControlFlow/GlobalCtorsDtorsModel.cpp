@@ -20,6 +20,7 @@
 #include "llvm/IR/IRBuilder.h"
 
 #include <functional>
+#include <map>
 
 namespace psr {
 template <typename MapTy>
@@ -30,8 +31,7 @@ static void insertGlobalCtorsDtorsImpl(MapTy &Into, const llvm::Module &M,
     return;
   }
 
-  if (const auto *FunArray =
-          llvm::dyn_cast<llvm::ArrayType>(Gtors->getValueType())) {
+  if (llvm::isa<llvm::ArrayType>(Gtors->getValueType())) {
     if (const auto *ConstFunArray =
             llvm::dyn_cast<llvm::ConstantArray>(Gtors->getInitializer())) {
       for (const auto &Op : ConstFunArray->operands()) {

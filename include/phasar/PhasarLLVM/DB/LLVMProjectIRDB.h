@@ -12,7 +12,6 @@
 
 #include "phasar/DB/ProjectIRDBBase.h"
 #include "phasar/PhasarLLVM/Utils/LLVMBasedContainerConfig.h"
-#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/MaybeUniquePtr.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -46,8 +45,17 @@ public:
   /// Reads and parses the given LLVM IR file and owns the resulting IR Module.
   /// If an error occurs, an error message is written to stderr and subsequent
   /// calls to isValid() return false.
+  explicit LLVMProjectIRDB(const llvm::Twine &IRFileName);
+
+  /// Reads and parses the given LLVM IR file and owns the resulting IR Module.
+  /// If an error occurs, an error message is written to stderr and subsequent
+  /// calls to isValid() return false.
+  [[deprecated("When moving to the next LLVM version, opaque pointers support "
+               "is removed completely. Please use one of the other "
+               "constructors of LLVMProjectIRDB.")]]
   explicit LLVMProjectIRDB(const llvm::Twine &IRFileName,
-                           bool EnableOpaquePointers = LLVM_VERSION_MAJOR > 14);
+                           bool EnableOpaquePointers);
+
   /// Initializes the new ProjectIRDB with the given IR Module _without_ taking
   /// ownership. The module is optionally being preprocessed.
   ///
@@ -69,8 +77,16 @@ public:
   /// Parses the given LLVM IR file and owns the resulting IR Module.
   /// If an error occurs, an error message is written to stderr and subsequent
   /// calls to isValid() return false.
+  explicit LLVMProjectIRDB(llvm::MemoryBufferRef Buf);
+
+  /// Parses the given LLVM IR file and owns the resulting IR Module.
+  /// If an error occurs, an error message is written to stderr and subsequent
+  /// calls to isValid() return false.
+  [[deprecated("When moving to the next LLVM version, opaque pointers support "
+               "is removed completely. Please use one of the other "
+               "constructors of LLVMProjectIRDB.")]]
   explicit LLVMProjectIRDB(llvm::MemoryBufferRef Buf,
-                           bool EnableOpaquePointers = LLVM_VERSION_MAJOR > 14);
+                           bool EnableOpaquePointers);
 
   LLVMProjectIRDB(const LLVMProjectIRDB &) = delete;
   LLVMProjectIRDB &operator=(const LLVMProjectIRDB &) = delete;
@@ -80,16 +96,6 @@ public:
 
   ~LLVMProjectIRDB();
 
-  [[nodiscard]] PSR_DEPRECATED("Deprecated in favor of getParsedIRModuleOrErr",
-                               "getParsedIRModuleOrErr") static std::
-      unique_ptr<llvm::Module> getParsedIRModuleOrNull(
-          const llvm::Twine &IRFileName, llvm::LLVMContext &Ctx) noexcept;
-
-  [[nodiscard]] PSR_DEPRECATED("Deprecated in favor of getParsedIRModuleOrErr",
-                               "getParsedIRModuleOrErr") static std::
-      unique_ptr<llvm::Module> getParsedIRModuleOrNull(
-          llvm::MemoryBufferRef IRFileContent, llvm::LLVMContext &Ctx) noexcept;
-
   [[nodiscard]] static llvm::ErrorOr<std::unique_ptr<llvm::Module>>
   getParsedIRModuleOrErr(const llvm::Twine &IRFileName,
                          llvm::LLVMContext &Ctx) noexcept;
@@ -98,8 +104,12 @@ public:
                          llvm::LLVMContext &Ctx) noexcept;
 
   [[nodiscard]] static llvm::ErrorOr<LLVMProjectIRDB>
-  load(const llvm::Twine &IRFileName,
-       bool EnableOpaquePointers = LLVM_VERSION_MAJOR > 14);
+  load(const llvm::Twine &IRFileName);
+
+  [[nodiscard]] static LLVMProjectIRDB loadOrExit(const llvm::Twine &IRFileName,
+                                                  int ErrorExitCode = 1);
+  [[nodiscard]] static LLVMProjectIRDB
+  loadOrExit(const llvm::Twine &IRFileName, bool EnableOpaquePointers) = delete;
 
   /// Also use the const overload
   using ProjectIRDBBase::getFunction;
@@ -172,7 +182,7 @@ private:
 
   [[nodiscard]] auto getAllInstructionsImpl() const noexcept {
     return llvm::map_range(
-        llvm::makeArrayRef(IdToInst).drop_front(IdOffset),
+        llvm::ArrayRef(IdToInst).drop_front(IdOffset),
         [](const llvm::Value *V) { return llvm::cast<llvm::Instruction>(V); });
   }
 
