@@ -1,4 +1,5 @@
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
@@ -39,7 +40,9 @@ int main(int Argc, const char **Argv) {
     auto TaintProblem = createAnalysisProblem<IFDSTaintAnalysis>(
         HA, &DefaultConfig, EntryPoints);
 
-    IFDSSolver S(TaintProblem, &HA.getICFG());
+    // TODO: InterativeTypeSolver austesten
+
+    IterativeIDESolver S(&TaintProblem, &HA.getICFG());
 
     Timer TimeSolve = Timer([](psr::hms ElapsedTime) {
       llvm::errs() << "IFDSResults ElapsedTime: " << ElapsedTime << "\n";

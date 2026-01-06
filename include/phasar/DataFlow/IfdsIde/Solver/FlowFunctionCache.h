@@ -170,7 +170,8 @@ class FlowFunctionCache
               Problem.getZeroValue()};
         } else {
           return detail::AutoAddZeroFF{
-              GenericFlowFunction<d_t>(std::forward<FFTy>(FF)),
+              GenericFlowFunction<d_t, typename ProblemTy::container_type>(
+                  std::forward<FFTy>(FF)),
               Problem.getZeroValue()};
         }
       } else {
@@ -278,7 +279,7 @@ public:
                                         ByConstRef<f_t> Callee,
                                         uint64_t /*CSCalleeId*/) {
     if constexpr (needs_cache_v<summary_ff_t>) {
-      return GenericFlowFunction<d_t>(
+      return GenericFlowFunction<d_t, typename ProblemTy::container_type>(
           Problem.getSummaryFlowFunction(CallSite, Callee));
     } else {
       return Problem.getSummaryFlowFunction(CallSite, Callee);
