@@ -51,11 +51,12 @@ struct IDESolverConfigBase {
 
   template <typename L> using EdgeFunctionPtrType = EdgeFunction<L>;
 
-  static inline constexpr bool AutoAddZero = true;
-  static inline constexpr bool EnableStatistics = false;
-  static inline constexpr JumpFunctionGCMode EnableJumpFunctionGC =
+  static constexpr bool AutoAddZero = true;
+  static constexpr bool EnableStatistics = false;
+  static constexpr bool ComputeResultsTable = true;
+  static constexpr JumpFunctionGCMode EnableJumpFunctionGC =
       JumpFunctionGCMode::Disabled;
-  static inline constexpr bool UseEndSummaryTab = false;
+  static constexpr bool UseEndSummaryTab = true;
 };
 
 template <typename Base, bool ComputeValuesVal>
@@ -77,7 +78,7 @@ struct WithWorkList : Base {
 };
 
 template <typename Base, bool UseEST> struct WithEndSummaryTab : Base {
-  static inline constexpr bool UseEndSummaryTab = UseEST;
+  static constexpr bool UseEndSummaryTab = UseEST;
 };
 
 using IDESolverConfig = WithComputeValues<IDESolverConfigBase, true>;

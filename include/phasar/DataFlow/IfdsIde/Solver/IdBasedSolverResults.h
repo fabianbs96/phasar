@@ -140,7 +140,8 @@ public:
   }
 
   [[nodiscard]] size_t size() const noexcept {
-    assert(Results->ValTab.size() >= Results->NodeCompressor.size());
+    assert(Results->ValTab.empty() ||
+           Results->ValTab.size() >= Results->NodeCompressor.size());
     return Results->NodeCompressor.size();
   }
 

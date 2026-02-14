@@ -43,6 +43,8 @@
 #include <type_traits>
 
 namespace psr {
+template <typename ProblemTy, typename StaticSolverConfigTy>
+class DemandIdBasedSolverResults;
 
 /// Solves the given IDETabulationProblem as described in the 1996 paper by
 /// Sagiv, Horwitz and Reps. To solve the problem, call solve().
@@ -66,6 +68,8 @@ class IterativeIDESolver
           StaticSolverConfigTy,
           typename StaticSolverConfigTy::template EdgeFunctionPtrType<
               typename ProblemTy::ProblemAnalysisDomain::l_t>> {
+  friend class DemandIdBasedSolverResults<ProblemTy, StaticSolverConfigTy>;
+
 public:
   using domain_t = typename ProblemTy::ProblemAnalysisDomain;
   using d_t = typename domain_t::d_t;
@@ -87,9 +91,11 @@ private:
 
   using base_results_t = detail::IterativeIDESolverResults<n_t, d_t, l_t>;
 
+  using base_t::ComputeResultsTable;
   using base_t::ComputeValues;
   using base_t::EnableStatistics;
-  static constexpr bool UseEndSummaryTab = config_t::UseEndSummaryTab;
+  using base_t::UseEndSummaryTab;
+
   using typename base_t::EdgeFunctionPtrType;
   using typename base_t::InterPropagationJob;
   using typename base_t::InterPropagationJobRef;
@@ -118,10 +124,10 @@ private:
 
   using typename base_t::summaries_t;
 
-  static inline constexpr JumpFunctionGCMode EnableJumpFunctionGC =
+  static constexpr JumpFunctionGCMode EnableJumpFunctionGC =
       StaticSolverConfigTy::EnableJumpFunctionGC;
 
-  static inline ProblemTy &assertNotNull(ProblemTy *Problem) noexcept {
+  static constexpr ProblemTy &assertNotNull(ProblemTy *Problem) noexcept {
     /// Dereferencing a nullptr is UB, so after initializing this->Problem the
     /// null-check might be optimized away to the literal 'true'.
     /// However, we still want to pass a pointer to the ctor to make clear that
@@ -131,7 +137,7 @@ private:
     return *Problem;
   }
 
-  static inline const i_t &assertNotNull(const i_t *ICFG) noexcept {
+  static constexpr const i_t &assertNotNull(const i_t *ICFG) noexcept {
     /// Dereferencing a nullptr is UB, so after initializing this->ICFG the
     /// null-check might be optimized away to the literal 'true'.
     /// However, we still want to pass a pointer to the ctor to make clear that
@@ -141,7 +147,7 @@ private:
   }
 
 public:
-  IterativeIDESolver(ProblemTy *Problem, const i_t *ICFG) noexcept
+  constexpr IterativeIDESolver(ProblemTy *Problem, const i_t *ICFG) noexcept
       : Problem(assertNotNull(Problem)), ICFG(assertNotNull(ICFG)) {}
 
   void solve() {
@@ -151,15 +157,16 @@ public:
     NodeCompressor =
         NodeCompressorTraits<n_t>::create(Problem.getProjectIRDB());
 
-    JumpFunctions.reserve(NumInsts);
-    this->base_results_t::ValTab.reserve(NumInsts);
-
-    /// Initial size of 64 is too much for jump functions per instruction; 16
-    /// should be better:
-    for (size_t I = 0; I != NumInsts; ++I) {
-      JumpFunctions.emplace_back();
-      this->base_results_t::ValTab.emplace_back().reserve(16);
+    JumpFunctions.resize(NumInsts);
+    if constexpr (ComputeResultsTable) {
+      this->base_results_t::ValTab.reserve(NumInsts);
+      /// Initial size of 64 is too much for jump functions per instruction; 16
+      /// should be better:
+      for (size_t I = 0; I != NumInsts; ++I) {
+        this->base_results_t::ValTab.emplace_back().reserve(16);
+      }
     }
+
     if constexpr (EnableJumpFunctionGC != JumpFunctionGCMode::Disabled) {
       RefCountPerFunction = llvm::OwningArrayRef<size_t>(NumFuns);
       std::uninitialized_fill_n(RefCountPerFunction.data(),
@@ -340,14 +347,16 @@ private:
       }
     }
 
+    if constexpr (ComputeResultsTable || !ComputeValues) {
+      SourceFactAndFuncToInterJob.clear();
+    }
     FECache.clearFlowFunctions();
-    SourceFactAndFuncToInterJob.clear();
     WorkList.clear();
     CallWL.clear();
   }
 
   void performValuePropagation() {
-    if constexpr (ComputeValues) {
+    if constexpr (ComputeValues && ComputeResultsTable) {
       /// NOTE: We can already clear the EFCache here, as we are not querying
       /// any edge function in Phase II; The EFs that are in use are kept alive
       /// by their shared_ptr
@@ -370,8 +379,10 @@ private:
 
       WLComp.clear();
     }
-
-    JumpFunctions.clear();
+    if constexpr (ComputeResultsTable || !ComputeValues) {
+      // For on-demand value-computation we'll need the jump functions
+      JumpFunctions.clear();
+    }
     SourceFactAndCSToInterJob.clear();
     AllInterPropagations.clear();
     AllInterPropagationsOwner.clear();
@@ -425,12 +436,16 @@ private:
     return false;
   }
 
-  ByConstRef<l_t> get(uint32_t Inst, uint32_t Fact) {
+  ByConstRef<l_t> get(uint32_t Inst, uint32_t Fact)
+    requires ComputeResultsTable
+  {
     return ValCompressor[this->base_results_t::ValTab[size_t(Inst)].getOrCreate(
         Fact)];
   }
 
-  void set(uint32_t Inst, uint32_t Fact, l_t Val) {
+  void set(uint32_t Inst, uint32_t Fact, l_t Val)
+    requires ComputeResultsTable
+  {
     if constexpr (EnableJumpFunctionGC ==
                   JumpFunctionGCMode::EnabledAggressively) {
       if (!keepAnalysisInformationAt<true>(NodeCompressor[Inst])) {
@@ -457,7 +472,9 @@ private:
 
       WorkList.emplace(PropagationJob{EF, SuccId, SourceFact, LocalFact});
 
-      set(SuccId, LocalFact, Problem.topElement());
+      if constexpr (ComputeResultsTable) {
+        set(SuccId, LocalFact, Problem.topElement());
+      }
 
       if constexpr (EnableJumpFunctionGC != JumpFunctionGCMode::Disabled) {
         RefCountPerFunction[FunId]++;
@@ -483,8 +500,7 @@ private:
       /// Register new propagation job as we have refined the
       /// edge-function
       EF = NewEF;
-      WorkList.emplace(
-          PropagationJob{std::move(NewEF), SuccId, SourceFact, LocalFact});
+      WorkList.emplace(std::move(NewEF), SuccId, SourceFact, LocalFact);
 
       if constexpr (EnableJumpFunctionGC != JumpFunctionGCMode::Disabled) {
         RefCountPerFunction[FunId]++;
@@ -503,7 +519,9 @@ private:
     if (JumpFns.insert(combineIds(SourceFact, LocalFact)).second) {
       WorkList.emplace(PropagationJob{{}, SuccId, SourceFact, LocalFact});
 
-      set(SuccId, LocalFact, BinaryDomain::TOP);
+      if constexpr (ComputeResultsTable) {
+        set(SuccId, LocalFact, BinaryDomain::TOP);
+      }
 
       if constexpr (EnableJumpFunctionGC != JumpFunctionGCMode::Disabled) {
         RefCountPerFunction[FunId]++;
@@ -1136,7 +1154,7 @@ private:
   }
 
   void computeValues(uint32_t SPId)
-    requires ComputeValues
+    requires(ComputeValues && ComputeResultsTable)
   {
     auto SP = NodeCompressor[SPId];
     auto Fun = ICFG.getFunctionOf(SP);
