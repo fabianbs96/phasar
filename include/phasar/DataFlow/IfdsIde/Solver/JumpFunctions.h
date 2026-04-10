@@ -25,6 +25,8 @@
 
 #include "llvm/ADT/SmallVector.h"
 
+#include "phmap.h"
+
 #include <functional>
 #include <memory>
 #include <optional>
@@ -59,7 +61,7 @@ protected:
   // a mapping from target node to a list of triples consisting of source value,
   // target value and associated function; the triple is implemented by a table
   // we exclude empty default functions
-  std::unordered_map<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
+  phmap::parallel_node_hash_map<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
       NonEmptyLookupByTargetNode;
 
 public:

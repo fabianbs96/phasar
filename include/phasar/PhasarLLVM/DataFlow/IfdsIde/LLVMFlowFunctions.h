@@ -52,7 +52,8 @@ namespace psr {
 /// return flow function, it is useful to kill the respective arguments here to
 /// enable strong updates.
 ///
-template <typename D = const llvm::Value *, typename Container = std::set<D>,
+template <typename D = const llvm::Value *,
+          typename Container = phmap::parallel_node_hash_set<D>,
           typename Fn = TrueFn, typename DCtor = DefaultConstruct<D>>
   requires std::is_invocable_r_v<bool, Fn, const llvm::Value *>
 auto mapFactsAlongsideCallSite(const llvm::CallBase *CallSite,
@@ -126,7 +127,8 @@ auto mapFactsAlongsideCallSite(const llvm::CallBase *CallSite,
 ///   f(x)  = {px} if PropagateArgumentWithSource(ax, x) else {}.
 ///
 /// \note Unlike the old version, this one is only meant for forward-analyses
-template <typename D = const llvm::Value *, typename Container = std::set<D>,
+template <typename D = const llvm::Value *,
+          typename Container = phmap::parallel_node_hash_set<D>,
           typename Fn = std::equal_to<D>, typename DCtor = DefaultConstruct<D>>
   requires std::is_invocable_r_v<bool, Fn, const llvm::Value *, D>
 FlowFunctionPtrType<D, Container>
@@ -232,7 +234,8 @@ mapFactsToCallee(const llvm::CallBase *CallSite, const llvm::Function *DestFun,
 ///                    PropagateRet(rv, x) else {}).
 ///
 template <
-    typename D = const llvm::Value *, typename Container = std::set<D>,
+    typename D = const llvm::Value *,
+    typename Container = phmap::parallel_node_hash_set<D>,
     typename FnParam = std::equal_to<D>, typename FnRet = std::equal_to<D>,
     typename DCtor = DefaultConstruct<D>, typename PostProcessFn = IgnoreArgs>
   requires(std::is_invocable_r_v<bool, FnParam, const llvm::Value *, D> &&
@@ -333,7 +336,8 @@ FlowFunctionPtrType<D, Container> mapFactsToCaller(
 ///   f(b) = {},
 ///   f(x) = {x, b} if pred(x) else {x}.
 ///
-template <typename Fn, typename Container = std::set<const llvm::Value *>>
+template <typename Fn, typename Container =
+                           phmap::parallel_node_hash_set<const llvm::Value *>>
   requires std::is_invocable_r_v<bool, Fn, const llvm::Value *>
 FlowFunctionPtrType<const llvm::Value *, Container>
 strongUpdateStore(const llvm::StoreInst *Store, Fn &&GeneratePointerOpIf) {
@@ -411,7 +415,8 @@ strongUpdateStore(const llvm::StoreInst *Store, Fn &&GeneratePointerOpIf) {
 ///               v   v   v
 ///               x   a   b  ...
 ///
-template <typename Container = std::set<const llvm::Value *>>
+template <
+    typename Container = phmap::parallel_node_hash_set<const llvm::Value *>>
 FlowFunctionPtrType<const llvm::Value *, Container>
 strongUpdateStore(const llvm::StoreInst *Store) {
   // Here we cheat a bit and "look through" the GetElementPtrInst to the

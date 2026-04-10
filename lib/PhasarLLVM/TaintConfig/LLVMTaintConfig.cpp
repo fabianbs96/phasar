@@ -130,7 +130,8 @@ LLVMTaintConfig::LLVMTaintConfig(const psr::LLVMProjectIRDB &Code,
 
   // handle variables
   // scope can be a function name or a struct.
-  std::unordered_map<const llvm::Type *, const std::string> StructConfigMap;
+  phmap::parallel_node_hash_map<const llvm::Type *, const std::string>
+      StructConfigMap;
 
   // read all struct types from config
   for (const auto &VarDesc : Config.Variables) {
@@ -457,9 +458,13 @@ TaintCategory LLVMTaintConfig::getCategoryImpl(const llvm::Value *V) const {
   return TaintCategory::None;
 }
 
-std::map<const llvm::Instruction *, std::set<const llvm::Value *>>
+phmap::parallel_node_hash_map<
+    const llvm::Instruction *,
+    phmap::parallel_node_hash_set<const llvm::Value *>>
 LLVMTaintConfig::makeInitialSeedsImpl(SeedConfig Conf) const {
-  std::map<const llvm::Instruction *, std::set<const llvm::Value *>>
+  phmap::parallel_node_hash_map<
+      const llvm::Instruction *,
+      phmap::parallel_node_hash_set<const llvm::Value *>>
       InitialSeeds;
   for (const auto *SourceValue : SourceValues) {
     if (const auto *Inst = llvm::dyn_cast<llvm::Instruction>(SourceValue)) {

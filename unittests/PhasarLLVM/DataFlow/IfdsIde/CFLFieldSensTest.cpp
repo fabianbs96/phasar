@@ -26,9 +26,10 @@
 namespace {
 
 template <typename AliasInfoTy>
-void populateWithMayAliases(const AliasInfoTy &AS,
-                            std::set<const llvm::Value *> &Facts,
-                            const llvm::Instruction *Context) {
+void populateWithMayAliases(
+    const AliasInfoTy &AS,
+    phmap::parallel_node_hash_set<const llvm::Value *> &Facts,
+    const llvm::Instruction *Context) {
   auto Tmp = Facts;
   for (const auto *Fact : Facts) {
     auto Aliases = AS.getAliasSet(Fact, Context);
@@ -143,7 +144,7 @@ protected:
   static constexpr auto PathToLLFiles = PHASAR_BUILD_SUBFOLDER("xtaint/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  using TaintSetT = std::set<TestingSrcLocation>;
+  using TaintSetT = phmap::parallel_node_hash_set<TestingSrcLocation>;
 
   void run(const llvm::Twine &IRFileName,
            const std::map<TestingSrcLocation, TaintSetT> &GroundTruth,
@@ -170,7 +171,8 @@ protected:
     // auto Results = psr::solveIDEProblem(FsTaintProblem, ICFG);
     // Results.dumpResults(ICFG);
 
-    std::map<const llvm::Instruction *, std::set<const llvm::Value *>>
+    std::map<const llvm::Instruction *,
+             phmap::parallel_node_hash_set<const llvm::Value *>>
         ComputedLeaks;
 
     for (auto IIt = TaintProblem.Leaks.begin(), End = TaintProblem.Leaks.end();

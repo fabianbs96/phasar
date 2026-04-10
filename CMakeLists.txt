@@ -43,6 +43,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# parallel_hashmap
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/btree.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/btree.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/meminfo.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/meminfo.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_base.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_base.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_bits.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_bits.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_config.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_config.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_dump.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_dump.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_fwd_decl.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_fwd_decl.h)
+file(DOWNLOAD https://raw.githubusercontent.com/greg7mdp/parallel-hashmap/refs/heads/master/parallel_hashmap/phmap_utils.h ${CMAKE_SOURCE_DIR}/external/parallel_hashmap/phmap_utils.h)
+
+include_directories(external/parallel_hashmap)
+
 include(GNUInstallDirs)
 
 set_property(GLOBAL PROPERTY TARGET_MESSAGES OFF)

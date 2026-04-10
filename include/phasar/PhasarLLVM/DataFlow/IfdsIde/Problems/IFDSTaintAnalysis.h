@@ -53,7 +53,7 @@ public:
   using ConfigurationTy = LLVMTaintConfig;
 
   /// Holds all leaks found during the analysis
-  std::map<n_t, std::set<d_t>> Leaks;
+  phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_set<d_t>> Leaks;
 
   /**
    *

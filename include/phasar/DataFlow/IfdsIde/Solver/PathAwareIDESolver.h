@@ -18,7 +18,8 @@
 
 namespace psr {
 template <typename AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
+          typename Container =
+              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
 class PathAwareIDESolver : public IDESolver<AnalysisDomainTy, Container> {
   using base_t = IDESolver<AnalysisDomainTy, Container>;
 

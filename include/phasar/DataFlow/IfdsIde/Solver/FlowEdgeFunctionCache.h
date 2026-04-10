@@ -73,7 +73,8 @@ private:
  * into the cache.
  */
 template <typename AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
+          typename Container =
+              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
 class FlowEdgeFunctionCache {
   using IDEProblemType = IDETabulationProblem<AnalysisDomainTy, Container>;
   using FlowFunctionPtrType = typename IDEProblemType::FlowFunctionPtrType;

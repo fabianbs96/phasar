@@ -104,14 +104,14 @@ public:
     return results().ValCompressor[RetIt->second];
   }
 
-  [[nodiscard]] std::unordered_map<d_t, l_t>
+  [[nodiscard]] phmap::parallel_node_hash_map<d_t, l_t>
   resultsAt(ByConstRef<n_t> Stmt, bool StripZero = false) const {
     auto NodeId = results().NodeCompressor.getOrNull(Stmt);
     if (!NodeId) {
       return {};
     }
 
-    std::unordered_map<d_t, l_t> Result;
+    phmap::parallel_node_hash_map<d_t, l_t> Result;
     Result.reserve(results().ValTab[size_t(*NodeId)].size());
     for (auto [Fact, Value] : results().ValTab[size_t(*NodeId)].cells()) {
       /// In the IterativeIDESolver, we have made sure that the zero flow-fact

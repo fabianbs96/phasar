@@ -65,7 +65,7 @@ public:
 
   mono_container_t normalFlow(n_t Inst, const mono_container_t &In) override;
 
-  std::unordered_map<n_t, mono_container_t> initialSeeds() override;
+  phmap::parallel_node_hash_map<n_t, mono_container_t> initialSeeds() override;
 };
 
 } // namespace psr

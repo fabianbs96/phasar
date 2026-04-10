@@ -9,6 +9,8 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "phmap.h"
+
 #include <array>
 #include <cstddef>
 #include <cstring>
@@ -66,13 +68,14 @@ public:
     return VT->ResultAt(Buffer.data(), Stmt, Node);
   }
 
-  [[nodiscard]] std::unordered_map<d_t, l_t>
+  [[nodiscard]] phmap::parallel_node_hash_map<d_t, l_t>
   resultsAt(ByConstRef<n_t> Stmt, bool StripZero = false) const {
     assert(VT != nullptr);
     return VT->ResultsAt(Buffer.data(), Stmt, StripZero);
   }
 
-  [[nodiscard]] std::set<d_t> ifdsResultsAt(ByConstRef<n_t> Stmt) const
+  [[nodiscard]] phmap::parallel_node_hash_set<d_t>
+  ifdsResultsAt(ByConstRef<n_t> Stmt) const
     requires std::is_same_v<L, BinaryDomain>
   {
     assert(VT != nullptr);
@@ -100,7 +103,7 @@ public:
     return resultAt(Stmt, Node);
   }
 
-  [[nodiscard]] std::unordered_map<d_t, l_t>
+  [[nodiscard]] phmap::parallel_node_hash_map<d_t, l_t>
   resultsAtInLLVMSSA(const llvm::Instruction *Stmt,
                      bool StripZero = false) const
     requires std::is_same_v<N, const llvm::Instruction *>
@@ -120,9 +123,10 @@ public:
 private:
   struct VTableTy {
     l_t (*ResultAt)(const void *, ByConstRef<n_t>, ByConstRef<d_t>);
-    std::unordered_map<d_t, l_t> (*ResultsAt)(const void *, ByConstRef<n_t>,
-                                              bool);
-    std::set<d_t> (*IfdsResultsAt)(const void *, ByConstRef<n_t>);
+    phmap::parallel_node_hash_map<d_t, l_t> (*ResultsAt)(const void *,
+                                                         ByConstRef<n_t>, bool);
+    phmap::parallel_node_hash_set<d_t> (*IfdsResultsAt)(const void *,
+                                                        ByConstRef<n_t>);
     size_t (*Size)(const void *) noexcept;
     bool (*ContainsNode)(const void *, ByConstRef<n_t>);
     void (*ForeachResultEntry)(
@@ -135,11 +139,12 @@ private:
         return static_cast<const T *>(SR)->resultAt(Stmt, Node);
       },
       [](const void *SR, ByConstRef<n_t> Stmt,
-         bool StripZero) -> std::unordered_map<d_t, l_t> {
+         bool StripZero) -> phmap::parallel_node_hash_map<d_t, l_t> {
         return static_cast<const T *>(SR)->resultsAt(Stmt, StripZero);
       },
       [] {
-        std::set<d_t> (*IfdsResultsAt)(const void *, ByConstRef<n_t>) = nullptr;
+        phmap::parallel_node_hash_set<d_t> (*IfdsResultsAt)(
+            const void *, ByConstRef<n_t>) = nullptr;
         if constexpr (std::is_same_v<BinaryDomain, l_t>) {
           IfdsResultsAt = [](const void *SR, ByConstRef<n_t> Stmt) {
             return static_cast<const T *>(SR)->ifdsResultsAt(Stmt);

@@ -57,7 +57,8 @@ struct IntraMonoFullConstantPropagationAnalysisDomain
   using plain_d_t = int64_t;
   using d_t = IntraMonoFCAFact;
   using mono_container_t =
-      std::map<const llvm::Value *, LatticeDomain<plain_d_t>>;
+      phmap::parallel_node_hash_map<const llvm::Value *,
+                                    LatticeDomain<plain_d_t>>;
 };
 
 class IntraMonoFullConstantPropagation
@@ -96,7 +97,7 @@ public:
   bool equal_to(const mono_container_t &Lhs,
                 const mono_container_t &Rhs) override;
 
-  std::unordered_map<n_t, mono_container_t> initialSeeds() override;
+  phmap::parallel_node_hash_map<n_t, mono_container_t> initialSeeds() override;
 };
 
 std::string DToString(const IntraMonoFCAFact &Fact);

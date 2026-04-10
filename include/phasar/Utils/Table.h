@@ -20,47 +20,51 @@
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DefaultValue.h"
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "phmap.h"
+
 #include <optional>
-#include <set>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
 // we may wish to replace this by boost::multi_index at some point
 
 namespace psr {
 
+template <typename R, typename C, typename V> struct TableCell {
+  TableCell() noexcept = default;
+  TableCell(R Row, C Col, V Val) noexcept
+      : Row(std::move(Row)), Column(std::move(Col)), Value(std::move(Val)) {}
+
+  [[nodiscard]] ByConstRef<R> getRowKey() const noexcept { return Row; }
+  [[nodiscard]] ByConstRef<C> getColumnKey() const noexcept { return Column; }
+  [[nodiscard]] ByConstRef<V> getValue() const noexcept { return Value; }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const TableCell &Cell) {
+    return OS << "Cell: " << Cell.Row << ", " << Cell.Column << ", "
+              << Cell.Value;
+  }
+  friend bool operator<(const TableCell &Lhs, const TableCell &Rhs) noexcept {
+    return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) <
+           std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
+  }
+  friend bool operator==(const TableCell &Lhs, const TableCell &Rhs) noexcept {
+    return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) ==
+           std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
+  }
+
+  R Row{};
+  C Column{};
+  V Value{};
+};
+
 template <typename R, typename C, typename V> class Table {
 public:
-  struct Cell {
-    Cell() noexcept = default;
-    Cell(R Row, C Col, V Val) noexcept
-        : Row(std::move(Row)), Column(std::move(Col)), Value(std::move(Val)) {}
-
-    [[nodiscard]] ByConstRef<R> getRowKey() const noexcept { return Row; }
-    [[nodiscard]] ByConstRef<C> getColumnKey() const noexcept { return Column; }
-    [[nodiscard]] ByConstRef<V> getValue() const noexcept { return Value; }
-
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                         const Cell &Cell) {
-      return OS << "Cell: " << Cell.r << ", " << Cell.c << ", " << Cell.v;
-    }
-    friend bool operator<(const Cell &Lhs, const Cell &Rhs) noexcept {
-      return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) <
-             std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
-    }
-    friend bool operator==(const Cell &Lhs, const Cell &Rhs) noexcept {
-      return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) ==
-             std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
-    }
-
-    R Row{};
-    C Column{};
-    V Value{};
-  };
+  using Cell = TableCell<R, C, V>;
 
   Table() noexcept = default;
 
@@ -101,9 +105,9 @@ public:
     return Sz;
   }
 
-  [[nodiscard]] std::set<Cell> cellSet() const {
+  [[nodiscard]] phmap::parallel_node_hash_set<Cell> cellSet() const {
     // Returns a set of all row key / column key / value triplets.
-    std::set<Cell> Result;
+    phmap::parallel_node_hash_set<Cell> Result;
     for (const auto &M1 : Tab) {
       for (const auto &M2 : M1.second) {
         Result.emplace(M1.first, M2.first, M2.second);
@@ -139,9 +143,10 @@ public:
     return Result;
   }
 
-  [[nodiscard]] std::unordered_map<R, V> column(ByConstRef<C> ColumnKey) const {
+  [[nodiscard]] phmap::parallel_node_hash_map<R, V>
+  column(ByConstRef<C> ColumnKey) const {
     // Returns a view of all mappings that have the given column key.
-    std::unordered_map<R, V> Column;
+    phmap::parallel_node_hash_map<R, V> Column;
     for (const auto &Row : Tab) {
       if (Row.second.count(ColumnKey)) {
         Column[Row.first] = Row.second[ColumnKey];
@@ -251,34 +256,37 @@ public:
 
   void remove(ByConstRef<R> RowKey) { Tab.erase(RowKey); }
 
-  [[nodiscard]] std::unordered_map<C, V> &row(R RowKey) {
+  [[nodiscard]] phmap::parallel_node_hash_map<C, V> &row(R RowKey) {
     // Returns a view of all mappings that have the given row key.
     return Tab[RowKey];
   }
 
-  [[nodiscard]] ByConstRef<std::unordered_map<C, V>>
+  [[nodiscard]] ByConstRef<phmap::parallel_node_hash_map<C, V>>
   row(ByConstRef<R> RowKey) const noexcept {
     // Returns a view of all mappings that have the given row key.
     auto It = Tab.find(RowKey);
     if (It == Tab.end()) {
-      return getDefaultValue<std::unordered_map<C, V>>();
+      return getDefaultValue<phmap::parallel_node_hash_map<C, V>>();
     }
     return It->second;
   }
 
-  [[nodiscard]] const std::unordered_map<R, std::unordered_map<C, V>> &
+  [[nodiscard]] const phmap::parallel_node_hash_map<
+      R, phmap::parallel_node_hash_map<C, V>> &
   rowMap() const & noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return Tab;
   }
-  [[nodiscard]] std::unordered_map<R, std::unordered_map<C, V>> &&
+  [[nodiscard]] phmap::parallel_node_hash_map<
+      R, phmap::parallel_node_hash_map<C, V>> &&
   rowMap() && noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return std::move(Tab);
   }
-  [[nodiscard]] const std::unordered_map<R, std::unordered_map<C, V>> &
+  [[nodiscard]] const phmap::parallel_node_hash_map<
+      R, phmap::parallel_node_hash_map<C, V>> &
   rowMapView() const noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
@@ -307,9 +315,18 @@ public:
   }
 
 private:
-  std::unordered_map<R, std::unordered_map<C, V>> Tab{};
+  phmap::parallel_node_hash_map<R, phmap::parallel_node_hash_map<C, V>> Tab{};
 };
 
 } // namespace psr
+
+namespace std {
+template <typename R, typename C, typename V>
+struct hash<psr::TableCell<R, C, V>> {
+  size_t operator()(const psr::TableCell<R, C, V> &Cell) const {
+    return llvm::hash_combine(Cell.Row, Cell.Column, Cell.Value);
+  }
+};
+} // namespace std
 
 #endif

@@ -23,6 +23,8 @@
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/Soundness.h"
 
+#include "phmap.h"
+
 #include <set>
 #include <string>
 #include <type_traits>
@@ -88,7 +90,8 @@ public:
 
   virtual mono_container_t allTop() { return mono_container_t{}; }
 
-  virtual std::unordered_map<n_t, mono_container_t> initialSeeds() = 0;
+  virtual phmap::parallel_node_hash_map<n_t, mono_container_t>
+  initialSeeds() = 0;
 
   [[nodiscard]] const std::vector<std::string> &getEntryPoints() const {
     return EntryPoints;

@@ -27,7 +27,8 @@ namespace psr {
 /// For more information on how to write an IFDS analysis, see [Writing an IFDS
 /// Analysis](https://github.com/secure-software-engineering/phasar/wiki/Writing-an-IFDS-analysis)
 template <IfdsAnalysisDomain AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
+          typename Container =
+              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
 class IFDSTabulationProblem
     : public IDETabulationProblem<WithBinaryValueDomain<AnalysisDomainTy>,
                                   Container> {

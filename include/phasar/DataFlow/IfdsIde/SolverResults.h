@@ -25,6 +25,8 @@
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/Utilities.h"
 
+#include "phmap.h"
+
 #include <set>
 #include <type_traits>
 #include <unordered_map>
@@ -63,9 +65,9 @@ public:
   /// \param Stmt The statement, where the analysis results are requested
   /// \param StripZero Whether the special zero value should be stripped from
   /// the result.
-  [[nodiscard]] std::unordered_map<d_t, l_t> resultsAt(ByConstRef<n_t> Stmt,
-                                                       bool StripZero) const {
-    std::unordered_map<d_t, l_t> Result = self().Results.row(Stmt);
+  [[nodiscard]] phmap::parallel_node_hash_map<d_t, l_t>
+  resultsAt(ByConstRef<n_t> Stmt, bool StripZero) const {
+    phmap::parallel_node_hash_map<d_t, l_t> Result = self().Results.row(Stmt);
     if (StripZero) {
       Result.erase(self().ZV);
     }
@@ -76,7 +78,7 @@ public:
   /// statement Stmt.
   ///
   /// Does not strip the special zero value from the result.
-  [[nodiscard]] const std::unordered_map<d_t, l_t> &
+  [[nodiscard]] const phmap::parallel_node_hash_map<d_t, l_t> &
   resultsAt(ByConstRef<n_t> Stmt) const {
     return self().Results.row(Stmt);
   }
@@ -98,10 +100,11 @@ public:
 
   // this function only exists for IFDS problems which use BinaryDomain as their
   // value domain L
-  [[nodiscard]] std::set<d_t> ifdsResultsAt(ByConstRef<n_t> Stmt) const
+  [[nodiscard]] phmap::parallel_node_hash_set<d_t>
+  ifdsResultsAt(ByConstRef<n_t> Stmt) const
     requires std::is_same_v<l_t, BinaryDomain>
   {
-    std::set<D> KeySet;
+    phmap::parallel_node_hash_set<D> KeySet;
     const auto &ResultMap = self().Results.row(Stmt);
     for (const auto &[FlowFact, Val] : ResultMap) {
       KeySet.insert(FlowFact);
@@ -124,7 +127,7 @@ public:
   /// This result accessor function returns the results at the successor
   /// instruction(s) reflecting that the expression on the left-hand side holds
   /// if the expression on the right-hand side holds.
-  [[nodiscard]] std::unordered_map<d_t, l_t>
+  [[nodiscard]] phmap::parallel_node_hash_map<d_t, l_t>
   resultsAtInLLVMSSA(ByConstRef<n_t> Stmt, bool AllowOverapproximation = false,
                      bool StripZero = false) const
     requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>;

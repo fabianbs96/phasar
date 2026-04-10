@@ -5,7 +5,7 @@
 
 namespace psr {
 /// Encapsulates an unmanaged pointer to a FlowFunction
-template <typename D, typename Container = std::set<D>>
+template <typename D, typename Container = phmap::parallel_node_hash_set<D>>
 class GenericFlowFunctionView {
 public:
   using FlowFunctionType = FlowFunction<D, Container>;
@@ -46,7 +46,7 @@ private:
 };
 
 /// Encapsulates a managed pointer to a FlowFunction
-template <typename D, typename Container = std::set<D>>
+template <typename D, typename Container = phmap::parallel_node_hash_set<D>>
 class GenericFlowFunction {
 public:
   using FlowFunctionType = FlowFunction<D, Container>;

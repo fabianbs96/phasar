@@ -43,7 +43,7 @@ public:
   MapFactsToCallerFlowFunction(const llvm::CallBase *CallSite,
                                const llvm::Instruction *ExitStmt,
                                const llvm::Function *Callee);
-  std::set<const llvm::Value *>
+  phmap::parallel_node_hash_set<const llvm::Value *>
   computeTargets(const llvm::Value *Source) override;
 };
 

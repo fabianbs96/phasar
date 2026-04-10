@@ -73,7 +73,7 @@ public:
   bool equal_to(const mono_container_t &Lhs,
                 const mono_container_t &Rhs) override;
 
-  std::unordered_map<n_t, mono_container_t> initialSeeds() override;
+  phmap::parallel_node_hash_map<n_t, mono_container_t> initialSeeds() override;
 
   void printContainer(llvm::raw_ostream &OS,
                       mono_container_t Con) const override;

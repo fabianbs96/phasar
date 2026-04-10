@@ -32,6 +32,7 @@
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Printer.h"
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Argument.h"
@@ -49,6 +50,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "phmap.h"
 
 #include <functional>
 #include <initializer_list>
@@ -154,6 +157,10 @@ public:
     print(OS);
     return Ret;
   }
+
+  friend llvm::hash_code hash_value(const IDEIIAFlowFact &FlowFact) {
+    return std::hash<const llvm::Value *>()(FlowFact.getBase());
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -175,7 +182,7 @@ inline std::ostream &operator<<(std::ostream &OS,
 namespace std {
 template <> struct hash<psr::IDEIIAFlowFact> {
   size_t operator()(const psr::IDEIIAFlowFact &FlowFact) const {
-    return std::hash<const llvm::Value *>()(FlowFact.getBase());
+    return hash_value(FlowFact);
   }
 };
 } // namespace std
@@ -900,7 +907,7 @@ public:
         //
         //               0
         //                \
-          // %i = call H     \ \x.x \cup { commit of('%i = call H') }
+        // %i = call H     \ \x.x \cup { commit of('%i = call H') }
         //                  v
         //                  i
         //
@@ -1097,7 +1104,7 @@ public:
 
   // Provide functionalities for printing things and emitting text reports.
 
-  static void stripBottomResults(std::unordered_map<d_t, l_t> &Res) {
+  static void stripBottomResults(phmap::parallel_node_hash_map<d_t, l_t> &Res) {
     for (auto It = Res.begin(); It != Res.end();) {
       if (It->second.isBottom()) {
         It = Res.erase(It);

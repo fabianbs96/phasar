@@ -48,7 +48,7 @@ public:
 protected:
   ProblemTy &IMProblem;
   std::deque<std::pair<n_t, n_t>> Worklist;
-  std::unordered_map<n_t, mono_container_t> Analysis;
+  phmap::parallel_node_hash_map<n_t, mono_container_t> Analysis;
   const c_t *CFG;
 
   void initialize() {
