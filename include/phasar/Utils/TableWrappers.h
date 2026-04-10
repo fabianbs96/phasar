@@ -2,6 +2,7 @@
 #define PHASAR_UTILS_TABLEWRAPPERS_H
 
 #include "phasar/Utils/ByRef.h"
+#include "phasar/Utils/DefaultValue.h"
 #include "phasar/Utils/EmptyBaseOptimizationUtils.h"
 #include "phasar/Utils/MemoryResource.h"
 #include "phasar/Utils/TypeTraits.h"
@@ -103,6 +104,13 @@ public:
   const V &getOr(ByConstRef<K> Key, V &&Or) const
     requires(!CanEfficientlyPassByValue<V>)
   = delete;
+
+  [[nodiscard]] ByConstRef<V> getOrDefault(ByConstRef<K> Key) const {
+    if (auto It = Map.find(Key); It != Map.end()) {
+      return It->second;
+    }
+    return getDefaultValue<V>();
+  }
 
   const_iterator find(ByConstRef<K> Key) const { return Map.find(Key); }
 
@@ -310,6 +318,13 @@ public:
     requires(!CanEfficientlyPassByValue<V>)
   = delete;
 
+  [[nodiscard]] ByConstRef<V> getOrDefault(ByConstRef<K> Key) const {
+    if (auto It = Map.find(Key); It != Map.end()) {
+      return It->second;
+    }
+    return getDefaultValue<V>();
+  }
+
   const_iterator find(ByConstRef<K> Key) const {
     return llvm::map_iterator(Map.find(Key),
                               detail::DummyTransform<K, V>{Value});
@@ -501,6 +516,13 @@ public:
   const V &getOr(ByConstRef<K> Key, V &&Or) const
     requires(!CanEfficientlyPassByValue<V>)
   = delete;
+
+  [[nodiscard]] ByConstRef<V> getOrDefault(ByConstRef<K> Key) const {
+    if (auto It = Map.find(Key); It != Map.end()) {
+      return It->second;
+    }
+    return getDefaultValue<V>();
+  }
 
   const_iterator find(ByConstRef<K> Key) const { return Map.find(Key); }
 
@@ -694,6 +716,13 @@ public:
   const V &getOr(ByConstRef<K> Key, V &&Or) const
     requires(!CanEfficientlyPassByValue<V>)
   = delete;
+
+  [[nodiscard]] ByConstRef<V> getOrDefault(ByConstRef<K> Key) const {
+    if (auto It = Map.find(Key); It != Map.end()) {
+      return It->second;
+    }
+    return getDefaultValue<V>();
+  }
 
   const_iterator find(ByConstRef<K> Key) const { return Map.find(Key); }
 
@@ -892,6 +921,13 @@ public:
   const V &getOr(ByConstRef<K> Key, V &&Or) const
     requires(!CanEfficientlyPassByValue<V>)
   = delete;
+
+  [[nodiscard]] ByConstRef<V> getOrDefault(ByConstRef<K> Key) const {
+    if (auto It = Map.find(Key); It != Map.end()) {
+      return It->second;
+    }
+    return getDefaultValue<V>();
+  }
 
   const_iterator find(ByConstRef<K> Key) const {
     return llvm::map_iterator(Map.find(Key),

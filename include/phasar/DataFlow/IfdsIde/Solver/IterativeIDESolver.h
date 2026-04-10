@@ -858,33 +858,36 @@ private:
         }
       }();
 
-      summaries_t Summaries;
       if constexpr (UseEndSummaryTab) {
         const auto &SummariesTab =
             EndSummaryTab.getOrCreate(combineIds(CalleeId, FactId));
-        Summaries = summaries_t(SummariesTab.begin(), SummariesTab.end());
-      }
-
-      for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
-        auto ExitId = NodeCompressor.getOrInsert(ExitInst);
-
-        if constexpr (!UseEndSummaryTab) {
-          // Summaries = JumpFunctions[ExitId].cellVec([FactId](const auto &Kvp)
-          // {
+        for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
+          auto ExitId = NodeCompressor.getOrInsert(ExitInst);
+          countSummaryLinearSearch(JumpFunctions[ExitId].size(),
+                                   SummariesTab.size());
+          if (!SummariesTab.empty()) {
+            propagateProcedureSummaries(
+                SummariesTab, AtInstruction, AtInstructionId, Callee, CalleeId,
+                ExitInst, ExitId, SourceFactId, CallerId, CallEF);
+          }
+        }
+      } else {
+        for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
+          auto ExitId = NodeCompressor.getOrInsert(ExitInst);
+          // Summaries = JumpFunctions[ExitId].cellVec([FactId](const auto
+          // &Kvp) {
           //   return splitId(Kvp.first).first == FactId;
           // });
-          Summaries = JumpFunctions[ExitId].allOf(
+          auto Summaries = JumpFunctions[ExitId].allOf(
               [](uint64_t Key) { return splitId(Key).first; }, FactId,
               [](uint64_t Key) { return splitId(Key).second; });
-        }
-
-        countSummaryLinearSearch(JumpFunctions[ExitId].size(),
-                                 Summaries.size());
-
-        if (!Summaries.empty()) {
-          propagateProcedureSummaries(Summaries, AtInstruction, AtInstructionId,
-                                      Callee, CalleeId, ExitInst, ExitId,
-                                      SourceFactId, CallerId, CallEF);
+          countSummaryLinearSearch(JumpFunctions[ExitId].size(),
+                                   Summaries.size());
+          if (!Summaries.empty()) {
+            propagateProcedureSummaries(
+                Summaries, AtInstruction, AtInstructionId, Callee, CalleeId,
+                ExitInst, ExitId, SourceFactId, CallerId, CallEF);
+          }
         }
       }
     }
@@ -940,20 +943,15 @@ private:
                                     CalleeId, FactId, SourceFactId, FunId,
                                     CallEF);
 
-          {
-            /// Reverse lookup
-            auto *&InterJob = SourceFactAndFuncToInterJob.getOrCreate(
-                combineIds(FactId, CalleeId));
-            It->NextWithSameSourceFactAndCallee = InterJob;
-            InterJob = &*It;
-          }
+          /// Reverse lookup
+          SourceFactAndFuncToInterJob.getOrCreate(combineIds(FactId, CalleeId))
+              .push_back(&*It);
 
           if constexpr (ComputeValues) {
             /// Forward lookup
-            auto *&InterJob = SourceFactAndCSToInterJob.getOrCreate(
-                combineIds(SourceFactId, AtInstructionId));
-            It->NextWithSameSourceFactAndCS = InterJob;
-            InterJob = &*It;
+            SourceFactAndCSToInterJob
+                .getOrCreate(combineIds(SourceFactId, AtInstructionId))
+                .push_back(&*It);
           }
         } else {
           /// The InterPropagationJob was already there, so we don't need to own
@@ -995,7 +993,7 @@ private:
     }
   }
 
-  void propagateProcedureSummaries(const summaries_t &Summaries,
+  void propagateProcedureSummaries(const auto &Summaries,
                                    ByConstRef<n_t> CallSite, uint32_t CSId,
                                    ByConstRef<f_t> Callee, uint32_t CalleeId,
                                    ByConstRef<n_t> ExitInst, uint32_t ExitId,
@@ -1043,6 +1041,12 @@ private:
     /// Here, no other job is running concurrently, so we save and reset the
     /// CallWL, such that we can start concurrent jobs in the loop below
     std::vector<uint64_t> RelevantCalls(CallWL.begin(), CallWL.end());
+    /// Sort by CalleeId (low 32 bits) so consecutive entries for the same
+    /// callee share hot cache lines for exit-point and compressor lookups.
+    std::ranges::sort(RelevantCalls, std::less<>{},
+                      [](uint64_t SourceFactAndFunc) noexcept {
+                        return uint32_t(SourceFactAndFunc);
+                      });
 
     scope_exit FinishedInterCalls = [] {
       PHASAR_LOG_LEVEL(INFO, "> end inter calls");
@@ -1064,50 +1068,56 @@ private:
         this->TotalNumRelevantCalls++;
       }
 
-      summaries_t Summaries;
+      size_t NumInterJobs = 0;
+      const auto &InterJobList =
+          SourceFactAndFuncToInterJob.getOrDefault(SourceFactAndFunc);
+
+      /// Helper: iterate all registered call-sites for this (SourceFact,Callee)
+      /// pair and propagate Summaries through each one.
+      const auto ApplyInterJobs =
+          [&](auto &&Summaries, ByConstRef<n_t> ExitInst, uint32_t ExitId) {
+            for (const auto *InterJob : InterJobList) {
+              auto CSId = InterJob->CallSite;
+              auto CallSite = NodeCompressor[CSId];
+              auto CallerId =
+                  FunCompressor.getOrInsert(ICFG.getFunctionOf(CallSite));
+
+              if constexpr (EnableStatistics) {
+                ++NumInterJobs;
+              }
+              propagateProcedureSummaries(
+                  Summaries, CallSite, CSId, Callee, CalleeId, ExitInst, ExitId,
+                  InterJob->SourceFact, CallerId, InterJob->SourceEF);
+            }
+          };
+
       if constexpr (UseEndSummaryTab) {
         const auto &SummariesTab =
             EndSummaryTab.getOrCreate(combineIds(CalleeId, SPFactId));
-        Summaries = summaries_t(SummariesTab.begin(), SummariesTab.end());
-      }
+        for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
+          auto ExitId = NodeCompressor.getOrInsert(ExitInst);
+          countSummaryLinearSearch(JumpFunctions[ExitId].size(),
+                                   SummariesTab.size());
+          ApplyInterJobs(SummariesTab, ExitInst, ExitId);
+        }
+      } else {
+        for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
+          auto ExitId = NodeCompressor.getOrInsert(ExitInst);
 
-      size_t NumInterJobs = 0;
-      for (ByConstRef<n_t> ExitInst : ICFG.getExitPointsOf(Callee)) {
-        auto ExitId = NodeCompressor.getOrInsert(ExitInst);
-
-        /// Copy the JumpFns, because in the below loop we are calling
-        /// getOrCreate on JumpFunctions again and in a tight recursion
-        /// ExitId and RSId might be the same and inserting into the same
-        /// map we are iterating over is bad
-
-        if constexpr (!UseEndSummaryTab) {
+          /// Copy the JumpFns, because in the below loop we are calling
+          /// getOrCreate on JumpFunctions again and in a tight recursion
+          /// ExitId and RSId might be the same and inserting into the same
+          /// map we are iterating over is bad
           // Summaries = JumpFunctions[ExitId].cellVec(
           //     [SPFactId{SPFactId}](const auto &Kvp) {
           //       return splitId(Kvp.first).first == SPFactId;
           //     });
-          Summaries = JumpFunctions[ExitId].allOf(
+          auto Summaries = JumpFunctions[ExitId].allOf(
               [](uint64_t Key) { return splitId(Key).first; }, SPFactId,
               [](uint64_t Key) { return splitId(Key).second; });
-        }
-
-        countSummaryLinearSearch(JumpFunctions[ExitId].size(),
-                                 Summaries.size());
-
-        for (const InterPropagationJob *InterJob =
-                 SourceFactAndFuncToInterJob.getOr(SourceFactAndFunc, nullptr);
-             InterJob; InterJob = InterJob->NextWithSameSourceFactAndCallee) {
-
-          auto CSId = InterJob->CallSite;
-          auto CallSite = NodeCompressor[CSId];
-          auto CallerId =
-              FunCompressor.getOrInsert(ICFG.getFunctionOf(CallSite));
-
-          if constexpr (EnableStatistics) {
-            ++NumInterJobs;
-          }
-          propagateProcedureSummaries(
-              Summaries, CallSite, CSId, Callee, CalleeId, ExitInst, ExitId,
-              InterJob->SourceFact, CallerId, InterJob->SourceEF);
+          countSummaryLinearSearch(JumpFunctions[ExitId].size(),
+                                   Summaries.size());
+          ApplyInterJobs(Summaries, ExitInst, ExitId);
         }
       }
 
@@ -1177,11 +1187,9 @@ private:
 
       auto InstId = NodeCompressor.getOrInsert(CS);
 
-      const InterPropagationJob *InterJobs =
-          SourceFactAndCSToInterJob.getOr(combineIds(FactId, InstId), nullptr);
-
-      for (; InterJobs; InterJobs = InterJobs->NextWithSameSourceFactAndCS) {
-        auto Callee = FunCompressor[InterJobs->Callee];
+      for (const auto *InterJob :
+           SourceFactAndCSToInterJob.getOrDefault(combineIds(FactId, InstId))) {
+        auto Callee = FunCompressor[InterJob->Callee];
 
         PHASAR_LOG_LEVEL_CAT(DEBUG, "IterativeIDESolver",
                              ">> Callee: " << FToString(Callee));
@@ -1193,14 +1201,13 @@ private:
               DEBUG, "IterativeIDESolver",
               "> emplace { N: "
                   << NToString(CalleeSP) << "; D: "
-                  << DToString(FactCompressor[InterJobs->FactInCallee])
-                  << "; L: "
-                  << LToString(InterJobs->SourceEF.computeTarget(Val))
+                  << DToString(FactCompressor[InterJob->FactInCallee])
+                  << "; L: " << LToString(InterJob->SourceEF.computeTarget(Val))
                   << " } into WLProp");
 
           WLProp.emplace(
-              ValuePropagationJob{CalleeSPId, InterJobs->FactInCallee,
-                                  InterJobs->SourceEF.computeTarget(Val)});
+              ValuePropagationJob{CalleeSPId, InterJob->FactInCallee,
+                                  InterJob->SourceEF.computeTarget(Val)});
 
           if constexpr (EnableStatistics) {
             if (WLProp.size() > this->WLPropHighWatermark) {
@@ -1377,15 +1384,13 @@ private:
   /// Stores keys of the SourceFactAndFuncToInterJob map. All mapped values
   /// should be part of the set
   DenseSet<uint64_t> CallWL{};
-  // Stores pointers into AllInterPropagations building up an intrusive
-  // linked list of all jobs matching the key (CalleeSourceFact x Callee).
-  // == Reverse Lookup
-  DenseTable1d<uint64_t, const InterPropagationJob *>
+  // Stores pointers into AllInterPropagations keyed by (CalleeSourceFact x
+  // Callee). == Reverse Lookup
+  DenseTable1d<uint64_t, llvm::SmallVector<const InterPropagationJob *, 5>>
       SourceFactAndFuncToInterJob{};
-  // Stores pointers into AllInterPropagations building up an intrusive
-  // linked list of all jobs matching the key (CSSourceFact x CS)
+  // Stores pointers into AllInterPropagations keyed by (CSSourceFact x CS)
   // == Forward Lookup
-  DenseTable1d<uint64_t, const InterPropagationJob *>
+  DenseTable1d<uint64_t, llvm::SmallVector<const InterPropagationJob *, 5>>
       SourceFactAndCSToInterJob{};
 
   /// <-- End InterPropagationJobs

@@ -58,14 +58,6 @@ protected:
     uint32_t CallSite{};
     uint32_t FactInCallee{};
 
-    /// NOTE: The Next-pointer must be mutable, such that we are able to mutate
-    /// it from inside a set. Recall that the next pointer does *not* affect
-    /// equality or hashing
-    mutable const InterPropagationJob *NextWithSameSourceFactAndCallee{};
-    [[no_unique_address]] mutable std::conditional_t<
-        ComputeValues, const InterPropagationJob *, EmptyType>
-        NextWithSameSourceFactAndCS{};
-
     [[nodiscard]] bool
     operator==(const InterPropagationJob &Other) const noexcept {
       return SourceFact == Other.SourceFact && Callee == Other.Callee &&
@@ -149,7 +141,7 @@ protected:
 
   /// Key is TargetFact
 
-  using SummaryEdges = SmallDenseTable1d<uint64_t, EdgeFunctionPtrType, 4>;
+  using SummaryEdges = SmallDenseTable1d<uint64_t, EdgeFunctionPtrType, 8>;
   using SummaryEdges_JF1 =
       std::conditional_t<ComputeValues,
                          llvm::SmallDenseMap<uint32_t, EdgeFunctionPtrType>,
