@@ -1,7 +1,7 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_EDGEFUNCTIONCACHESTATS_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_EDGEFUNCTIONCACHESTATS_H
 
-#include <cstddef>
+#include "phasar/DataFlow/IfdsIde/Solver/EdgeFunctionKind.h"
 
 namespace llvm {
 class raw_ostream;

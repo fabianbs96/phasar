@@ -21,6 +21,9 @@ namespace psr {
 enum class EdgeFunctionKind;
 enum class EdgeFunctionAllocationPolicy;
 
+template <typename AnalysisDomainTy, typename Container>
+class ParallelizedIDESolver;
+
 namespace detail {
 struct EdgeFunctionStatsData {
   static constexpr size_t NumEFKinds = 5;
@@ -74,6 +77,9 @@ public:
 private:
   template <typename AnalysisDomainTy, typename Container>
   friend class IDESolver;
+
+  template <typename AnalysisDomainTy, typename Container>
+  friend class ParallelizedIDESolver;
 
   constexpr EdgeFunctionStats(
       const detail::EdgeFunctionStatsData &Data) noexcept

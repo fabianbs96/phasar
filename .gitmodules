@@ -5,3 +5,6 @@
 [submodule "external/json-schema-validator"]
 	path = external/json-schema-validator
 	url = https://github.com/pboettch/json-schema-validator.git
+[submodule "external/parallel-hashmap"]
+	path = external/parallel-hashmap
+	url = https://github.com/greg7mdp/parallel-hashmap.git

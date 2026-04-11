@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_FLOWEDGEFUNCTIONCACHE_H
-#define PHASAR_DATAFLOW_IFDSIDE_SOLVER_FLOWEDGEFUNCTIONCACHE_H
+#ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_FLOWEDGEFUNCTIONCACHE_PLL_H
+#define PHASAR_DATAFLOW_IFDSIDE_SOLVER_FLOWEDGEFUNCTIONCACHE_PLL_H
 
 #include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
@@ -21,10 +21,10 @@
 
 #include "llvm/ADT/DenseMap.h"
 
+#include "parallel_hashmap/phmap.h"
+
 #include <algorithm>
-#include <map>
 #include <memory>
-#include <set>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -42,8 +42,9 @@ namespace psr {
  * into the cache.
  */
 template <typename AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
-class FlowEdgeFunctionCache {
+          typename Container =
+              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
+class FlowEdgeFunctionCachePll {
   using IDEProblemType = IDETabulationProblem<AnalysisDomainTy, Container>;
   using FlowFunctionPtrType = typename IDEProblemType::FlowFunctionPtrType;
 
@@ -91,28 +92,34 @@ private:
   };
 
   // Caches for the flow/edge functions
-  std::map<EdgeFuncInstKey, NormalEdgeFlowData> NormalFunctionCache;
+  phmap::parallel_node_hash_map<EdgeFuncInstKey, NormalEdgeFlowData>
+      NormalFunctionCache;
 
   // Caches for the flow functions
-  std::map<std::tuple<n_t, f_t>, FlowFunctionPtrType> CallFlowFunctionCache;
-  std::map<std::tuple<n_t, f_t, n_t, n_t>, FlowFunctionPtrType>
+  phmap::parallel_node_hash_map<std::tuple<n_t, f_t>, FlowFunctionPtrType>
+      CallFlowFunctionCache;
+  phmap::parallel_node_hash_map<std::tuple<n_t, f_t, n_t, n_t>,
+                                FlowFunctionPtrType>
       ReturnFlowFunctionCache;
-  std::map<std::tuple<n_t, n_t>, FlowFunctionPtrType>
+  phmap::parallel_node_hash_map<std::tuple<n_t, n_t>, FlowFunctionPtrType>
       CallToRetFlowFunctionCache;
   // Caches for the edge functions
-  std::map<std::tuple<n_t, d_t, f_t, d_t>, EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map<std::tuple<n_t, d_t, f_t, d_t>,
+                                EdgeFunction<l_t>>
       CallEdgeFunctionCache;
-  std::map<std::tuple<n_t, f_t, n_t, d_t, n_t, d_t>, EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map<std::tuple<n_t, f_t, n_t, d_t, n_t, d_t>,
+                                EdgeFunction<l_t>>
       ReturnEdgeFunctionCache;
-  std::map<EdgeFuncInstKey, InnerEdgeFunctionMapType>
+  phmap::parallel_node_hash_map<EdgeFuncInstKey, InnerEdgeFunctionMapType>
       CallToRetEdgeFunctionCache;
-  std::map<std::tuple<n_t, d_t, n_t, d_t>, EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map<std::tuple<n_t, d_t, n_t, d_t>,
+                                EdgeFunction<l_t>>
       SummaryEdgeFunctionCache;
 
 public:
   // Ctor allows access to the IDEProblem in order to get access to flow and
   // edge function factory functions.
-  FlowEdgeFunctionCache(
+  FlowEdgeFunctionCachePll(
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem)
       : Problem(Problem),
         AutoAddZero(Problem.getIFDSIDESolverConfig().autoAddZero()),
@@ -149,14 +156,15 @@ public:
     REG_COUNTER("Summary-EF Cache Hit", 0, Full);
   }
 
-  ~FlowEdgeFunctionCache() = default;
+  ~FlowEdgeFunctionCachePll() = default;
 
-  FlowEdgeFunctionCache(const FlowEdgeFunctionCache &FEFC) = default;
-  FlowEdgeFunctionCache &operator=(const FlowEdgeFunctionCache &FEFC) = default;
+  FlowEdgeFunctionCachePll(const FlowEdgeFunctionCachePll &FEFC) = default;
+  FlowEdgeFunctionCachePll &
+  operator=(const FlowEdgeFunctionCachePll &FEFC) = default;
 
-  FlowEdgeFunctionCache(FlowEdgeFunctionCache &&FEFC) noexcept = default;
-  FlowEdgeFunctionCache &
-  operator=(FlowEdgeFunctionCache &&FEFC) noexcept = default;
+  FlowEdgeFunctionCachePll(FlowEdgeFunctionCachePll &&FEFC) noexcept = default;
+  FlowEdgeFunctionCachePll &
+  operator=(FlowEdgeFunctionCachePll &&FEFC) noexcept = default;
 
   FlowFunctionPtrType getNormalFlowFunction(n_t Curr, n_t Succ) {
     assertNotNull(Curr);

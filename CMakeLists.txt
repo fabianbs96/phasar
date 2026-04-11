@@ -280,6 +280,9 @@ include(add_nlohmann_json)
 add_nlohmann_json()
 add_json_schema_validator()
 
+# Parallel Hashmap
+include_directories(external/parallel-hashmap/)
+
 # Coverage
 if (CODE_COVERAGE)
   set(CODE_COVERAGE_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/code-coverage.cmake")
