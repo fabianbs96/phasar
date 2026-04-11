@@ -21,7 +21,7 @@ namespace {
 
 static LLVMTaintConfig getDefaultConfig() {
   auto SourceCB = [](const llvm::Instruction *Inst) {
-    phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+    std::set<const llvm::Value *> Ret;
     if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
         Call && Call->getCalledFunction() &&
         Call->getCalledFunction()->getName() == "_Z6sourcev") {
@@ -30,7 +30,7 @@ static LLVMTaintConfig getDefaultConfig() {
     return Ret;
   };
   auto SinkCB = [](const llvm::Instruction *Inst) {
-    phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+    std::set<const llvm::Value *> Ret;
     if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
         Call && Call->getCalledFunction() &&
         Call->getCalledFunction()->getName() == "_Z4sinki") {
@@ -44,7 +44,7 @@ static LLVMTaintConfig getDefaultConfig() {
 
 static LLVMTaintConfig getDoubleFreeConfig() {
   auto SourceCB = [](const llvm::Instruction *Inst) {
-    phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+    std::set<const llvm::Value *> Ret;
     if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
         Call && Call->getCalledFunction() &&
         Call->getCalledFunction()->getName() == "free") {

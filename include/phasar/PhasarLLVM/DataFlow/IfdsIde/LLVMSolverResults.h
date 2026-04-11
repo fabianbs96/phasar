@@ -31,11 +31,10 @@ namespace psr::detail {
 template <typename Derived, typename N, typename D, typename L>
 auto SolverResultsBase<Derived, N, D, L>::resultsAtInLLVMSSA(
     ByConstRef<n_t> Stmt, bool AllowOverapproximation, bool StripZero) const
-    -> phmap::parallel_node_hash_map<d_t, l_t>
+    -> std::unordered_map<d_t, l_t>
   requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>
 {
-  phmap::parallel_node_hash_set<d_t, l_t> Result = [this, Stmt,
-                                                    AllowOverapproximation]() {
+  std::unordered_map<d_t, l_t> Result = [this, Stmt, AllowOverapproximation]() {
     if (Stmt->getType()->isVoidTy()) {
       return self().Results.row(Stmt);
     }
@@ -72,7 +71,7 @@ auto SolverResultsBase<Derived, N, D, L>::resultsAtInLLVMSSA(
                                     << llvmIRToString(Stmt)
                                     << ". Use a sound, but potentially "
                                        "imprecise overapproximation");
-      phmap::parallel_node_hash_set<d_t, l_t> Ret;
+      std::unordered_map<d_t, l_t> Ret;
       for (const llvm::BasicBlock *Succ : llvm::successors(Stmt)) {
         const auto &Row = GetStartRow(Succ);
         for (const auto &[Fact, Value] : Row) {

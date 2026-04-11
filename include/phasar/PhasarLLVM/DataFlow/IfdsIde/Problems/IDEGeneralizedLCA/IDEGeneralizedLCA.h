@@ -43,13 +43,12 @@ public:
     LCAResult() = default;
     unsigned LineNo = 0;
     std::string SrcNode;
-    phmap::parallel_node_hash_map<std::string, l_t> VariableToValue;
+    std::map<std::string, l_t> VariableToValue;
     std::vector<n_t> IRTrace;
     void print(llvm::raw_ostream &OS);
   };
 
-  using lca_results_t = phmap::parallel_node_hash_map<
-      std::string, phmap::parallel_node_hash_map<unsigned, LCAResult>>;
+  using lca_results_t = std::map<std::string, std::map<unsigned, LCAResult>>;
 
   IDEGeneralizedLCA(const LLVMProjectIRDB *IRDB, const LLVMBasedICFG *ICF,
                     std::vector<std::string> EntryPoints, size_t MaxSetSize);
@@ -119,7 +118,7 @@ private:
   const LLVMBasedICFG *ICF{};
   size_t MaxSetSize;
 
-  void stripBottomResults(phmap::parallel_node_hash_map<d_t, l_t> &Res);
+  void stripBottomResults(std::unordered_map<d_t, l_t> &Res);
   [[nodiscard]] bool isEntryPoint(const std::string &Name) const;
   bool isStringConstructor(const llvm::Function *Func);
 };

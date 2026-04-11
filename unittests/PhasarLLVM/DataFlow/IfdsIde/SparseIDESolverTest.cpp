@@ -69,7 +69,7 @@ TEST_P(LinearConstant, SparseResultsEquivalent) {
 
 static LLVMTaintConfig getDoubleFreeConfig() {
   auto SourceCB = [](const llvm::Instruction *Inst) {
-    phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+    std::set<const llvm::Value *> Ret;
     if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
         Call && Call->getCalledFunction() &&
         Call->getCalledFunction()->getName() == "free") {

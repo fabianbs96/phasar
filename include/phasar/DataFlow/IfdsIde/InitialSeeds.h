@@ -16,8 +16,8 @@
 
 #include "llvm/Support/Compiler.h"
 
-#include "phmap.h"
-
+#include <map>
+#include <set>
 #include <type_traits>
 
 namespace psr {
@@ -27,8 +27,7 @@ namespace psr {
 /// The initial facts that should hold at the entry points.
 template <typename N, typename D, typename L> class InitialSeeds {
 public:
-  using GeneralizedSeeds =
-      phmap::parallel_node_hash_map<N, phmap::parallel_node_hash_map<D, L>>;
+  using GeneralizedSeeds = std::map<N, std::map<D, L>>;
 
   using n_t = N;
   using d_t = D;
@@ -36,9 +35,7 @@ public:
 
   InitialSeeds() = default;
 
-  InitialSeeds(
-      const phmap::parallel_node_hash_map<N, phmap::parallel_node_hash_set<D>>
-          &Seeds)
+  InitialSeeds(const std::map<N, std::set<D>> &Seeds)
     requires std::is_same_v<l_t, BinaryDomain>
   {
     for (const auto &[Node, Facts] : Seeds) {

@@ -80,15 +80,13 @@ public:
                                  llvm::ArrayRef<f_t> Callees,
                                  const mono_container_t &In) override;
 
-  phmap::parallel_node_hash_map<n_t, mono_container_t> initialSeeds() override;
+  std::unordered_map<n_t, mono_container_t> initialSeeds() override;
 
-  [[nodiscard]] const phmap::parallel_node_hash_map<
-      n_t, phmap::parallel_node_hash_set<d_t>> &
-  getAllLeaks() const;
+  [[nodiscard]] const std::map<n_t, std::set<d_t>> &getAllLeaks() const;
 
 private:
   [[maybe_unused]] const LLVMTaintConfig &Config;
-  phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_set<d_t>> Leaks;
+  std::map<n_t, std::set<d_t>> Leaks;
 };
 
 } // namespace psr

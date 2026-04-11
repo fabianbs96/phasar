@@ -42,12 +42,11 @@ protected:
   static constexpr auto PathToLLFiles = PHASAR_BUILD_SUBFOLDER("xtaint/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  using TaintSetT = phmap::parallel_node_hash_set<TestingSrcLocation>;
+  using TaintSetT = std::set<TestingSrcLocation>;
 
   void doAnalysis(
       const llvm::Twine &IRFilePath,
-      const phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT>
-          &GroundTruth,
+      const std::map<TestingSrcLocation, TaintSetT> &GroundTruth,
       std::variant<std::monostate, TaintConfigData *, CallBackPairTy> Config,
       bool DumpResults = true) {
     HelperAnalyses HA(PathToLLFiles + IRFilePath, EntryPoints);
@@ -85,17 +84,14 @@ protected:
     compareResults(TaintProblem, Solver, GroundTruth);
   }
 
-  void compareResults(
-      IDEExtendedTaintAnalysis<> &TaintProblem,
-      IDESolver_P<IDEExtendedTaintAnalysis<>> &Solver,
-      const phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT>
-          &GroundTruth) {
+  void
+  compareResults(IDEExtendedTaintAnalysis<> &TaintProblem,
+                 IDESolver_P<IDEExtendedTaintAnalysis<>> &Solver,
+                 const std::map<TestingSrcLocation, TaintSetT> &GroundTruth) {
     auto GroundTruthEntries = convertTestingLocationSetMapInIR(
         GroundTruth, *TaintProblem.getProjectIRDB());
 
-    phmap::parallel_node_hash_map<
-        const llvm::Instruction *,
-        phmap::parallel_node_hash_set<const llvm::Value *>>
+    std::map<const llvm::Instruction *, std::set<const llvm::Value *>>
         FoundLeaks;
 
     for (const auto &[LeakInst, LeakVals] :
@@ -121,7 +117,7 @@ TEST_F(IDETaintAnalysisTest, XTaint01_Json) {
   Config.Functions.push_back(std::move(FuncDataMain));
   Config.Functions.push_back(std::move(FuncDataPrint));
 
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {{
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {{
       LineColFun{8, 3, "main"},
       {LineColFunOp{8, 9, "main", llvm::Instruction::Load}},
   }};
@@ -130,7 +126,7 @@ TEST_F(IDETaintAnalysisTest, XTaint01_Json) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint01) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{8, 3, "main"},
        {LineColFunOp{8, 9, "main", llvm::Instruction::Load}}}};
 
@@ -138,7 +134,7 @@ TEST_F(IDETaintAnalysisTest, XTaint01) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint02) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{9, 3, "main"},
        {LineColFunOp{9, 9, "main", llvm::Instruction::Load}}}};
 
@@ -146,7 +142,7 @@ TEST_F(IDETaintAnalysisTest, XTaint02) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint03) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{10, 3, "main"},
        {LineColFunOp{10, 9, "main", llvm::Instruction::Load}}}};
 
@@ -156,7 +152,7 @@ TEST_F(IDETaintAnalysisTest, XTaint03) {
 TEST_F(IDETaintAnalysisTest, XTaint04) {
   auto Call = LineColFun{6, 3, "_Z3barPi"};
 
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {Call, {OperandOf{0, Call}}}};
 
   doAnalysis("xtaint04_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
@@ -165,7 +161,7 @@ TEST_F(IDETaintAnalysisTest, XTaint04) {
 // XTaint05 is similar to 06, but even harder
 
 TEST_F(IDETaintAnalysisTest, XTaint06) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       // no leaks expected
   };
 
@@ -176,7 +172,7 @@ TEST_F(IDETaintAnalysisTest, XTaint06) {
 /// extra parameters of C-style variadic functions is not (yet?) supported.
 /// So, the tests XTaint07 and XTaint08 are disabled.
 TEST_F(IDETaintAnalysisTest, DISABLED_XTaint07) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{10, 0, "main"},
        {LineColFunOp{10, 18, "main", llvm::Instruction::Load}}}};
 
@@ -184,7 +180,7 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint07) {
 }
 
 TEST_F(IDETaintAnalysisTest, DISABLED_XTaint08) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{20, 3, "main"},
        {LineColFunOp{20, 18, "main", llvm::Instruction::Load}}}};
 
@@ -192,7 +188,7 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint08) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint09_1) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{14, 3, "main"}, {LineColFun{14, 8, "main"}}}};
 
   doAnalysis("xtaint09_1_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
@@ -200,14 +196,14 @@ TEST_F(IDETaintAnalysisTest, XTaint09_1) {
 
 TEST_F(IDETaintAnalysisTest, XTaint09) {
   auto SinkCall = LineColFun{16, 3, "main"};
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {SinkCall, {OperandOf{0, SinkCall}}}};
 
   doAnalysis("xtaint09_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 }
 
 TEST_F(IDETaintAnalysisTest, DISABLED_XTaint10) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       // no leaks expected
   };
 
@@ -215,7 +211,7 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint10) {
 }
 
 TEST_F(IDETaintAnalysisTest, DISABLED_XTaint11) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       // no leaks expected
   };
 
@@ -223,21 +219,21 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint11) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint12) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{19, 3, "main"}, {LineColFun{19, 8, "main"}}}};
 
   doAnalysis("xtaint12_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint13) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{17, 3, "main"}, {LineColFun{17, 8, "main"}}}};
 
   doAnalysis("xtaint13_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint14) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{24, 3, "main"}, {LineColFun{24, 8, "main"}}}};
 
   doAnalysis("xtaint14_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
@@ -246,7 +242,7 @@ TEST_F(IDETaintAnalysisTest, XTaint14) {
 /// The TaintConfig fails to get all call-sites of Source::get, because it has
 /// no CallGraph information
 TEST_F(IDETaintAnalysisTest, DISABLED_XTaint15) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       // no leaks expected
   };
 
@@ -254,21 +250,21 @@ TEST_F(IDETaintAnalysisTest, DISABLED_XTaint15) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint16) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{13, 3, "main"}, {LineColFun{13, 8, "main"}}}};
 
   doAnalysis("xtaint16_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint17) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{17, 3, "main"}, {LineColFun{17, 8, "main"}}}};
 
   doAnalysis("xtaint17_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint18) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       // no leaks expected
   };
 
@@ -279,14 +275,14 @@ PHASAR_SKIP_TEST(TEST_F(IDETaintAnalysisTest, XTaint19) {
   // Is now the same as XTaint17
   GTEST_SKIP();
 
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{17, 3, "main"}, {LineColFun{17, 8, "main"}}}};
 
   doAnalysis("xtaint19_cpp_dbg.ll", GroundTruth, std::monostate{}, true);
 })
 
 TEST_F(IDETaintAnalysisTest, XTaint20) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{12, 3, "main"}, {LineColFun{6, 7, "main"}}},
       {LineColFun{13, 3, "main"}, {LineColFun{13, 8, "main"}}},
   };
@@ -295,14 +291,14 @@ TEST_F(IDETaintAnalysisTest, XTaint20) {
 }
 
 TEST_F(IDETaintAnalysisTest, XTaint21) {
-  phmap::parallel_node_hash_map<TestingSrcLocation, TaintSetT> GroundTruth = {
+  std::map<TestingSrcLocation, TaintSetT> GroundTruth = {
       {LineColFun{17, 3, "main"}, {LineColFun{11, 7, "main"}}},
       {LineColFun{18, 3, "main"}, {LineColFun{18, 8, "main"}}},
   };
 
   IDEExtendedTaintAnalysis<>::config_callback_t SourceCB =
       [](const llvm::Instruction *Inst) {
-        phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+        std::set<const llvm::Value *> Ret;
         if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
             Call && Call->getCalledFunction() &&
             Call->getCalledFunction()->getName() == "_Z7srcsinkRi") {
@@ -312,7 +308,7 @@ TEST_F(IDETaintAnalysisTest, XTaint21) {
       };
   IDEExtendedTaintAnalysis<>::config_callback_t SinkCB =
       [](const llvm::Instruction *Inst) {
-        phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+        std::set<const llvm::Value *> Ret;
         if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
             Call && Call->getCalledFunction() &&
             (Call->getCalledFunction()->getName() == "_Z7srcsinkRi" ||

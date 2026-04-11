@@ -26,9 +26,7 @@ protected:
       PHASAR_BUILD_SUBFOLDER("taint_analysis/");
   const std::vector<std::string> EntryPoints = {"main"};
 
-  phmap::parallel_node_hash_map<
-      llvm::Instruction const *,
-      phmap::parallel_node_hash_set<llvm::Value const *>>
+  std::map<llvm::Instruction const *, std::set<llvm::Value const *>>
   doAnalysis(llvm::StringRef LlvmFilePath, bool PrintDump = false) {
     HelperAnalyses HA(PathToLlFiles + LlvmFilePath, EntryPoints);
 
@@ -37,7 +35,7 @@ protected:
     ConfigPath.erase(BuildPos, 6);
     LLVMTaintConfig TC(HA.getProjectIRDB(), parseTaintConfig(ConfigPath));
     TC.registerSinkCallBack([](const llvm::Instruction *Inst) {
-      phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+      std::set<const llvm::Value *> Ret;
       if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
           Call && Call->getCalledFunction() &&
           Call->getCalledFunction()->getName() == "printf") {
@@ -65,10 +63,10 @@ protected:
     return Leaks;
   }
 
-  void doAnalysisAndCompare(
-      const std::string & /*LlvmFilePath*/, size_t /*InstId*/,
-      const phmap::parallel_node_hash_set<std::string> & /*GroundTruth*/,
-      bool /*PrintDump = false*/) {
+  void doAnalysisAndCompare(const std::string & /*LlvmFilePath*/,
+                            size_t /*InstId*/,
+                            const std::set<std::string> & /*GroundTruth*/,
+                            bool /*PrintDump = false*/) {
     // FIXME
     // auto IR_Files = {PathToLlFiles + LlvmFilePath};
     // IRDB = std::make_unique<ProjectIRDB>(IR_Files, IRDBOptions::WPA);
@@ -84,7 +82,7 @@ protected:
     // TaintSolver(TaintProblem); TaintSolver.solve(); if (PrintDump) {
     //   TaintSolver.dumpResults();
     // }
-    // phmap::parallel_node_hash_set<std::string> FoundResults;
+    // std::set<std::string> FoundResults;
     // for (const auto *Result :
     //      TaintSolver.getResultsAt(IRDB->getInstruction(InstId))) {
     //   FoundResults.insert(getMetaDataID(Result));
@@ -94,15 +92,10 @@ protected:
   }
 
   static void compareResults(
-      phmap::parallel_node_hash_map<
-          llvm::Instruction const *,
-          phmap::parallel_node_hash_set<llvm::Value const *>> &Leaks,
-      phmap::parallel_node_hash_map<
-          int, phmap::parallel_node_hash_set<std::string>> &GroundTruth,
+      std::map<llvm::Instruction const *, std::set<llvm::Value const *>> &Leaks,
+      std::map<int, std::set<std::string>> &GroundTruth,
       const std::string &ErrorMessage = "") {
-    phmap::parallel_node_hash_map<int,
-                                  phmap::parallel_node_hash_set<std::string>>
-        LeakIds;
+    std::map<int, std::set<std::string>> LeakIds;
     for (const auto &Kvp : Leaks) {
       int InstId = stoi(getMetaDataID(Kvp.first));
       EXPECT_NE(-1, InstId);
@@ -123,30 +116,30 @@ protected:
  ******************************************************************************
 
 TEST_F(InterMonoTaintAnalysisTest, TaintTest_03) {
-  phmap::parallel_node_hash_set<std::string> Facts{"20", "21", "22",     "24",
-"27", "28", "32", "main.0", "main.1"}; doAnalysisAndCompare("taint_11_c.ll", 34,
-Facts);
+  std::set<std::string> Facts{"20", "21", "22",     "24",    "27",
+                              "28", "32", "main.0", "main.1"};
+  doAnalysisAndCompare("taint_11_c.ll", 34, Facts);
 }
 
 TEST_F(InterMonoTaintAnalysisTest, TaintTest_03_v2) {
   auto Leaks = doAnalysis("taint_11_c.ll");
   // 35 => {34}
   // 37 => {36} due to overapproximation (limitation of call string)
-  phmap::parallel_node_hash_map<int, phmap::parallel_node_hash_set<std::string>>
-GroundTruth; GroundTruth[35] = {"34"}; GroundTruth[37] = {"36"};
+  std::map<int, std::set<std::string>> GroundTruth;
+  GroundTruth[35] = {"34"};
+  GroundTruth[37] = {"36"};
   // kind of nondeterministic: sometimes it only leaks at 35, some only at
   // 37, but most times at both
   compareResults(Leaks, GroundTruth);
 }
 
 TEST_F(InterMonoTaintAnalysisTest, TaintTest_05) {
-  phmap::parallel_node_hash_set<std::string> Facts{"7", "8", "14", "15", "19",
-"main.0", "main.1"}; doAnalysisAndCompare("taint_13_c.ll", 31, Facts);
+  std::set<std::string> Facts{"7", "8", "14", "15", "19", "main.0",
+  "main.1"}; doAnalysisAndCompare("taint_13_c.ll", 31, Facts);
 }
 
 TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
-  phmap::parallel_node_hash_set<std::string> Facts{"7", "8", "14", "15", "19",
-"main.0", "main.1"};
+  std::set<std::string> Facts{"7", "8", "14", "15", "19", "main.0", "main.1"};
   // doAnalysisAndCompare("taint_13_c.ll", 31, Facts);
   const std::string pathToLLFiles =
       PhasarConfig::getPhasarConfig().PhasarDirectory() +
@@ -161,7 +154,7 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
       TaintProblem);
   TaintSolver.solve();
   TaintSolver.dumpResults();
-  phmap::parallel_node_hash_set<std::string> FoundResults;
+  std::set<std::string> FoundResults;
   for (auto result :
        TaintSolver.getResultsAt(IRDB.getInstruction(31)).getAsSet()) {
     FoundResults.insert(getMetaDataID(result));
@@ -176,19 +169,18 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
  ******************************************************************************/
 
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_01) {
-//   phmap::parallel_node_hash_set<std::string> Facts{"5", "6", "7", "10", "11",
-//   "main.0", "main.1"}; doAnalysisAndCompare("taint_9_c.ll", 13, Facts);
+//   std::set<std::string> Facts{"5", "6", "7", "10", "11", "main.0", "main.1"};
+//   doAnalysisAndCompare("taint_9_c.ll", 13, Facts);
 // }
 
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_02) {
-//   phmap::parallel_node_hash_set<std::string> Facts{"5", "6", "7", "12", "13",
-//   "main.0", "main.1"}; doAnalysisAndCompare("taint_10_c.ll", 19, Facts);
+//   std::set<std::string> Facts{"5", "6", "7", "12", "13", "main.0", "main.1"};
+//   doAnalysisAndCompare("taint_10_c.ll", 19, Facts);
 // }
 
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_04) {
-//   phmap::parallel_node_hash_set<std::string> Facts{"21", "22", "23", "28",
-//   "29", "main.0", "main.1"}; doAnalysisAndCompare("taint_12_c.ll", 35,
-//   Facts);
+//   std::set<std::string> Facts{"21", "22", "23", "28", "29", "main.0",
+//   "main.1"}; doAnalysisAndCompare("taint_12_c.ll", 35, Facts);
 // }
 
 // /******************************************************************************
@@ -199,17 +191,17 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_01_v2) {
 //   auto Leaks = doAnalysis("taint_9_c.ll");
 //   // 14 => {13}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[14] =
-//   {"13"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[14] = {"13"};
+//   compareResults(Leaks, GroundTruth);
 // }
 
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_02_v2) {
 //   auto Leaks = doAnalysis("taint_10_c.ll");
 //   // 20 => {19}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[20] =
-//   {"19"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[20] = {"19"};
+//   compareResults(Leaks, GroundTruth);
 // }
 
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_04_v2) {
@@ -217,9 +209,8 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 //   // 36 => {35}
 //   // why not 38 => {37} due to overapproximation in recursion (limitation of
 //   // call string) ???
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[36] =
-//   {"35"};
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[36] = {"35"};
 //   // GroundTruth[38] = {"37"};
 //   compareResults(Leaks, GroundTruth);
 // }
@@ -229,9 +220,9 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 //   // 32 => {31}
 //   // 34 => {33} will not leak (analysis is naturally never strong enough for
 //   // this)
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[32] =
-//   {"31"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[32] = {"31"};
+//   compareResults(Leaks, GroundTruth);
 // }
 
 // /**********************************************************
@@ -240,9 +231,8 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_06) {
 //   auto Leaks = doAnalysis("taint_4_v2_cpp.ll");
 //   // 19 => {18}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[19] =
-//   {"18"};
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[19] = {"18"};
 
 //   compareResults(Leaks, GroundTruth);
 // }
@@ -253,17 +243,17 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_07) {
 //   auto Leaks = doAnalysis("taint_2_v2_cpp.ll");
 //   // 10 => {9}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[10] =
-//   {"9"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[10] = {"9"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // ***********************************************************/
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_08) {
 //   auto Leaks = doAnalysis("taint_2_v2_1_cpp.ll");
 //   // 4 => {3}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[4] =
-//   {"3"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[4] = {"3"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // /**********************************************************
 //  * fails due to lack of alias information
@@ -271,9 +261,9 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_09) {
 //   auto Leaks = doAnalysis("source_sink_function_test_c.ll");
 //   // 41 => {40};
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[41] =
-//   {"40"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[41] = {"40"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // ***********************************************************/
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_10) {
@@ -281,9 +271,9 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 //   // 11 => {10}; do not know, why it fails; getchar is definitely a source,
 //   but
 //   // it doesn't generate a fact
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[11] =
-//   {"10"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[11] = {"10"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // /**********************************************************
 //  * fails, because arithmetic operations do not propagate taints;
@@ -292,9 +282,9 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_11) {
 //   auto Leaks = doAnalysis("taint_14_1_cpp.ll");
 //   // 12 => {11}; quite similar as TaintTest10, but all in main;
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[12] =
-//   {"11"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[12] = {"11"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // ***********************************************************/
 // /**********************************************************
@@ -304,9 +294,8 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_12) {
 //   auto Leaks = doAnalysis("taint_15_cpp.ll");
 //   // 21 => {20}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[21] =
-//   {"20"};
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[21] = {"20"};
 //   // overapproximation due to lack of knowledge
 //   // about ring-exchanges may be allowed, but actually 22 should not hold at
 //   23 GroundTruth[23] = {"22"}; compareResults(Leaks, GroundTruth,
@@ -317,10 +306,9 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, TaintTest_13) {
 //   auto Leaks = doAnalysis("taint_15_1_cpp.ll");
 //   // 16 => {15};
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[16] =
-//   {"15"}; compareResults(Leaks, GroundTruth, "The ring-exchange was not
-//   successful");
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[16] = {"15"};
+//   compareResults(Leaks, GroundTruth, "The ring-exchange was not successful");
 // }
 // /**********************************************************
 //  * Fails, since the callgraph algorithm cannot find a function without body
@@ -332,8 +320,7 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, VirtualCalls) {
 //   auto Leaks = doAnalysis("virtual_calls_cpp.ll");
 //   // 20 => {19};
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth;
+//   std::map<int, std::set<std::string>> GroundTruth;
 //   // Fails, although putchar is definitely a source;
 
 //   // The dump says, the callgraph construction only finds one possible callee
@@ -345,8 +332,7 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, VirtualCalls_v2) {
 //   auto Leaks = doAnalysis("virtual_calls_v2_cpp.ll");
 //   // 7 => {6};
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth;
+//   std::map<int, std::set<std::string>> GroundTruth;
 
 //   GroundTruth[7] = {"6"};
 //   compareResults(Leaks, GroundTruth);
@@ -358,8 +344,7 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 //   auto Leaks = doAnalysis("struct_member_cpp.ll");
 //   // 16 => {15};
 //   // 19 => {18};
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth;
+//   std::map<int, std::set<std::string>> GroundTruth;
 
 //   // Overapproximation due to field-insensitivity
 //   GroundTruth[16] = {"15"};
@@ -374,16 +359,15 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, DynamicMemory) {
 //   auto Leaks = doAnalysis("dynamic_memory_cpp.ll");
 //   // 11 => {10}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth; GroundTruth[11] =
-//   {"10"}; compareResults(Leaks, GroundTruth);
+//   std::map<int, std::set<std::string>> GroundTruth;
+//   GroundTruth[11] = {"10"};
+//   compareResults(Leaks, GroundTruth);
 // }
 // ***********************************************************/
 // TEST_F(InterMonoTaintAnalysisTest, DynamicMemory_simple) {
 //   auto Leaks = doAnalysis("dynamic_memory_simple_cpp.ll");
 //   // 15 => {14}
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::string>> GroundTruth;
+//   std::map<int, std::set<std::string>> GroundTruth;
 
 //   GroundTruth[15] = {"14"};
 //   compareResults(Leaks, GroundTruth);
@@ -394,8 +378,7 @@ TEST(InterMonoTaintAnalysisTestNF, TaintTest_05) {
 // TEST_F(InterMonoTaintAnalysisTest, FileIO) {
 //   auto Leaks = doAnalysis("read_c.ll");
 
-//   phmap::parallel_node_hash_map<int,
-//   phmap::parallel_node_hash_set<std::std::string>> GroundTruth;
+//   std::map<int, std::set<std::std::string>> GroundTruth;
 //   // 37 => {36}
 //   // 43 => {41}
 //   GroundTruth[37] = {"36"};

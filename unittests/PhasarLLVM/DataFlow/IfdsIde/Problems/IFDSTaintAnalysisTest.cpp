@@ -42,7 +42,7 @@ protected:
   }
   static LLVMTaintConfig getDefaultConfig() {
     auto SourceCB = [](const llvm::Instruction *Inst) {
-      phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+      std::set<const llvm::Value *> Ret;
       if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
           Call && Call->getCalledFunction() &&
           isDummySrcFun(Call->getCalledFunction()->getName())) {
@@ -51,7 +51,7 @@ protected:
       return Ret;
     };
     auto SinkCB = [](const llvm::Instruction *Inst) {
-      phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+      std::set<const llvm::Value *> Ret;
       if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
           Call && Call->getCalledFunction() &&
           isDummySinkFun(Call->getCalledFunction()->getName())) {
@@ -65,7 +65,7 @@ protected:
 
   static LLVMTaintConfig getDoubleFreeConfig() {
     auto SourceCB = [](const llvm::Instruction *Inst) {
-      phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+      std::set<const llvm::Value *> Ret;
       if (const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
           Call && Call->getCalledFunction() &&
           Call->getCalledFunction()->getName() == "free") {
@@ -94,8 +94,8 @@ protected:
         createAnalysisProblem<IFDSTaintAnalysis>(*HA, Config, EntryPoints);
   }
 
-  using GroundTruthTy = phmap::parallel_node_hash_map<
-      TestingSrcLocation, phmap::parallel_node_hash_set<TestingSrcLocation>>;
+  using GroundTruthTy =
+      std::map<TestingSrcLocation, std::set<TestingSrcLocation>>;
 
   template <typename LeaksTy>
   void compare(const LeaksTy &Leaks, const GroundTruthTy &GroundTruth) {

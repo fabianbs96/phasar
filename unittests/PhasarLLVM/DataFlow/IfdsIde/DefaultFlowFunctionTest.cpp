@@ -72,21 +72,21 @@ private:
 };
 
 template <typename ImplT>
-phmap::parallel_node_hash_set<const llvm::Value *>
+std::set<const llvm::Value *>
 getNormalFlowValueSet(const llvm::Instruction *Instr, ImplT &Impl,
                       const llvm::Value *Arg) {
   return Impl.getNormalFlowFunction(Instr, nullptr)->computeTargets(Arg);
 }
 
 template <typename ImplT>
-phmap::parallel_node_hash_set<const llvm::Value *>
+std::set<const llvm::Value *>
 getCallFlowValueSet(const llvm::Instruction *Instr, ImplT &Impl,
                     const llvm::Value *Arg, const llvm::Function *CalleeFunc) {
   return Impl.getCallFlowFunction(Instr, CalleeFunc)->computeTargets(Arg);
 }
 
 template <typename ImplT>
-phmap::parallel_node_hash_set<const llvm::Value *>
+std::set<const llvm::Value *>
 getRetFlowValueSet(const llvm::Instruction *Instr, ImplT &Impl,
                    const llvm::Value *Arg, const llvm::Instruction *ExitInst) {
   return Impl.getRetFlowFunction(Instr, nullptr, ExitInst, nullptr)
@@ -94,14 +94,13 @@ getRetFlowValueSet(const llvm::Instruction *Instr, ImplT &Impl,
 }
 
 template <typename ImplT>
-phmap::parallel_node_hash_set<const llvm::Value *>
+std::set<const llvm::Value *>
 getCallToRetFlowValueSet(const llvm::Instruction *Instr, ImplT &Impl,
                          const llvm::Value *Arg) {
   return Impl.getCallToRetFlowFunction(Instr, nullptr, {})->computeTargets(Arg);
 }
 
-std::string stringifyValueSet(
-    const phmap::parallel_node_hash_set<const llvm::Value *> &Vals) {
+std::string stringifyValueSet(const std::set<const llvm::Value *> &Vals) {
   std::string Ret;
   llvm::raw_string_ostream ROS(Ret);
 
@@ -123,35 +122,33 @@ struct Impls {
   Impls(LLVMProjectIRDB *IRDB) : Alias(IRDB), NoAlias(IRDB), RAS(IRDB) {}
 };
 
-void expectNormalFlow(
-    const phmap::parallel_node_hash_set<const llvm::Value *> &Expected,
-    const llvm::Instruction *Instr, const llvm::Value *Arg, Impls &I) {
+void expectNormalFlow(const std::set<const llvm::Value *> &Expected,
+                      const llvm::Instruction *Instr, const llvm::Value *Arg,
+                      Impls &I) {
   EXPECT_EQ(Expected, getNormalFlowValueSet(Instr, I.Alias, Arg));
   EXPECT_EQ(Expected, getNormalFlowValueSet(Instr, I.NoAlias, Arg));
   EXPECT_EQ(Expected, getNormalFlowValueSet(Instr, I.RAS, Arg));
 }
 
-void expectCallFlow(
-    const phmap::parallel_node_hash_set<const llvm::Value *> &Expected,
-    const llvm::Instruction *Instr, const llvm::Value *Arg,
-    const llvm::Function *Callee, Impls &I) {
+void expectCallFlow(const std::set<const llvm::Value *> &Expected,
+                    const llvm::Instruction *Instr, const llvm::Value *Arg,
+                    const llvm::Function *Callee, Impls &I) {
   EXPECT_EQ(Expected, getCallFlowValueSet(Instr, I.Alias, Arg, Callee));
   EXPECT_EQ(Expected, getCallFlowValueSet(Instr, I.NoAlias, Arg, Callee));
   EXPECT_EQ(Expected, getCallFlowValueSet(Instr, I.RAS, Arg, Callee));
 }
 
-void expectRetFlow(
-    const phmap::parallel_node_hash_set<const llvm::Value *> &Expected,
-    const llvm::Instruction *CallSite, const llvm::Value *Arg,
-    const llvm::Instruction *ExitInst, Impls &I) {
+void expectRetFlow(const std::set<const llvm::Value *> &Expected,
+                   const llvm::Instruction *CallSite, const llvm::Value *Arg,
+                   const llvm::Instruction *ExitInst, Impls &I) {
   EXPECT_EQ(Expected, getRetFlowValueSet(CallSite, I.Alias, Arg, ExitInst));
   EXPECT_EQ(Expected, getRetFlowValueSet(CallSite, I.NoAlias, Arg, ExitInst));
   EXPECT_EQ(Expected, getRetFlowValueSet(CallSite, I.RAS, Arg, ExitInst));
 }
 
-void expectCallToRetFlow(
-    const phmap::parallel_node_hash_set<const llvm::Value *> &Expected,
-    const llvm::Instruction *Instr, const llvm::Value *Arg, Impls &I) {
+void expectCallToRetFlow(const std::set<const llvm::Value *> &Expected,
+                         const llvm::Instruction *Instr, const llvm::Value *Arg,
+                         Impls &I) {
   EXPECT_EQ(Expected, getCallToRetFlowValueSet(Instr, I.Alias, Arg));
   EXPECT_EQ(Expected, getCallToRetFlowValueSet(Instr, I.NoAlias, Arg));
   EXPECT_EQ(Expected, getCallToRetFlowValueSet(Instr, I.RAS, Arg));
@@ -776,19 +773,19 @@ TEST(PureFlow, RetFlow03) {
   const auto &Got =
       getRetFlowValueSet(PercentCall, I.Alias, FunctionZ8newThreePKi->getArg(0),
                          RetValNewThreeInstr);
-  EXPECT_EQ(phmap::parallel_node_hash_set<const llvm::Value *>{Percent0},
+  EXPECT_EQ(std::set<const llvm::Value *>{Percent0},
             getRetFlowValueSet(PercentCall, I.NoAlias,
                                FunctionZ8newThreePKi->getArg(0),
                                RetValNewThreeInstr));
-  EXPECT_EQ((phmap::parallel_node_hash_set<const llvm::Value *>{
-                Percent0, PercentThreeInCall, PercentCall}),
+  EXPECT_EQ((std::set<const llvm::Value *>{Percent0, PercentThreeInCall,
+                                           PercentCall}),
             getRetFlowValueSet(PercentCall, I.RAS,
                                FunctionZ8newThreePKi->getArg(0),
                                RetValNewThreeInstr));
 
   EXPECT_EQ(
-      (phmap::parallel_node_hash_set<const llvm::Value *>{
-          PercentThreeInCall, PercentThreePtrInCall, Percent0, PercentCall}),
+      (std::set<const llvm::Value *>{PercentThreeInCall, PercentThreePtrInCall,
+                                     Percent0, PercentCall}),
       Got)
       << stringifyValueSet(Got);
 

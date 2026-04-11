@@ -85,9 +85,8 @@ private:
 
   [[nodiscard]] TaintCategory getCategoryImpl(const llvm::Value *V) const;
 
-  [[nodiscard]] phmap::parallel_node_hash_map<
-      const llvm::Instruction *,
-      phmap::parallel_node_hash_set<const llvm::Value *>>
+  [[nodiscard]] std::map<const llvm::Instruction *,
+                         std::set<const llvm::Value *>>
   makeInitialSeedsImpl(SeedConfig Conf) const;
 
   void printImpl(llvm::raw_ostream &OS) const;

@@ -87,12 +87,12 @@ InterMonoSolverTest::mono_container_t InterMonoSolverTest::callToRetFlow(
   return In;
 }
 
-phmap::parallel_node_hash_map<InterMonoSolverTest::n_t,
-                              InterMonoSolverTest::mono_container_t>
+std::unordered_map<InterMonoSolverTest::n_t,
+                   InterMonoSolverTest::mono_container_t>
 InterMonoSolverTest::initialSeeds() {
   llvm::outs() << "InterMonoSolverTest::initialSeeds()\n";
-  phmap::parallel_node_hash_map<InterMonoSolverTest::n_t,
-                                InterMonoSolverTest::mono_container_t>
+  std::unordered_map<InterMonoSolverTest::n_t,
+                     InterMonoSolverTest::mono_container_t>
       Seeds;
   InterMonoSolverTest::f_t Main = IRDB->getFunction("main");
   for (const auto *StartPoint : ICF->getStartPointsOf(Main)) {

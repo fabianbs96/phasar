@@ -42,7 +42,7 @@ namespace detail {
 
 class IDETypeStateAnalysisBaseCommon : public LLVMAnalysisDomainDefault {
 public:
-  using container_type = phmap::parallel_node_hash_set<d_t>;
+  using container_type = std::set<d_t>;
   using FlowFunctionPtrType = psr::FlowFunctionPtrType<d_t, container_type>;
 };
 
@@ -134,11 +134,9 @@ private:
 
   bool hasMatchingTypeName(const llvm::DIType *DITy);
 
-  phmap::parallel_node_hash_map<const llvm::Value *, LLVMAliasInfo::AliasSetTy>
-      AliasCache;
+  std::map<const llvm::Value *, LLVMAliasInfo::AliasSetTy> AliasCache;
   LLVMAliasInfoRef PT{};
-  phmap::parallel_node_hash_map<
-      const llvm::Value *, phmap::parallel_node_hash_set<const llvm::Value *>>
+  std::map<const llvm::Value *, std::set<const llvm::Value *>>
       RelevantAllocaCache;
 };
 } // namespace detail

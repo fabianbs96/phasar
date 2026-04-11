@@ -55,14 +55,12 @@ protected:
     return RetOrResInstructions;
   }
 
-  void compareResultsImpl(
-      const phmap::parallel_node_hash_set<const llvm::Value *> &GroundTruth,
-      IFDSSolver_P<IFDSConstAnalysis> &Solver) {
-    phmap::parallel_node_hash_set<const llvm::Value *> AllMutableAllocas;
+  void compareResultsImpl(const std::set<const llvm::Value *> &GroundTruth,
+                          IFDSSolver_P<IFDSConstAnalysis> &Solver) {
+    std::set<const llvm::Value *> AllMutableAllocas;
 
     for (const auto *RR : getRetOrResInstructions()) {
-      phmap::parallel_node_hash_set<const llvm::Value *> Facts =
-          Solver.ifdsResultsAt(RR);
+      std::set<const llvm::Value *> Facts = Solver.ifdsResultsAt(RR);
       for (const auto *Fact : Facts) {
         if (isAllocaInstOrHeapAllocaFunction(Fact) ||
             (llvm::isa<llvm::GlobalValue>(Fact) &&
@@ -76,9 +74,8 @@ protected:
     EXPECT_EQ(GroundTruth, AllMutableAllocas);
   }
 
-  void compareResults(
-      const phmap::parallel_node_hash_set<TestingSrcLocation> &GroundTruth,
-      IFDSSolver_P<IFDSConstAnalysis> &Solver) {
+  void compareResults(const std::set<TestingSrcLocation> &GroundTruth,
+                      IFDSSolver_P<IFDSConstAnalysis> &Solver) {
     auto GroundTruthEntries =
         convertTestingLocationSetInIR(GroundTruth, HA->getProjectIRDB());
 
@@ -98,7 +95,7 @@ TEST_F(IFDSConstAnalysisTest, HandleBasicTest_01) {
   initialize({PathToLlFiles + "basic/basic_01_cpp_dbg.ll"});
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth;
+  std::set<TestingSrcLocation> GroundTruth;
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -107,7 +104,7 @@ TEST_F(IFDSConstAnalysisTest, HandleBasicTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -116,7 +113,7 @@ TEST_F(IFDSConstAnalysisTest, HandleBasicTest_03) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -125,7 +122,7 @@ TEST_F(IFDSConstAnalysisTest, HandleBasicTest_04) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -135,7 +132,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCFForTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 12, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -144,7 +141,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCFForTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{4, 12, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -153,7 +150,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCFIfTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{4, 12, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -161,7 +158,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCFIfTest_02) {
   initialize({PathToLlFiles + "control_flow/cf_if_02_cpp_m2r_dbg.ll"});
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{};
+  std::set<TestingSrcLocation> GroundTruth{};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -170,7 +167,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCFWhileTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{5, 12, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -180,7 +177,7 @@ TEST_F(IFDSConstAnalysisTest, HandlePointerTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -189,7 +186,7 @@ TEST_F(IFDSConstAnalysisTest, HandlePointerTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -200,7 +197,7 @@ TEST_F(IFDSConstAnalysisTest, DISABLED_HandlePointerTest_03) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{4, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -209,7 +206,7 @@ TEST_F(IFDSConstAnalysisTest, HandlePointerTest_04) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{5, 7, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -219,7 +216,7 @@ TEST_F(IFDSConstAnalysisTest, HandleGlobalTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = GlobalVar{"g1"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -229,8 +226,7 @@ TEST_F(IFDSConstAnalysisTest, HandleGlobalTest_02) {
   Llvmconstsolver.solve();
   auto Entry = GlobalVar{"g"};
   auto EntryTwo = LineColFun{4, 7, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry,
-                                                                EntryTwo};
+  std::set<TestingSrcLocation> GroundTruth{Entry, EntryTwo};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -242,8 +238,7 @@ TEST_F(IFDSConstAnalysisTest, HandleGlobalTest_03) {
   auto Entry = LineColFun{6, 10, "__cxx_global_var_init"};
   auto EntryTwo = GlobalVar{"g"};
 
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry,
-                                                                EntryTwo};
+  std::set<TestingSrcLocation> GroundTruth{Entry, EntryTwo};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -254,7 +249,7 @@ TEST_F(IFDSConstAnalysisTest, DISABLED_HandleGlobalTest_04) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = GlobalVar{"g1"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -264,7 +259,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallParamTest_01) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{5, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -273,7 +268,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallParamTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{5, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -282,8 +277,8 @@ TEST_F(IFDSConstAnalysisTest, HandleCallParamTest_03) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   // auto Entry = LineColFun{, , "main"};
-  // phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{};
+  // std::set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -317,7 +312,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallParamTest_07) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{6, 12, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -326,7 +321,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallParamTest_08) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{9, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -342,7 +337,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallReturnTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 12, "_Z3foov"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -351,7 +346,7 @@ TEST_F(IFDSConstAnalysisTest, HandleCallReturnTest_03) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 12, "_Z3foov"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -391,7 +386,7 @@ TEST_F(IFDSConstAnalysisTest, HandleArrayTest_05) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -401,7 +396,7 @@ TEST_F(IFDSConstAnalysisTest, HandleArrayTest_06) {
   Llvmconstsolver.solve();
   HA->getAliasInfo().print(llvm::errs());
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -426,7 +421,7 @@ TEST_F(IFDSConstAnalysisTest, HandleArrayTest_09) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{3, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -442,7 +437,7 @@ TEST_F(IFDSConstAnalysisTest, HandleSTLArrayTest_02) {
   initialize({PathToLlFiles + "array/stl_array/stl_array_02_cpp_m2r_dbg.ll"});
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth = {
+  std::set<TestingSrcLocation> GroundTruth = {
       LineColFun{4, 0, "main"},
       GlobalVar{"__const.main.a"},
   };
@@ -487,7 +482,7 @@ TEST_F(IFDSConstAnalysisTest, HandleSTLArrayTest_06) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{4, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 
@@ -506,7 +501,7 @@ TEST_F(IFDSConstAnalysisTest, DISABLED_HandleCStringTest_02) {
   IFDSSolver Llvmconstsolver(*Constproblem, &HA->getICFG());
   Llvmconstsolver.solve();
   auto Entry = LineColFun{4, 0, "main"};
-  phmap::parallel_node_hash_set<TestingSrcLocation> GroundTruth{Entry};
+  std::set<TestingSrcLocation> GroundTruth{Entry};
   compareResults(GroundTruth, Llvmconstsolver);
 }
 

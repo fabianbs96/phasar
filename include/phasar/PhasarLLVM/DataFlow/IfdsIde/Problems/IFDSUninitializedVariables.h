@@ -31,9 +31,8 @@ class IFDSUninitializedVariables
     std::string FilePath;
     std::string SrcCode;
     std::vector<std::string> VarNames;
-    phmap::parallel_node_hash_map<
-        IFDSUninitializedVariables::n_t,
-        phmap::parallel_node_hash_set<IFDSUninitializedVariables::d_t>>
+    std::map<IFDSUninitializedVariables::n_t,
+             std::set<IFDSUninitializedVariables::d_t>>
         IRTrace;
     [[nodiscard]] bool empty() const;
     void print(llvm::raw_ostream &OS);
@@ -66,15 +65,12 @@ public:
   void emitTextReport(GenericSolverResults<n_t, d_t, l_t> Results,
                       llvm::raw_ostream &OS = llvm::outs()) override;
 
-  [[nodiscard]] const phmap::parallel_node_hash_map<
-      n_t, phmap::parallel_node_hash_set<d_t>> &
-  getAllUndefUses() const;
+  [[nodiscard]] const std::map<n_t, std::set<d_t>> &getAllUndefUses() const;
 
   std::vector<UninitResult> aggregateResults();
 
 private:
-  phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_set<d_t>>
-      UndefValueUses;
+  std::map<n_t, std::set<d_t>> UndefValueUses;
 };
 
 } // namespace psr

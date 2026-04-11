@@ -197,17 +197,15 @@ public:
    * @param AliasSet that is refined.
    * @param Context dictates which points-to information is relevant.
    */ // clang-format on
-  static phmap::parallel_node_hash_set<d_t>
-  getContextRelevantAliasSet(phmap::parallel_node_hash_set<d_t> &AliasSet,
-                             f_t Context);
+  static std::set<d_t> getContextRelevantAliasSet(std::set<d_t> &AliasSet,
+                                                  f_t Context);
 
 private:
   LLVMAliasInfoRef PT{};
   // Holds all allocated memory locations, including global variables
-  phmap::parallel_node_hash_set<d_t>
-      AllMemLocs; // FIXME: initialize within the constructor body!
+  std::set<d_t> AllMemLocs; // FIXME: initialize within the constructor body!
   // Holds all initialized variables and objects.
-  phmap::parallel_node_hash_set<d_t> Initialized;
+  std::set<d_t> Initialized;
 };
 
 } // namespace psr

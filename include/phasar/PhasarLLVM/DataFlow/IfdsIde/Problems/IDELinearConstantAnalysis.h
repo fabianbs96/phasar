@@ -72,7 +72,7 @@ public:
 
   using lca_results_t = std::map<std::string, std::map<unsigned, LCAResult>>;
 
-  static void stripBottomResults(phmap::parallel_node_hash_map<d_t, l_t> &Res);
+  static void stripBottomResults(std::unordered_map<d_t, l_t> &Res);
 
   // start formulating our analysis by specifying the parts required for IFDS
 

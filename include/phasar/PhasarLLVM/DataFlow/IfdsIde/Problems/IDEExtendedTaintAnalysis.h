@@ -86,12 +86,12 @@ private:
 
   /// Add source to ret if it belongs to the same function as CurrInst. If
   /// addGlobals is true, also add llvm::GlobalValue.
-  static void identity(phmap::parallel_node_hash_set<d_t> &Ret, d_t Source,
+  static void identity(std::set<d_t> &Ret, d_t Source,
                        const llvm::Instruction *CurrInst,
                        bool AddGlobals = true);
-  [[nodiscard]] static phmap::parallel_node_hash_set<d_t>
-  identity(d_t Source, const llvm::Instruction *CurrInst,
-           bool AddGlobals = true);
+  [[nodiscard]] static std::set<d_t> identity(d_t Source,
+                                              const llvm::Instruction *CurrInst,
+                                              bool AddGlobals = true);
 
   [[nodiscard]] static inline bool equivalent(d_t LHS, d_t RHS) {
     return LHS->equivalent(RHS);
@@ -116,10 +116,11 @@ private:
                                  const llvm::Value *ValueOp,
                                  const llvm::Instruction *Store,
                                  unsigned PALevel = 1);
-  phmap::parallel_node_hash_set<d_t>
-  propagateAtStore(AliasInfoRef<v_t, n_t>::AliasSetPtrTy PTS, d_t Source,
-                   d_t Val, d_t Mem, const llvm::Value *PointerOp,
-                   const llvm::Value *ValueOp, const llvm::Instruction *Store);
+  std::set<d_t> propagateAtStore(AliasInfoRef<v_t, n_t>::AliasSetPtrTy PTS,
+                                 d_t Source, d_t Val, d_t Mem,
+                                 const llvm::Value *PointerOp,
+                                 const llvm::Value *ValueOp,
+                                 const llvm::Instruction *Store);
 
   void forEachAliasOf(AliasInfoRef<v_t, n_t>::AliasSetPtrTy PTS,
                       const llvm::Value *Of,
@@ -155,8 +156,7 @@ private:
 
   bool isMustAlias(const SanitizerConfigTy &Facts, d_t CurrNod);
 
-  void generateFromZero(phmap::parallel_node_hash_set<d_t> &Dest,
-                        const llvm::Instruction *Inst,
+  void generateFromZero(std::set<d_t> &Dest, const llvm::Instruction *Inst,
                         const llvm::Value *FormalArg,
                         const llvm::Value *ActualArg, bool IncludeActualArg);
   void reportLeakIfNecessary(const llvm::Instruction *Inst,

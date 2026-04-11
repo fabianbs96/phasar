@@ -18,8 +18,6 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "phmap.h"
-
 #include <map>
 #include <set>
 #include <type_traits>
@@ -41,7 +39,7 @@ public:
   using f_t = typename TaintConfigTraits<Derived>::f_t;
 
   using TaintDescriptionCallBackTy =
-      llvm::unique_function<phmap::parallel_node_hash_set<v_t>(n_t) const>;
+      llvm::unique_function<std::set<v_t>(n_t) const>;
 
   enum class [[clang::flag_enum]] SeedConfig {
     Arguments = 1,
@@ -133,8 +131,7 @@ public:
     return self().getCategoryImpl(std::move(Val));
   }
 
-  [[nodiscard]] phmap::parallel_node_hash_map<
-      n_t, phmap::parallel_node_hash_set<v_t>>
+  [[nodiscard]] std::map<n_t, std::set<v_t>>
   makeInitialSeeds(SeedConfig Conf = SeedConfig::All) const {
     return self().makeInitialSeedsImpl(Conf);
   }

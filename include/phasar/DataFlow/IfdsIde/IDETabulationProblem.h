@@ -65,8 +65,7 @@ public:
 /// For more information on how to write an IDE analysis, see [Writing an IDE
 /// Analysis](https://github.com/secure-software-engineering/phasar/wiki/Writing-an-IDE-analysis)
 template <IdeAnalysisDomain AnalysisDomainTy,
-          typename Container =
-              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
+          typename Container = std::set<typename AnalysisDomainTy::d_t>>
 class IDETabulationProblem : public FlowFunctions<AnalysisDomainTy, Container>,
                              public EdgeFunctions<AnalysisDomainTy>,
                              public JoinLattice<AnalysisDomainTy>,

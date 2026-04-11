@@ -19,8 +19,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "phmap.h"
-
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -437,11 +435,11 @@ testingLocInIR(TestingSrcLocation Loc, const LLVMProjectIRDB &IRDB,
 }
 
 template <typename SetTy>
-[[nodiscard]] inline phmap::parallel_node_hash_set<const llvm::Value *>
+[[nodiscard]] inline std::set<const llvm::Value *>
 convertTestingLocationSetInIR(
     const SetTy &Locs, const LLVMProjectIRDB &IRDB,
     const llvm::Function *InterestingFunction = nullptr) {
-  phmap::parallel_node_hash_set<const llvm::Value *> Ret;
+  std::set<const llvm::Value *> Ret;
   llvm::transform(Locs, std::inserter(Ret, Ret.end()),
                   [&](TestingSrcLocation Loc) {
                     return testingLocInIR(Loc, IRDB, InterestingFunction);
@@ -453,9 +451,7 @@ template <typename MapTy>
 [[nodiscard]] inline auto convertTestingLocationSetMapInIR(
     const MapTy &Locs, const LLVMProjectIRDB &IRDB,
     const llvm::Function *InterestingFunction = nullptr) {
-  std::map<const llvm::Instruction *,
-           phmap::parallel_node_hash_set<const llvm::Value *>>
-      Ret;
+  std::map<const llvm::Instruction *, std::set<const llvm::Value *>> Ret;
   llvm::transform(
       Locs, std::inserter(Ret, Ret.end()), [&](const auto &LocAndSet) {
         const auto &[InstLoc, Set] = LocAndSet;

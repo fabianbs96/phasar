@@ -22,8 +22,6 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
-#include "phmap.h"
-
 #include <functional>
 #include <initializer_list>
 #include <iterator>
@@ -41,8 +39,7 @@ namespace psr {
 ///
 /// This class models a flow function for distributive data-flow problems.
 ///
-template <typename D, typename Container = phmap::parallel_node_hash_set<D>>
-class FlowFunction {
+template <typename D, typename Container = std::set<D>> class FlowFunction {
   static_assert(std::is_same<typename Container::value_type, D>::value,
                 "Container values needs to be the same as D");
 
@@ -97,13 +94,13 @@ using FlowFunctionPtrTypeOf = std::shared_ptr<FF>;
 /// flow-fact- and container type.
 ///
 /// Equivalent to FlowFunctionPtrTypeOf<FlowFunction<D, Container>>
-template <typename D, typename Container = phmap::parallel_node_hash_set<D>>
+template <typename D, typename Container = std::set<D>>
 using FlowFunctionPtrType = FlowFunctionPtrTypeOf<FlowFunction<D, Container>>;
 
 /// Wrapper flow function that is automatically used by the IDESolver if the
 /// autoAddZero configuration option is set to true (default).
 /// Ensures that the tautological zero-flow fact (Λ) does not get killed.
-template <typename D, typename Container = phmap::parallel_node_hash_set<D>>
+template <typename D, typename Container = std::set<D>>
 class ZeroedFlowFunction : public FlowFunction<D, Container> {
   using typename FlowFunction<D, Container>::container_type;
   using typename FlowFunction<D, Container>::FlowFunctionPtrType;

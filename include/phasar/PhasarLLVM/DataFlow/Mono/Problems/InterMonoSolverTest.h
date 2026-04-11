@@ -79,7 +79,7 @@ public:
                                  llvm::ArrayRef<f_t> Callees,
                                  const mono_container_t &In) override;
 
-  phmap::parallel_node_hash_map<n_t, mono_container_t> initialSeeds() override;
+  std::unordered_map<n_t, mono_container_t> initialSeeds() override;
 };
 
 } // namespace psr

@@ -65,8 +65,8 @@ IntraMonoSolverTest::mono_container_t IntraMonoSolverTest::normalFlow(
   return Result;
 }
 
-phmap::parallel_node_hash_map<IntraMonoSolverTest::n_t,
-                              IntraMonoSolverTest::mono_container_t>
+std::unordered_map<IntraMonoSolverTest::n_t,
+                   IntraMonoSolverTest::mono_container_t>
 IntraMonoSolverTest::initialSeeds() {
   llvm::outs() << "IntraMonoSolverTest::initialSeeds()\n";
   return {};
