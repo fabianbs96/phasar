@@ -17,15 +17,18 @@
 #ifndef PHASAR_UTILS_TABLE_PLL_H_
 #define PHASAR_UTILS_TABLE_PLL_H_
 
+#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DefaultValue.h"
 
 #include "llvm/ADT/Hashing.h"
+#include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "parallel_hashmap/phmap.h"
 
 #include <optional>
+#include <set>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -320,17 +323,34 @@ private:
 
 } // namespace psr
 
-namespace std {
+namespace llvm {
+template <typename T, class Hash, class Eq, class Alloc, size_t N, class Mtx_>
+hash_code hash_value(
+    const phmap::parallel_node_hash_set<T, Hash, Eq, Alloc, N, Mtx_> &PHSet) {
+  return hash_value(PHSet.hash);
+}
 
+template <class Key, class Value, class Hash, class Eq, class Alloc, size_t N,
+          class Mtx_>
+hash_code
+hash_value(const phmap::parallel_node_hash_map<Key, Value, Hash, Eq, Alloc, N,
+                                               Mtx_> &PHMap) {
+  hash_code Code = 0;
+  PHMap.for_each([&Code](const auto &K) { Code = hash_combine(Code, K); });
+  return Code;
+}
+
+template <typename L> hash_code hash_value(const psr::EdgeFunction<L> &EdgeFn) {
+  return hash_value(EdgeFn.getHashCode());
+}
+
+} // namespace llvm
+
+namespace std {
 template <typename R, typename C, typename V>
 struct hash<psr::TableCell<R, C, V>> {
   size_t operator()(const psr::TableCell<R, C, V> &Cell) const {
-    auto RowHash = llvm::hash_value(Cell.Row);
-    auto ColHash = llvm::hash_value(Cell.Column);
-    // TODO: error: no matching function for call to 'hash_value'
-    //       How to fix?
-    auto ValHash = llvm::hash_value(Cell.Value);
-    return llvm::hash_combine(RowHash, ColHash, ValHash);
+    return llvm::hash_combine(Cell.Row, Cell.Column, Cell.Value);
   }
 };
 
