@@ -92,18 +92,17 @@ public:
 
   [[nodiscard]] size_t getApproxSizeInBytes() const noexcept {
     size_t Sz =
-        Tab.bucket_count() * sizeof(void *) +
-        Tab.size() *
-            sizeof(
-                std::tuple<void *, void *, typename decltype(Tab)::value_type>);
+        (Tab.bucket_count() * sizeof(void *)) +
+        (Tab.size() *
+         sizeof(
+             std::tuple<void *, void *, typename decltype(Tab)::value_type>));
 
     for (const auto &[RowKey, Row] : Tab) {
-      Sz +=
-          Row.bucket_count() * sizeof(void *) +
-          Row.size() *
-              sizeof(
-                  std::tuple<void *, void *,
-                             typename std::decay_t<decltype(Row)>::value_type>);
+      Sz += (Row.bucket_count() * sizeof(void *)) +
+            (Row.size() *
+             sizeof(
+                 std::tuple<void *, void *,
+                            typename std::decay_t<decltype(Row)>::value_type>));
     }
     return Sz;
   }
@@ -344,9 +343,25 @@ template <typename L> hash_code hash_value(const psr::EdgeFunction<L> &EdgeFn) {
   return hash_value(EdgeFn.getHashCode());
 }
 
+template <typename R, typename C, typename V>
+hash_code hash_value(const psr::TableCell<R, C, V> &Cell) {
+  return hash_combine(Cell.getRowKey(), Cell.getColumnKey(), Cell.getValue());
+}
+
+template <typename R> hash_code hash_value(const std::set<R> &Set) {
+  hash_code Code = 0;
+
+  for (const auto &Entry : Set) {
+    Code = hash_combine(Code, hash_value(Entry));
+  }
+
+  return Code;
+}
+
 } // namespace llvm
 
 namespace std {
+
 template <typename R, typename C, typename V>
 struct hash<psr::TableCell<R, C, V>> {
   size_t operator()(const psr::TableCell<R, C, V> &Cell) const {
