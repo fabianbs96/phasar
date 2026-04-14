@@ -124,7 +124,7 @@ public:
     using CellOfTable = typename TablePll<n_t, d_t, l_t>::Cell;
     const static std::string DataFlowID = "DataFlow";
     nlohmann::json J;
-    auto Results = this->ValTab.cellSet();
+    auto Results = this->ValTab.cellVec();
     if (Results.empty()) {
       J[DataFlowID] = "EMPTY";
     } else {
@@ -229,7 +229,7 @@ public:
 
   void dumpAllInterPathEdges() {
     llvm::outs() << "COMPUTED INTER PATH EDGES" << '\n';
-    auto Interpe = this->computedInterPathEdges.cellSet();
+    auto Interpe = this->computedInterPathEdges.cellVec();
     for (const auto &Cell : Interpe) {
       llvm::outs() << "FROM" << '\n';
       IDEProblem.printNode(llvm::outs(), Cell.getRowKey());
@@ -249,7 +249,7 @@ public:
 
   void dumpAllIntraPathEdges() {
     llvm::outs() << "COMPUTED INTRA PATH EDGES" << '\n';
-    auto Intrape = this->computedIntraPathEdges.cellSet();
+    auto Intrape = this->computedIntraPathEdges.cellVec();
     for (auto &Cell : Intrape) {
       llvm::outs() << "FROM" << '\n';
       IDEProblem.printNode(llvm::outs(), Cell.getRowKey());
@@ -835,7 +835,7 @@ protected:
         TablePll<d_t, d_t, EdgeFunction<l_t>> &LookupByTarget =
             JumpFn->lookupByTarget(n);
         for (const CellOfTable &SourceValTargetValAndFunction :
-             LookupByTarget.cellSet()) {
+             LookupByTarget.cellVec()) {
           d_t dPrime = SourceValTargetValAndFunction.getRowKey();
           d_t d = SourceValTargetValAndFunction.getColumnKey();
           EdgeFunction<l_t> fPrime = SourceValTargetValAndFunction.getValue();
@@ -1278,9 +1278,7 @@ protected:
     return IDEProblem.join(std::move(Curr), std::move(NewVal));
   }
 
-  phmap::parallel_node_hash_set<
-      typename TablePll<n_t, d_t, EdgeFunction<l_t>>::Cell>
-  endSummary(n_t SP, d_t d3) {
+  auto endSummary(n_t SP, d_t d3) {
     if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Core) {
       auto Key = std::make_pair(SP, d3);
       auto FindND = FSummaryReuse.find(Key);
@@ -1290,7 +1288,7 @@ protected:
         FSummaryReuse[Key] += 1;
       }
     }
-    return EndsummaryTab.get(SP, d3).cellSet();
+    return EndsummaryTab.get(SP, d3).cellVec();
   }
 
   phmap::parallel_node_hash_map<n_t, container_type> incoming(d_t d1, n_t SP) {
@@ -1304,7 +1302,7 @@ protected:
   void printIncomingTab() const {
     IF_LOG_LEVEL_ENABLED(DEBUG, {
       PHASAR_LOG_LEVEL(DEBUG, "Start of incomingtab entry");
-      for (const auto &Cell : IncomingTab.cellSet()) {
+      for (const auto &Cell : IncomingTab.cellVec()) {
         PHASAR_LOG_LEVEL(DEBUG, "sP: " << NToString(Cell.getRowKey()));
         PHASAR_LOG_LEVEL(DEBUG, "d3: " << DToString(Cell.getColumnKey()));
         for (const auto &Entry : Cell.getValue()) {
@@ -1427,7 +1425,7 @@ protected:
     // d1 --> d2-Set
     // Case 1: d1 in d2-Set
     // Case 2: d1 not in d2-Set, i.e., d1 was killed. d2-Set could be empty.
-    for (const auto &Cell : ComputedIntraPathEdges.cellSet()) {
+    for (const auto &Cell : ComputedIntraPathEdges.cellVec()) {
       auto Edge = std::make_pair(Cell.getRowKey(), Cell.getColumnKey());
       PHASAR_LOG_LEVEL(DEBUG, "N1: " << NToString(Edge.first));
       PHASAR_LOG_LEVEL(DEBUG, "N2: " << NToString(Edge.second));
@@ -1459,7 +1457,7 @@ protected:
     phmap::parallel_node_hash_set<std::pair<n_t, d_t>> ProcessSummaryFacts;
     PHASAR_LOG_LEVEL(DEBUG, "==============================================");
     PHASAR_LOG_LEVEL(DEBUG, "INTER PATH EDGES");
-    for (const auto &Cell : ComputedInterPathEdges.cellSet()) {
+    for (const auto &Cell : ComputedInterPathEdges.cellVec()) {
       auto Edge = std::make_pair(Cell.getRowKey(), Cell.getColumnKey());
       PHASAR_LOG_LEVEL(DEBUG, "N1: " << NToString(Edge.first));
       PHASAR_LOG_LEVEL(DEBUG, "N2: " << NToString(Edge.second));

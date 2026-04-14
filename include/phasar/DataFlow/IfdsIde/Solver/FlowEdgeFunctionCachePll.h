@@ -43,7 +43,7 @@ namespace psr {
  */
 template <typename AnalysisDomainTy,
           typename Container =
-              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
+              phmap::parallel_node_hash_set_m<typename AnalysisDomainTy::d_t>>
 class FlowEdgeFunctionCachePll {
   using IDEProblemType = IDETabulationProblem<AnalysisDomainTy, Container>;
   using FlowFunctionPtrType = typename IDEProblemType::FlowFunctionPtrType;
@@ -92,28 +92,28 @@ private:
   };
 
   // Caches for the flow/edge functions
-  phmap::parallel_node_hash_map<EdgeFuncInstKey, NormalEdgeFlowData>
+  phmap::parallel_node_hash_map_m<EdgeFuncInstKey, NormalEdgeFlowData>
       NormalFunctionCache;
 
   // Caches for the flow functions
-  phmap::parallel_node_hash_map<std::tuple<n_t, f_t>, FlowFunctionPtrType>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, f_t>, FlowFunctionPtrType>
       CallFlowFunctionCache;
-  phmap::parallel_node_hash_map<std::tuple<n_t, f_t, n_t, n_t>,
-                                FlowFunctionPtrType>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, f_t, n_t, n_t>,
+                                  FlowFunctionPtrType>
       ReturnFlowFunctionCache;
-  phmap::parallel_node_hash_map<std::tuple<n_t, n_t>, FlowFunctionPtrType>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, n_t>, FlowFunctionPtrType>
       CallToRetFlowFunctionCache;
   // Caches for the edge functions
-  phmap::parallel_node_hash_map<std::tuple<n_t, d_t, f_t, d_t>,
-                                EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, d_t, f_t, d_t>,
+                                  EdgeFunction<l_t>>
       CallEdgeFunctionCache;
-  phmap::parallel_node_hash_map<std::tuple<n_t, f_t, n_t, d_t, n_t, d_t>,
-                                EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, f_t, n_t, d_t, n_t, d_t>,
+                                  EdgeFunction<l_t>>
       ReturnEdgeFunctionCache;
-  phmap::parallel_node_hash_map<EdgeFuncInstKey, InnerEdgeFunctionMapType>
+  phmap::parallel_node_hash_map_m<EdgeFuncInstKey, InnerEdgeFunctionMapType>
       CallToRetEdgeFunctionCache;
-  phmap::parallel_node_hash_map<std::tuple<n_t, d_t, n_t, d_t>,
-                                EdgeFunction<l_t>>
+  phmap::parallel_node_hash_map_m<std::tuple<n_t, d_t, n_t, d_t>,
+                                  EdgeFunction<l_t>>
       SummaryEdgeFunctionCache;
 
 public:

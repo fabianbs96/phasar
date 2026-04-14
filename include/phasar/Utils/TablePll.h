@@ -28,7 +28,6 @@
 #include "parallel_hashmap/phmap.h"
 
 #include <optional>
-#include <set>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -58,6 +57,11 @@ template <typename R, typename C, typename V> struct TableCell {
   friend bool operator==(const TableCell &Lhs, const TableCell &Rhs) noexcept {
     return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) ==
            std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
+  }
+
+  friend llvm::hash_code hash_value(const TableCell &Cell) {
+    return llvm::hash_combine(Cell.getRowKey(), Cell.getColumnKey(),
+                              Cell.getValue());
   }
 
   R Row{};
@@ -107,9 +111,9 @@ public:
     return Sz;
   }
 
-  [[nodiscard]] phmap::parallel_node_hash_set<Cell> cellSet() const {
+  [[nodiscard]] phmap::parallel_node_hash_set_m<Cell> cellSet() const {
     // Returns a set of all row key / column key / value triplets.
-    phmap::parallel_node_hash_set<Cell> Result;
+    phmap::parallel_node_hash_set_m<Cell> Result;
     for (const auto &M1 : Tab) {
       for (const auto &M2 : M1.second) {
         Result.emplace(M1.first, M2.first, M2.second);
@@ -145,10 +149,10 @@ public:
     return Result;
   }
 
-  [[nodiscard]] phmap::parallel_node_hash_map<R, V>
+  [[nodiscard]] phmap::parallel_node_hash_map_m<R, V>
   column(ByConstRef<C> ColumnKey) const {
     // Returns a view of all mappings that have the given column key.
-    phmap::parallel_node_hash_map<R, V> Column;
+    phmap::parallel_node_hash_map_m<R, V> Column;
     for (const auto &Row : Tab) {
       if (Row.second.count(ColumnKey)) {
         Column[Row.first] = Row.second[ColumnKey];
@@ -235,7 +239,6 @@ public:
 
   V remove(ByConstRef<R> RowKey, ByConstRef<C> ColumnKey) {
     // Removes the mapping, if any, associated with the given keys.
-
     auto OuterIt = Tab.find(RowKey);
     if (OuterIt == Tab.end()) {
       return V();
@@ -258,37 +261,37 @@ public:
 
   void remove(ByConstRef<R> RowKey) { Tab.erase(RowKey); }
 
-  [[nodiscard]] phmap::parallel_node_hash_map<C, V> &row(R RowKey) {
+  [[nodiscard]] phmap::parallel_node_hash_map_m<C, V> &row(R RowKey) {
     // Returns a view of all mappings that have the given row key.
     return Tab[RowKey];
   }
 
-  [[nodiscard]] ByConstRef<phmap::parallel_node_hash_map<C, V>>
+  [[nodiscard]] ByConstRef<phmap::parallel_node_hash_map_m<C, V>>
   row(ByConstRef<R> RowKey) const noexcept {
     // Returns a view of all mappings that have the given row key.
     auto It = Tab.find(RowKey);
     if (It == Tab.end()) {
-      return getDefaultValue<phmap::parallel_node_hash_map<C, V>>();
+      return getDefaultValue<phmap::parallel_node_hash_map_m<C, V>>();
     }
     return It->second;
   }
 
-  [[nodiscard]] const phmap::parallel_node_hash_map<
-      R, phmap::parallel_node_hash_map<C, V>> &
+  [[nodiscard]] const phmap::parallel_node_hash_map_m<
+      R, phmap::parallel_node_hash_map_m<C, V>> &
   rowMap() const & noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return Tab;
   }
-  [[nodiscard]] phmap::parallel_node_hash_map<
-      R, phmap::parallel_node_hash_map<C, V>> &&
+  [[nodiscard]] phmap::parallel_node_hash_map_m<
+      R, phmap::parallel_node_hash_map_m<C, V>> &&
   rowMap() && noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return std::move(Tab);
   }
-  [[nodiscard]] const phmap::parallel_node_hash_map<
-      R, phmap::parallel_node_hash_map<C, V>> &
+  [[nodiscard]] const phmap::parallel_node_hash_map_m<
+      R, phmap::node_hash_map<C, V>> &
   rowMapView() const noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
@@ -317,48 +320,10 @@ public:
   }
 
 private:
-  phmap::parallel_node_hash_map<R, phmap::parallel_node_hash_map<C, V>> Tab{};
+  phmap::parallel_node_hash_map_m<R, phmap::node_hash_map<C, V>> Tab{};
 };
 
 } // namespace psr
-
-namespace llvm {
-template <typename T, class Hash, class Eq, class Alloc, size_t N, class Mtx_>
-hash_code hash_value(
-    const phmap::parallel_node_hash_set<T, Hash, Eq, Alloc, N, Mtx_> &PHSet) {
-  return hash_value(PHSet.hash);
-}
-
-template <class Key, class Value, class Hash, class Eq, class Alloc, size_t N,
-          class Mtx_>
-hash_code
-hash_value(const phmap::parallel_node_hash_map<Key, Value, Hash, Eq, Alloc, N,
-                                               Mtx_> &PHMap) {
-  hash_code Code = 0;
-  PHMap.for_each([&Code](const auto &K) { Code = hash_combine(Code, K); });
-  return Code;
-}
-
-template <typename L> hash_code hash_value(const psr::EdgeFunction<L> &EdgeFn) {
-  return hash_value(EdgeFn.getHashCode());
-}
-
-template <typename R, typename C, typename V>
-hash_code hash_value(const psr::TableCell<R, C, V> &Cell) {
-  return hash_combine(Cell.getRowKey(), Cell.getColumnKey(), Cell.getValue());
-}
-
-template <typename R> hash_code hash_value(const std::set<R> &Set) {
-  hash_code Code = 0;
-
-  for (const auto &Entry : Set) {
-    Code = hash_combine(Code, hash_value(Entry));
-  }
-
-  return Code;
-}
-
-} // namespace llvm
 
 namespace std {
 

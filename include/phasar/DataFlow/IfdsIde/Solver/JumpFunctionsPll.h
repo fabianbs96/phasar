@@ -61,7 +61,7 @@ protected:
   // a mapping from target node to a list of triples consisting of source value,
   // target value and associated function; the triple is implemented by a table
   // we exclude empty default functions
-  phmap::parallel_node_hash_map<n_t, TablePll<d_t, d_t, EdgeFunction<l_t>>>
+  phmap::parallel_node_hash_map_m<n_t, TablePll<d_t, d_t, EdgeFunction<l_t>>>
       NonEmptyLookupByTargetNode;
 
 public:
@@ -218,7 +218,7 @@ public:
       std::string NLabel = NToString(Entry.first);
       OS << "\nN: " << NLabel << "\n---" << std::string(NLabel.size(), '-')
          << '\n';
-      for (auto Cell : Entry.second.cellSet()) {
+      for (auto Cell : Entry.second.cellVec()) {
         OS << "D1: " << DToString(Cell.r) << '\n'
            << "\tD2: " << DToString(Cell.c) << '\n'
            << "\tEF: " << Cell.v << "\n\n";
@@ -228,7 +228,7 @@ public:
 
   void printNonEmptyReverseLookup(llvm::raw_ostream &OS) {
     OS << "DUMP nonEmptyReverseLookup\nTablePll<N, D, "
-          "phmap::parallel_node_hash_map<D, "
+          "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
     auto CellVec = NonEmptyReverseLookup.cellVec();
     for (auto Cell : CellVec) {
@@ -244,7 +244,7 @@ public:
 
   void printNonEmptyForwardLookup(llvm::raw_ostream &OS) {
     OS << "DUMP nonEmptyForwardLookup\nTablePll<D, N, "
-          "phmap::parallel_node_hash_map<D, "
+          "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
     auto CellVec = NonEmptyForwardLookup.cellVec();
     for (auto Cell : CellVec) {
@@ -259,7 +259,7 @@ public:
   }
 
   void printNonEmptyLookupByTargetNode(llvm::raw_ostream &OS) {
-    OS << "DUMP nonEmptyLookupByTargetNode\nphmap::parallel_node_hash_map<N, "
+    OS << "DUMP nonEmptyLookupByTargetNode\nphmap::parallel_node_hash_map_m<N, "
           "TablePll<D, D, "
           "EdgeFunctionPtrType>>\n";
     for (auto Node : NonEmptyLookupByTargetNode) {
