@@ -36,26 +36,12 @@ int main(int Argc, const char **Argv) {
   }
 
   if (HA.getProjectIRDB().getFunctionDefinition("main")) {
-    // Parallelized IDESolver test
-
     auto Problem = createAnalysisProblem<IDESolverTest>(HA, EntryPoints);
 
+    llvm::outs() << "Testing ParallelizedIDESolver:\n";
     ParallelizedIDESolver Solver(Problem, &HA.getICFG());
-
-    // IFDS template parametrization test
-    llvm::outs() << "Testing IFDS:\n";
-    auto L = createAnalysisProblem<IFDSSolverTest>(HA, EntryPoints);
-    IFDSSolver S(L, &HA.getICFG());
-    auto IFDSResults = S.solve();
-    IFDSResults.dumpResults(HA.getICFG());
-
-    // IDE template parametrization test
-    llvm::outs() << "Testing IDE:\n";
-    auto M = createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
-    // Alternative way of solving an IFDS/IDEProblem:
-    // auto IDEResults = solveIDEProblem(M, HA.getICFG());
-    // IDEResults.dumpResults(HA.getICFG());
-
+    auto PIDEResults = Solver.solve();
+    PIDEResults.dumpResults(HA.getICFG());
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }

@@ -57,6 +57,7 @@
 #include <concepts>
 #include <memory>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -1852,12 +1853,26 @@ private:
       return false;
     }
 
-    auto [Edge, EF] = std::move(WorkList.back());
-    WorkList.pop_back();
+    void (*doNextPll)() = [&]() {
+      auto [Edge, EF] = std::move(WorkList.back());
+      WorkList.pop_back();
 
-    auto [SourceVal, Target, TargetVal] = Edge.consume();
-    propagate(std::move(SourceVal), std::move(Target), std::move(TargetVal),
-              std::move(EF));
+      auto [SourceVal, Target, TargetVal] = Edge.consume();
+      propagate(std::move(SourceVal), std::move(Target), std::move(TargetVal),
+                std::move(EF));
+    };
+
+    auto MaxNumOfThreads = std::thread::hardware_concurrency();
+
+    std::vector<std::thread> Threads(MaxNumOfThreads);
+
+    for (int CurrThread = 0; CurrThread < MaxNumOfThreads; CurrThread++) {
+      Threads.emplace_back(doNextPll);
+    }
+
+    for (auto &Elem : Threads) {
+      Elem.join();
+    }
 
     return true;
   }
