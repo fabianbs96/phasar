@@ -54,6 +54,7 @@
 #include "nlohmann/json.hpp"
 #include "parallel_hashmap/phmap.h"
 
+#include <algorithm>
 #include <concepts>
 #include <memory>
 #include <string>
@@ -130,9 +131,10 @@ public:
       J[DataFlowID] = "EMPTY";
     } else {
       std::vector<CellOfTable> Cells(Results.begin(), Results.end());
-      sort(Cells.begin(), Cells.end(), [](CellOfTable Lhs, CellOfTable Rhs) {
-        return Lhs.getRowKey() < Rhs.getRowKey();
-      });
+      std::sort(Cells.begin(), Cells.end(),
+                [](CellOfTable Lhs, CellOfTable Rhs) {
+                  return Lhs.getRowKey() < Rhs.getRowKey();
+                });
       n_t Curr;
       for (unsigned I = 0; I < Cells.size(); ++I) {
         Curr = Cells[I].getRowKey();
@@ -863,8 +865,7 @@ protected:
   }
 
   void submitInitialValues() {
-    phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_map<d_t, l_t>>
-        AllSeeds = Seeds.getSeeds();
+    auto AllSeeds = Seeds.getSeeds();
     for (n_t UnbalancedRetSite : UnbalancedRetSites) {
       if (AllSeeds.find(UnbalancedRetSite) == AllSeeds.end()) {
         AllSeeds[UnbalancedRetSite][ZeroValue] = IDEProblem.topElement();
@@ -1351,7 +1352,7 @@ protected:
     // Sort intra-procedural path edges
     auto Cells = ComputedIntraPathEdges.cellVec();
     StmtLess Stmtless(ICF);
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1379,7 +1380,7 @@ protected:
 
     // Sort intra-procedural path edges
     Cells = ComputedInterPathEdges.cellVec();
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1595,7 +1596,7 @@ public:
     // Sort intra-procedural path edges
     auto Cells = ComputedIntraPathEdges.cellVec();
     StmtLess Stmtless(ICF);
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1688,7 +1689,7 @@ public:
     PHASAR_LOG_LEVEL(DEBUG, "Process inter-procedural path edges");
     PHASAR_LOG_LEVEL(DEBUG, "=============================================");
     Cells = ComputedInterPathEdges.cellVec();
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1848,26 +1849,28 @@ private:
     submitInitialSeeds();
   }
 
+  void doNextPll() {
+    auto [Edge, EF] = std::move(WorkList.back());
+    WorkList.pop_back();
+
+    auto [SourceVal, Target, TargetVal] = Edge.consume();
+    propagate(std::move(SourceVal), std::move(Target), std::move(TargetVal),
+              std::move(EF));
+  }
+
   bool doNext() {
     if (WorkList.empty()) {
       return false;
     }
 
-    void (*doNextPll)() = [&]() {
-      auto [Edge, EF] = std::move(WorkList.back());
-      WorkList.pop_back();
-
-      auto [SourceVal, Target, TargetVal] = Edge.consume();
-      propagate(std::move(SourceVal), std::move(Target), std::move(TargetVal),
-                std::move(EF));
-    };
-
     auto MaxNumOfThreads = std::thread::hardware_concurrency();
 
     std::vector<std::thread> Threads(MaxNumOfThreads);
 
-    for (int CurrThread = 0; CurrThread < MaxNumOfThreads; CurrThread++) {
-      Threads.emplace_back(doNextPll);
+    for (int CurrThread = 0;
+         CurrThread < std::min(size_t(MaxNumOfThreads), WorkList.size());
+         CurrThread++) {
+      Threads.emplace_back(&ParallelizedIDESolver::doNextPll, this);
     }
 
     for (auto &Elem : Threads) {
