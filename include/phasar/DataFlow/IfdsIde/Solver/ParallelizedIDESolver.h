@@ -63,6 +63,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace psr {
 
@@ -1863,18 +1864,56 @@ private:
       return false;
     }
 
-    auto MaxNumOfThreads = std::thread::hardware_concurrency();
+    size_t NumOfThreads =
+        std::min(size_t(std::thread::hardware_concurrency()), WorkList.size());
 
-    std::vector<std::thread> Threads(MaxNumOfThreads);
+    std::vector<std::thread> Threads;
+    Threads.reserve(NumOfThreads);
+    std::vector<bool> Joined(NumOfThreads);
 
-    for (int CurrThread = 0;
-         CurrThread < std::min(size_t(MaxNumOfThreads), WorkList.size());
-         CurrThread++) {
-      Threads.emplace_back(&ParallelizedIDESolver::doNextPll, this);
+    for (size_t CurrThread = 0; CurrThread < NumOfThreads; CurrThread++) {
+      Threads.emplace(Threads.begin() + CurrThread,
+                      &ParallelizedIDESolver::doNextPll, this);
     }
 
+    /*
+        When the below code works, the result is: "No results computed!".
+        TODO: find out why.
+        My main idea why it does not work is, is that a copy of 'this' is used
+       for the thread, so all work in the work list is not saved in the main
+       one.
+    */
+
+    // Below works sometimes. Probably a race condition problem.
+#if false
     for (auto &Elem : Threads) {
       Elem.join();
+    }
+#endif
+
+    // Very very ugly, but works all the time
+    // Update: Nevermind, it does not work all the time.
+    bool AllJoined = false;
+
+    while (!AllJoined) {
+      int CurrThread = 0;
+
+      for (auto &Elem : Threads) {
+        if (!Joined[CurrThread] && Elem.joinable()) {
+          Elem.join();
+          Joined[CurrThread] = true;
+        }
+
+        CurrThread++;
+      }
+
+      AllJoined = true;
+      for (const auto &Elem : Joined) {
+        if (!Elem) {
+          AllJoined = false;
+          break;
+        }
+      }
     }
 
     return true;
