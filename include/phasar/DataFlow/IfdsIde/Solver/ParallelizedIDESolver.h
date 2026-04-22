@@ -46,8 +46,8 @@
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/Utilities.h"
 
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/TypeName.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -57,6 +57,7 @@
 #include <algorithm>
 #include <concepts>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -305,7 +306,8 @@ public:
 
     // Cached Edge Functions
     {
-      std::array<llvm::DenseSet<EdgeFunction<l_t>>, EdgeFunctionKindCount>
+      std::array<phmap::parallel_flat_hash_set_m<EdgeFunction<l_t>>,
+                 EdgeFunctionKindCount>
           UniqueEFs{};
       Sampler DepthSampler{};
       Sampler UniqueDepthSampler{};
@@ -337,8 +339,8 @@ public:
 
     // Jump Functions
     {
-      llvm::DenseSet<EdgeFunction<l_t>> UniqueJumpFns;
-      llvm::DenseSet<const void *> AllocatedJumpFns;
+      phmap::parallel_flat_hash_set_m<EdgeFunction<l_t>> UniqueJumpFns;
+      phmap::parallel_flat_hash_set_m<const void *> AllocatedJumpFns;
       Sampler DepthSampler{};
       Sampler UniqueDepthSampler{};
       Sampler AllocDepthSampler{};
@@ -466,6 +468,8 @@ protected:
                              "Compose: " << SumEdgFnE << " * " << f << '\n');
 
             auto DestN = GetNextUse(ReturnSiteN, d3);
+
+            std::lock_guard Guard(WorkListMutex);
             WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
                                   IDEProblem.extend(f, SumEdgFnE));
           }
@@ -495,8 +499,11 @@ protected:
             // create initial self-loop
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
-            WorkList.emplace_back(PathEdge(d3, SP, d3),
-                                  EdgeIdentity<l_t>{}); // line 15
+            {
+              std::lock_guard Guard(WorkListMutex);
+              WorkList.emplace_back(PathEdge(d3, SP, d3),
+                                    EdgeIdentity<l_t>{}); // line 15
+            }
             //  register the fact that <sp,d3> has an incoming edge from <n,d2>
             //  line 15.1 of Naeem/Lhotak/Rodriguez
             addIncoming(SP, d3, n, d2);
@@ -568,6 +575,7 @@ protected:
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f);
 
                   auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
+                  std::lock_guard Guard(WorkListMutex);
                   WorkList.emplace_back(
                       PathEdge(d1, DestN, std::move(d5_restoredCtx)),
                       IDEProblem.extend(f, fPrime));
@@ -606,6 +614,7 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Compose: " << EdgeFnE << " * " << f << " = "
                                             << fPrime);
         auto DestN = GetNextUse(ReturnSiteN, d3);
+        std::lock_guard Guard(WorkListMutex);
         WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
                               std::move(fPrime));
       }
@@ -654,8 +663,12 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG,
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
-        WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
-                              std::move(fPrime));
+
+        {
+          std::lock_guard Guard(WorkListMutex);
+          WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
+                                std::move(fPrime));
+        }
       }
     }
   }
@@ -947,6 +960,7 @@ protected:
         if (!IDEProblem.isZeroValue(Fact)) {
           INC_COUNTER("Gen facts", 1, Core);
         }
+        std::lock_guard Guard(WorkListMutex);
         WorkList.emplace_back(PathEdge(Fact, StartPoint, Fact),
                               EdgeIdentity<l_t>{});
       }
@@ -1053,6 +1067,7 @@ protected:
                     return RetSiteC;
                   }();
 
+                  std::lock_guard Guard(WorkListMutex);
                   WorkList.emplace_back(
                       PathEdge(std::move(d3), DestN, std::move(d5_restoredCtx)),
                       IDEProblem.extend(f3, fPrime));
@@ -1115,6 +1130,7 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
+    std::lock_guard Guard(WorkListMutex);
     WorkList.emplace_back(
         PathEdge(ZeroValue, std::move(RetSiteC), std::move(TargetVal)),
         std::move(EdgeFunc));
@@ -1232,9 +1248,11 @@ protected:
       const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
       if (RevLookupResult) {
         const auto &JumpFnContainer = RevLookupResult->get();
-        const auto Find = std::find_if(
-            JumpFnContainer.begin(), JumpFnContainer.end(),
-            [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
+        const auto Find =
+            std::find_if(JumpFnContainer.begin(), JumpFnContainer.end(),
+                         [SourceVal, this](auto &KVpair) {
+                           return KVpair.first == SourceVal;
+                         });
         if (Find != JumpFnContainer.end()) {
           return Find->second;
         }
@@ -1850,15 +1868,31 @@ private:
     submitInitialSeeds();
   }
 
-  void doNextPll() {
-    auto [Edge, EF] = std::move(WorkList.back());
-    WorkList.pop_back();
+  bool doNext() { return false; }
 
-    auto [SourceVal, Target, TargetVal] = Edge.consume();
-    propagate(std::move(SourceVal), std::move(Target), std::move(TargetVal),
-              std::move(EF));
+  void continueImpl() override {
+    while (!WorkList.empty()) {
+      // If there are no threads available, wait for one to finish
+      if (TPool.getThreadCount() == std::thread::hardware_concurrency() - 1) {
+        continue;
+      }
+
+      auto [Edge, EF] = [this] {
+        std::lock_guard Guard(WorkListMutex);
+        auto ReturnValue = std::move(WorkList.back());
+        WorkList.pop_back();
+        return ReturnValue;
+      }();
+
+      auto [SourceVal, Target, TargetVal] = Edge.consume();
+      TPool.async(&ParallelizedIDESolver::propagate, this, std::move(SourceVal),
+                  std::move(Target), std::move(TargetVal), std::move(EF));
+    }
+
+    TPool.wait();
   }
 
+#if false
   bool doNext() {
     if (WorkList.empty()) {
       return false;
@@ -1869,55 +1903,33 @@ private:
 
     std::vector<std::thread> Threads;
     Threads.reserve(NumOfThreads);
-    std::vector<bool> Joined(NumOfThreads);
 
     for (size_t CurrThread = 0; CurrThread < NumOfThreads; CurrThread++) {
-      Threads.emplace(Threads.begin() + CurrThread,
-                      &ParallelizedIDESolver::doNextPll, this);
+      auto [Edge, EF] = [this] {
+        std::lock_guard Guard(WorkListMutex);
+        auto ReturnValue = std::move(WorkList.back());
+        WorkList.pop_back();
+        return ReturnValue;
+      }();
+
+      auto [SourceVal, Target, TargetVal] = Edge.consume();
+
+      Threads.emplace_back(&ParallelizedIDESolver::propagate, this,
+                           std::move(SourceVal), std::move(Target),
+                           std::move(TargetVal), std::move(EF));
     }
 
     /*
         When the below code works, the result is: "No results computed!".
-        TODO: find out why.
-        My main idea why it does not work is, is that a copy of 'this' is used
-       for the thread, so all work in the work list is not saved in the main
-       one.
     */
 
-    // Below works sometimes. Probably a race condition problem.
-#if false
     for (auto &Elem : Threads) {
       Elem.join();
-    }
-#endif
-
-    // Very very ugly, but works all the time
-    // Update: Nevermind, it does not work all the time.
-    bool AllJoined = false;
-
-    while (!AllJoined) {
-      int CurrThread = 0;
-
-      for (auto &Elem : Threads) {
-        if (!Joined[CurrThread] && Elem.joinable()) {
-          Elem.join();
-          Joined[CurrThread] = true;
-        }
-
-        CurrThread++;
-      }
-
-      AllJoined = true;
-      for (const auto &Elem : Joined) {
-        if (!Elem) {
-          AllJoined = false;
-          break;
-        }
-      }
     }
 
     return true;
   }
+#endif
 
   void finalizeInternal() {
     PAMM_GET_INSTANCE;
@@ -2000,6 +2012,9 @@ private:
   TablePll<n_t, d_t, l_t> ValTab;
 
   phmap::parallel_node_hash_map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
+
+  llvm::ThreadPool TPool;
+  std::mutex WorkListMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>

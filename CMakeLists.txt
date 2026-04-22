@@ -141,6 +141,22 @@ if (PHASAR_ENABLE_SANITIZERS)
   string(APPEND CMAKE_CXX_FLAGS " ${ASAN_FLAG}")
 endif()
 
+# Thread Sanitizer
+if (PHASAR_ENABLE_THREAD_SANITIZER)
+  # NOT compatible with address sanitizer
+  if (PHASAR_ENABLE_SANITIZERS)
+    message("The address sanitizer is NOT compatible with the thread sanitizer!")
+  else()
+    if(MSVC)
+      set(TSAN_FLAG "/fsanitize=thread")
+    else()
+      set(TSAN_FLAG "-fsanitize=thread")
+    endif()
+
+    string(APPEND CMAKE_CXX_FLAGS " ${TSAN_FLAG}")
+  endif()
+endif()
+
 # LTO
 option(PHASAR_ALLOW_LTO_IN_RELEASE_BUILD "Use link-time-optimization (LTO) in Release builds, if possible (default is ON)" ON)
 if(PHASAR_ALLOW_LTO_IN_RELEASE_BUILD)

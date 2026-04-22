@@ -189,6 +189,9 @@ public:
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
     // Returns the value corresponding to the given row and column keys, or V()
     // if no such mapping exists.
+
+    // TODO: nicht thread safe, auseinanderziehen.
+
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
