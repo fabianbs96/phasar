@@ -27,6 +27,7 @@
 
 #include "parallel_hashmap/phmap.h"
 
+#include <mutex>
 #include <optional>
 #include <tuple>
 #include <type_traits>
@@ -137,9 +138,10 @@ public:
     }
   }
 
-  [[nodiscard]] std::vector<Cell> cellVec() const {
+  [[nodiscard]] std::vector<Cell> cellVec() {
     // Returns a vector of all row key / column key / value triplets.
     std::vector<Cell> Result;
+    std::lock_guard Guard(TabMutex);
     Result.reserve(Tab.size()); // better than nothing...
     for (const auto &M1 : Tab) {
       for (const auto &M2 : M1.second) {
@@ -324,6 +326,7 @@ public:
 
 private:
   phmap::parallel_node_hash_map_m<R, phmap::node_hash_map<C, V>> Tab{};
+  std::mutex TabMutex;
 };
 
 } // namespace psr

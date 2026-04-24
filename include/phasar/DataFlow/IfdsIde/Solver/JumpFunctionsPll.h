@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <ostream>
 #include <utility>
@@ -64,6 +65,10 @@ protected:
   phmap::parallel_node_hash_map_m<n_t, TablePll<d_t, d_t, EdgeFunction<l_t>>>
       NonEmptyLookupByTargetNode;
 
+  std::mutex NonEmptyReverseLookupMutex;
+  std::mutex NonEmptyForwardLookupMutex;
+  std::mutex NonEmptyLookupByTargetNodeMutex;
+
 public:
   JumpFunctionsPll() noexcept = default;
   ~JumpFunctionsPll() = default;
@@ -89,37 +94,45 @@ public:
       return;
     }
 
-    auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
-    if (auto Find = std::find_if(
-            SourceValToFunc.begin(), SourceValToFunc.end(),
-            [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
-              return SourceVal == Entry.first;
-            });
-        Find != SourceValToFunc.end()) {
-      // it is important that existing values in JumpFunctionsPll
-      // are overwritten
-      Find->second = EdgeFunc;
-    } else {
-      SourceValToFunc.emplace_back(SourceVal, EdgeFunc);
+    {
+      std::lock_guard Guard(NonEmptyReverseLookupMutex);
+      auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
+      if (auto Find = std::find_if(
+              SourceValToFunc.begin(), SourceValToFunc.end(),
+              [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+                return SourceVal == Entry.first;
+              });
+          Find != SourceValToFunc.end()) {
+        // it is important that existing values in JumpFunctionsPll
+        // are overwritten
+        Find->second = EdgeFunc;
+      } else {
+        SourceValToFunc.emplace_back(SourceVal, EdgeFunc);
+      }
     }
-
-    auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
-    if (auto Find = std::find_if(
-            TargetValToFunc.begin(), TargetValToFunc.end(),
-            [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
-              return TargetVal == Entry.first;
-            });
-        Find != TargetValToFunc.end()) {
-      // it is important that existing values in JumpFunctionsPll
-      // are overwritten
-      Find->second = EdgeFunc;
-    } else {
-      TargetValToFunc.emplace_back(TargetVal, EdgeFunc);
+    {
+      std::lock_guard Guard(NonEmptyForwardLookupMutex);
+      auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
+      if (auto Find = std::find_if(
+              TargetValToFunc.begin(), TargetValToFunc.end(),
+              [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+                return TargetVal == Entry.first;
+              });
+          Find != TargetValToFunc.end()) {
+        // it is important that existing values in JumpFunctionsPll
+        // are overwritten
+        Find->second = EdgeFunc;
+      } else {
+        TargetValToFunc.emplace_back(TargetVal, EdgeFunc);
+      }
     }
 
     // V Table::insert(R r, C c, V v) always overrides (see
     // comments above)
-    NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
+    {
+      std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
+      NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
+    }
     PHASAR_LOG_LEVEL(DEBUG, "End adding new jump function");
   }
 
@@ -131,6 +144,7 @@ public:
   std::optional<std::reference_wrapper<
       llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>>>>
   reverseLookup(n_t Target, d_t TargetVal) {
+    std::lock_guard Guard(NonEmptyReverseLookupMutex);
     if (!NonEmptyReverseLookup.contains(Target, TargetVal)) {
       return std::nullopt;
     }
@@ -145,6 +159,7 @@ public:
   std::optional<std::reference_wrapper<
       llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>>>>
   forwardLookup(d_t SourceVal, n_t Target) {
+    std::lock_guard Guard(NonEmptyForwardLookupMutex);
     if (!NonEmptyForwardLookup.contains(SourceVal, Target)) {
       return std::nullopt;
     }
@@ -158,11 +173,13 @@ public:
    * (sourceVal,targetVal,edgeFunction).
    */
   TablePll<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
+    std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     return NonEmptyLookupByTargetNode[Target];
   }
 
   template <typename HandlerFn>
   void foreachEdgeFunction(HandlerFn Handler) const {
+    std::lock_guard Guard(NonEmptyForwardLookupMutex);
     NonEmptyForwardLookup.foreachCell(
         [Handler = std::move(Handler)](ByConstRef<d_t> /*Row*/,
                                        ByConstRef<n_t> /*Col*/,
@@ -180,31 +197,42 @@ public:
    * there anyway.
    */
   bool removeFunction(d_t SourceVal, n_t Target, d_t TargetVal) {
-    auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
-    if (auto Find = std::find_if(
-            SourceValToFunc.begin(), SourceValToFunc.end(),
-            [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
-              return SourceVal == Entry.first;
-            });
-        Find != SourceValToFunc.end()) {
-      SourceValToFunc.erase(Find);
+    {
+      std::lock_guard Guard(NonEmptyReverseLookupMutex);
+      auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
+      if (auto Find = std::find_if(
+              SourceValToFunc.begin(), SourceValToFunc.end(),
+              [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+                return SourceVal == Entry.first;
+              });
+          Find != SourceValToFunc.end()) {
+        SourceValToFunc.erase(Find);
+      }
     }
-    auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
-    if (auto Find = std::find_if(
-            TargetValToFunc.begin(), TargetValToFunc.end(),
-            [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
-              return TargetVal == Entry.first;
-            });
-        Find != TargetValToFunc.end()) {
-      TargetValToFunc.erase(Find);
+    {
+      std::lock_guard ForwardGuard(NonEmptyForwardLookupMutex);
+      auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
+      if (auto Find = std::find_if(
+              TargetValToFunc.begin(), TargetValToFunc.end(),
+              [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+                return TargetVal == Entry.first;
+              });
+          Find != TargetValToFunc.end()) {
+        TargetValToFunc.erase(Find);
+      }
+      std::lock_guard LookupGuard(NonEmptyLookupByTargetNodeMutex);
+      return NonEmptyLookupByTargetNode.erase(Target);
     }
-    return NonEmptyLookupByTargetNode.erase(Target);
   }
 
   /**
    * Removes all jump functions
    */
   void clear() {
+    std::lock_guard ReverseGuard(NonEmptyReverseLookupMutex);
+    std::lock_guard ForwardGuard(NonEmptyForwardLookupMutex);
+    std::lock_guard LookupGuard(NonEmptyLookupByTargetNodeMutex);
+
     NonEmptyReverseLookup.clear();
     NonEmptyForwardLookup.clear();
     NonEmptyLookupByTargetNode.clear();
@@ -214,6 +242,7 @@ public:
     OS << "\n******************************************************";
     OS << "\n*              Print all Jump Functions              *";
     OS << "\n******************************************************\n";
+    std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     for (auto &Entry : NonEmptyLookupByTargetNode) {
       std::string NLabel = NToString(Entry.first);
       OS << "\nN: " << NLabel << "\n---" << std::string(NLabel.size(), '-')
@@ -230,6 +259,7 @@ public:
     OS << "DUMP nonEmptyReverseLookup\nTablePll<N, D, "
           "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
+    std::lock_guard Guard(NonEmptyReverseLookupMutex);
     auto CellVec = NonEmptyReverseLookup.cellVec();
     for (auto Cell : CellVec) {
       OS << "N : " << NToString(Cell.r) << "\nD1: " << DToString(Cell.c)
@@ -246,7 +276,13 @@ public:
     OS << "DUMP nonEmptyForwardLookup\nTablePll<D, N, "
           "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
-    auto CellVec = NonEmptyForwardLookup.cellVec();
+    std::vector<TableCell<
+        d_t, n_t, phmap::parallel_node_hash_map_m<d_t, EdgeFunction<l_t>>>>
+        CellVec;
+    {
+      std::lock_guard Guard(NonEmptyForwardLookupMutex);
+      CellVec = NonEmptyForwardLookup.cellVec();
+    }
     for (auto Cell : CellVec) {
       OS << "D1: " << DToString(Cell.r) << "\nN : " << NToString(Cell.c)
          << '\n';
@@ -262,6 +298,7 @@ public:
     OS << "DUMP nonEmptyLookupByTargetNode\nphmap::parallel_node_hash_map_m<N, "
           "TablePll<D, D, "
           "EdgeFunctionPtrType>>\n";
+    std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     for (auto Node : NonEmptyLookupByTargetNode) {
       OS << "\nN : " << NToString(Node.first) << '\n';
       auto Table = NonEmptyLookupByTargetNode[Node.first];

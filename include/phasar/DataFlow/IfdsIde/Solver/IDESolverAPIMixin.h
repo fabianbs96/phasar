@@ -428,7 +428,7 @@ private:
     return static_cast<Derived &>(*this);
   }
 
-  virtual void continueImpl() {
+  constexpr void continueImpl() {
     while (next()) {
       // no interrupt in normal solving process
     }

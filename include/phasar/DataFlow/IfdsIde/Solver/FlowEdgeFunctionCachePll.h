@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -68,6 +69,7 @@ class FlowEdgeFunctionCachePll {
 
 private:
   MapKeyCompressorType KeyCompressor;
+  std::mutex KeyCompressorMutex;
 
   using EdgeFuncInstKey = uint64_t;
   using EdgeFuncNodeKey = std::conditional_t<
@@ -613,6 +615,7 @@ public:
 private:
   inline EdgeFuncInstKey createEdgeFunctionInstKey(n_t Lhs, n_t Rhs) {
     uint64_t Val = 0;
+    std::lock_guard Guard(KeyCompressorMutex);
     Val |= KeyCompressor.getCompressedID(Lhs);
     Val <<= 32;
     Val |= KeyCompressor.getCompressedID(Rhs);
@@ -622,6 +625,7 @@ private:
   inline EdgeFuncNodeKey createEdgeFunctionNodeKey(d_t Lhs, d_t Rhs) {
     if constexpr (std::is_base_of_v<llvm::Value, std::remove_pointer_t<d_t>>) {
       uint64_t Val = 0;
+      std::lock_guard Guard(KeyCompressorMutex);
       Val |= KeyCompressor.getCompressedID(Lhs);
       Val <<= 32;
       Val |= KeyCompressor.getCompressedID(Rhs);

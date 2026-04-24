@@ -469,9 +469,10 @@ protected:
 
             auto DestN = GetNextUse(ReturnSiteN, d3);
 
+            auto Extend = IDEProblem.extend(f, SumEdgFnE);
+
             std::lock_guard Guard(WorkListMutex);
-            WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
-                                  IDEProblem.extend(f, SumEdgFnE));
+            WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)), Extend);
           }
         }
       } else {
@@ -1320,7 +1321,7 @@ protected:
     IncomingTab.get(SP, d3)[n].insert(d2);
   }
 
-  void printIncomingTab() const {
+  void printIncomingTab() {
     IF_LOG_LEVEL_ENABLED(DEBUG, {
       PHASAR_LOG_LEVEL(DEBUG, "Start of incomingtab entry");
       for (const auto &Cell : IncomingTab.cellVec()) {
@@ -1868,9 +1869,7 @@ private:
     submitInitialSeeds();
   }
 
-  bool doNext() { return false; }
-
-  void continueImpl() override {
+  bool doNext() {
     while (!WorkList.empty()) {
       // If there are no threads available, wait for one to finish
       if (TPool.getThreadCount() == std::thread::hardware_concurrency() - 1) {
@@ -1890,46 +1889,8 @@ private:
     }
 
     TPool.wait();
+    return false;
   }
-
-#if false
-  bool doNext() {
-    if (WorkList.empty()) {
-      return false;
-    }
-
-    size_t NumOfThreads =
-        std::min(size_t(std::thread::hardware_concurrency()), WorkList.size());
-
-    std::vector<std::thread> Threads;
-    Threads.reserve(NumOfThreads);
-
-    for (size_t CurrThread = 0; CurrThread < NumOfThreads; CurrThread++) {
-      auto [Edge, EF] = [this] {
-        std::lock_guard Guard(WorkListMutex);
-        auto ReturnValue = std::move(WorkList.back());
-        WorkList.pop_back();
-        return ReturnValue;
-      }();
-
-      auto [SourceVal, Target, TargetVal] = Edge.consume();
-
-      Threads.emplace_back(&ParallelizedIDESolver::propagate, this,
-                           std::move(SourceVal), std::move(Target),
-                           std::move(TargetVal), std::move(EF));
-    }
-
-    /*
-        When the below code works, the result is: "No results computed!".
-    */
-
-    for (auto &Elem : Threads) {
-      Elem.join();
-    }
-
-    return true;
-  }
-#endif
 
   void finalizeInternal() {
     PAMM_GET_INSTANCE;
