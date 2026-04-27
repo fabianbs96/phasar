@@ -221,11 +221,13 @@ public:
   }
 
   virtual void emitTextReport(llvm::raw_ostream &OS = llvm::outs()) {
-    IDEProblem.emitTextReport(getSolverResults(), OS);
+    auto Results = getSolverResults();
+    IDEProblem.emitTextReport(Results.get(), OS);
   }
 
   virtual void emitGraphicalReport(llvm::raw_ostream &OS = llvm::outs()) {
-    IDEProblem.emitGraphicalReport(getSolverResults(), OS);
+    auto Results = getSolverResults();
+    IDEProblem.emitGraphicalReport(Results.get(), OS);
   }
 
   void dumpResults(llvm::raw_ostream &OS = llvm::outs()) {
@@ -278,17 +280,21 @@ public:
   /// so its lifetime is also bound to the lifetime of this solver. If you want
   /// to use the solverResults beyond the lifetime of this solver, use
   /// comsumeSolverResults() instead.
-  [[nodiscard]] SolverResults<n_t, d_t, l_t> getSolverResults() noexcept {
-    const auto &ParallelTable = this->ValTab;
+  [[nodiscard]] OwningSolverResults<n_t, d_t, l_t> getSolverResults() noexcept {
     Table<n_t, d_t, l_t> Converted;
 
-    for (const auto [RowKey, ColKeysToVals] : ParallelTable.rowMapView()) {
-      for (const auto [ColKey, ColVal] : ColKeysToVals) {
-        Converted.insert(RowKey, ColKey, ColVal);
+    {
+      std::lock_guard Guard(ValTabMutex);
+      const auto &ParallelTable = this->ValTab;
+
+      for (const auto [RowKey, ColKeysToVals] : ParallelTable.rowMapView()) {
+        for (const auto [ColKey, ColVal] : ColKeysToVals) {
+          Converted.insert(RowKey, ColKey, ColVal);
+        }
       }
     }
 
-    return SolverResults<n_t, d_t, l_t>(Converted, ZeroValue);
+    return OwningSolverResults<n_t, d_t, l_t>(std::move(Converted), ZeroValue);
   }
 
   /// Moves the computed solver-results out of this solver such that the solver
@@ -312,20 +318,23 @@ public:
       Sampler DepthSampler{};
       Sampler UniqueDepthSampler{};
       // TODO: Cache EFs
-      CachedFlowEdgeFunctions.foreachCachedEdgeFunction(
-          [&](EdgeFunction<l_t> EF, EdgeFunctionKind Kind) {
-            auto Depth = EF.depth();
-            DepthSampler.addSample(Depth);
-            if (Depth > Stats.MaxDepth) {
-              Stats.MaxDepth = Depth;
-            }
+      {
+        std::lock_guard Guard(CachedFlowEdgeFunctionsMutex);
+        CachedFlowEdgeFunctions.foreachCachedEdgeFunction(
+            [&](EdgeFunction<l_t> EF, EdgeFunctionKind Kind) {
+              auto Depth = EF.depth();
+              DepthSampler.addSample(Depth);
+              if (Depth > Stats.MaxDepth) {
+                Stats.MaxDepth = Depth;
+              }
 
-            if (UniqueEFs[size_t(Kind)].insert(std::move(EF)).second) {
-              UniqueDepthSampler.addSample(Depth);
-            }
-            Stats.TotalEFCount[size_t(Kind)]++;
-            Stats.PerAllocCount[size_t(EF.getAllocationPolicy())]++;
-          });
+              if (UniqueEFs[size_t(Kind)].insert(std::move(EF)).second) {
+                UniqueDepthSampler.addSample(Depth);
+              }
+              Stats.TotalEFCount[size_t(Kind)]++;
+              Stats.PerAllocCount[size_t(EF.getAllocationPolicy())]++;
+            });
+      }
 
       size_t TotalUniqueNumEF = 0;
       for (size_t I = 0, End = UniqueEFs.size(); I != End; ++I) {
@@ -679,6 +688,7 @@ protected:
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
+      std::lock_guard Guard(JumpFnMutex);
       auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
       if (!LookupResults) {
         continue;
@@ -727,13 +737,17 @@ protected:
     l_t LPrime = joinValueAt(NHashN, NHashD, ValNHash, L);
     if (!(LPrime == ValNHash)) {
       setVal(NHashN, NHashD, std::move(LPrime));
+      std::lock_guard Guard(ValuePropWLMutex);
       ValuePropWL.emplace_back(std::move(NHashN), std::move(NHashD));
     }
   }
 
   l_t val(n_t NHashN, d_t NHashD) {
-    if (ValTab.contains(NHashN, NHashD)) {
-      return ValTab.get(NHashN, NHashD);
+    {
+      std::lock_guard Guard(ValTabMutex);
+      if (ValTab.contains(NHashN, NHashD)) {
+        return ValTab.get(NHashN, NHashD);
+      }
     }
     // implicitly initialized to top; see line [1] of Fig. 7 in SRH96 paper
     return IDEProblem.topElement();
@@ -767,17 +781,20 @@ protected:
                        "   Target D: " << DToString(Edge.factAtTarget()));
     });
 
-    auto FwdLookupRes =
-        JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
-    if (FwdLookupRes) {
-      auto &Ref = FwdLookupRes->get();
-      if (auto Find = std::find_if(Ref.begin(), Ref.end(),
-                                   [Edge](const auto &Pair) {
-                                     return Edge.factAtTarget() == Pair.first;
-                                   });
-          Find != Ref.end()) {
-        PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
-        return Find->second;
+    {
+      std::lock_guard Guard(JumpFnMutex);
+      auto FwdLookupRes =
+          JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
+      if (FwdLookupRes) {
+        auto &Ref = FwdLookupRes->get();
+        if (auto Find = std::find_if(Ref.begin(), Ref.end(),
+                                     [Edge](const auto &Pair) {
+                                       return Edge.factAtTarget() == Pair.first;
+                                     });
+            Find != Ref.end()) {
+          PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
+          return Find->second;
+        }
       }
     }
     PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
@@ -850,6 +867,7 @@ protected:
       for (n_t SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
         using CellOfTable =
             typename TablePll<d_t, d_t, EdgeFunction<l_t>>::Cell;
+        std::lock_guard Guard(JumpFnMutex);
         TablePll<d_t, d_t, EdgeFunction<l_t>> &LookupByTarget =
             JumpFn->lookupByTarget(n);
         for (const CellOfTable &SourceValTargetValAndFunction :
@@ -910,10 +928,13 @@ protected:
     PHASAR_LOG_LEVEL(DEBUG, "Start computing values");
     // Phase II(i)
     submitInitialValues();
-    while (!ValuePropWL.empty()) {
-      auto NAndD = std::move(ValuePropWL.back());
-      ValuePropWL.pop_back();
-      valuePropagationTask(std::move(NAndD));
+    {
+      std::lock_guard Guard(ValuePropWLMutex);
+      while (!ValuePropWL.empty()) {
+        auto NAndD = std::move(ValuePropWL.back());
+        ValuePropWL.pop_back();
+        valuePropagationTask(std::move(NAndD));
+      }
     }
 
     // Phase II(ii)
@@ -1047,6 +1068,8 @@ protected:
             EdgeFunction<l_t> fPrime =
                 IDEProblem.extend(IDEProblem.extend(f4, f), f5);
             PHASAR_LOG_LEVEL(DEBUG, "       = " << fPrime);
+
+            std::lock_guard Guard(JumpFnMutex);
             // for each jump function coming into the call, propagate to
             // return site using the composed function
             auto RevLookupResult = JumpFn->reverseLookup(c, d4);
@@ -1246,16 +1269,17 @@ protected:
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
     EdgeFunction<l_t> JumpFnE = [&]() {
-      const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
-      if (RevLookupResult) {
-        const auto &JumpFnContainer = RevLookupResult->get();
-        const auto Find =
-            std::find_if(JumpFnContainer.begin(), JumpFnContainer.end(),
-                         [SourceVal, this](auto &KVpair) {
-                           return KVpair.first == SourceVal;
-                         });
-        if (Find != JumpFnContainer.end()) {
-          return Find->second;
+      {
+        std::lock_guard Guard(JumpFnMutex);
+        const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
+        if (RevLookupResult) {
+          const auto &JumpFnContainer = RevLookupResult->get();
+          const auto Find = std::find_if(
+              JumpFnContainer.begin(), JumpFnContainer.end(),
+              [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
+          if (Find != JumpFnContainer.end()) {
+            return Find->second;
+          }
         }
       }
       // jump function is initialized to all-top if no entry
@@ -1275,7 +1299,10 @@ protected:
       PHASAR_LOG_LEVEL(DEBUG, ' ');
     });
     if (NewFunction) {
-      JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
+      {
+        std::lock_guard Guard(JumpFnMutex);
+        JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
+      }
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
       pathEdgeProcessingTask(std::move(Edge));
@@ -1303,6 +1330,7 @@ protected:
   auto endSummary(n_t SP, d_t d3) {
     if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Core) {
       auto Key = std::make_pair(SP, d3);
+      std::lock_guard Guard(FSummaryReuseMutex);
       auto FindND = FSummaryReuse.find(Key);
       if (FindND == FSummaryReuse.end()) {
         FSummaryReuse.emplace(Key, 0);
@@ -1915,7 +1943,7 @@ private:
     }
   }
 
-  SolverResults<n_t, d_t, l_t> doFinalize() & {
+  OwningSolverResults<n_t, d_t, l_t> doFinalize() & {
     finalizeInternal();
     return getSolverResults();
   }
@@ -1976,6 +2004,11 @@ private:
 
   llvm::ThreadPool TPool;
   std::mutex WorkListMutex;
+  std::mutex ValuePropWLMutex;
+  std::mutex JumpFnMutex;
+  std::mutex FSummaryReuseMutex;
+  std::mutex ValTabMutex;
+  std::mutex CachedFlowEdgeFunctionsMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>

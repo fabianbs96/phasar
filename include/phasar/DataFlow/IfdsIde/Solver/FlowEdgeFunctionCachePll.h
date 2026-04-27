@@ -118,6 +118,16 @@ private:
                                   EdgeFunction<l_t>>
       SummaryEdgeFunctionCache;
 
+  std::mutex NormalFunctionCacheMutex;
+  std::mutex CallFlowFunctionCacheMutex;
+  std::mutex ReturnFlowFunctionCacheMutex;
+  std::mutex CallToRetFlowFunctionCacheMutex;
+
+  std::mutex CallEdgeFunctionCacheMutex;
+  std::mutex ReturnEdgeFunctionCacheMutex;
+  std::mutex CallToRetEdgeFunctionCacheMutex;
+  std::mutex SummaryEdgeFunctionCacheMutex;
+
 public:
   // Ctor allows access to the IDEProblem in order to get access to flow and
   // edge function factory functions.
@@ -177,6 +187,7 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Curr Inst : " << NToString(Curr));
         PHASAR_LOG_LEVEL(DEBUG, "(N) Succ Inst : " << NToString(Succ)));
     auto Key = createEdgeFunctionInstKey(Curr, Succ);
+    std::lock_guard Guard(NormalFunctionCacheMutex);
     auto SearchNormalFlowFunction = NormalFunctionCache.find(Key);
     if (SearchNormalFlowFunction != NormalFunctionCache.end()) {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
@@ -211,6 +222,7 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Call Stmt : " << NToString(CallSite));
         PHASAR_LOG_LEVEL(DEBUG, "(F) Dest Fun : " << FToString(DestFun)));
     auto Key = std::tie(CallSite, DestFun);
+    std::lock_guard Guard(CallFlowFunctionCacheMutex);
     auto SearchCallFlowFunction = CallFlowFunctionCache.find(Key);
     if (SearchCallFlowFunction != CallFlowFunctionCache.end()) {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
@@ -241,6 +253,8 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Exit Stmt : " << NToString(ExitInst));
         PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite)));
     auto Key = std::tie(CallSite, CalleeFun, ExitInst, RetSite);
+
+    std::lock_guard Guard(ReturnFlowFunctionCacheMutex);
     auto SearchReturnFlowFunction = ReturnFlowFunctionCache.find(Key);
     if (SearchReturnFlowFunction != ReturnFlowFunctionCache.end()) {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
@@ -276,6 +290,8 @@ public:
           PHASAR_LOG_LEVEL(DEBUG, "  " << FToString(callee));
         };);
     auto Key = std::tie(CallSite, RetSite);
+
+    std::lock_guard Guard(CallToRetFlowFunctionCacheMutex);
     auto SearchCallToRetFlowFunction = CallToRetFlowFunctionCache.find(Key);
     if (SearchCallToRetFlowFunction != CallToRetFlowFunctionCache.end()) {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
@@ -322,6 +338,7 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(D) Succ Node : " << DToString(SuccNode)));
 
     EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(Curr, Succ);
+    std::lock_guard Guard(NormalFunctionCacheMutex);
     auto SearchInnerMap = NormalFunctionCache.find(OuterMapKey);
     if (SearchInnerMap != NormalFunctionCache.end()) {
       auto SearchEdgeFunc = SearchInnerMap->second.EdgeFunctionMap.find(
@@ -371,6 +388,8 @@ public:
                          "(F) Dest Fun : " << FToString(DestinationFunction));
         PHASAR_LOG_LEVEL(DEBUG, "(D) Dest Node : " << DToString(DestNode)));
     auto Key = std::tie(CallSite, SrcNode, DestinationFunction, DestNode);
+
+    std::lock_guard Guard(CallEdgeFunctionCacheMutex);
     auto SearchCallEdgeFunction = CallEdgeFunctionCache.find(Key);
     if (SearchCallEdgeFunction != CallEdgeFunctionCache.end()) {
       INC_COUNTER("Call-EF Cache Hit", 1, Full);
@@ -408,6 +427,8 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(D) Ret Node  : " << DToString(RetNode)));
     auto Key = std::tie(CallSite, CalleeFunction, ExitInst, ExitNode, RetSite,
                         RetNode);
+
+    std::lock_guard Guard(ReturnEdgeFunctionCacheMutex);
     auto SearchReturnEdgeFunction = ReturnEdgeFunctionCache.find(Key);
     if (SearchReturnEdgeFunction != ReturnEdgeFunctionCache.end()) {
       INC_COUNTER("Return-EF Cache Hit", 1, Full);
@@ -447,6 +468,8 @@ public:
         });
 
     EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(CallSite, RetSite);
+
+    std::lock_guard Guard(CallToRetEdgeFunctionCacheMutex);
     auto SearchInnerMap = CallToRetEdgeFunctionCache.find(OuterMapKey);
     if (SearchInnerMap != CallToRetEdgeFunctionCache.end()) {
       auto SearchEdgeFunc = SearchInnerMap->second.find(
@@ -497,6 +520,8 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(D) Ret Node  : " << DToString(RetSiteNode));
         PHASAR_LOG_LEVEL(DEBUG, ' '));
     auto Key = std::tie(CallSite, CallNode, RetSite, RetSiteNode);
+
+    std::lock_guard Guard(SummaryEdgeFunctionCacheMutex);
     auto SearchSummaryEdgeFunction = SummaryEdgeFunctionCache.find(Key);
     if (SearchSummaryEdgeFunction != SummaryEdgeFunctionCache.end()) {
       INC_COUNTER("Summary-EF Cache Hit", 1, Full);
@@ -587,28 +612,43 @@ public:
   }
 
   template <typename Handler> void foreachCachedEdgeFunction(Handler Fn) const {
-    for (const auto &[Key, NormalFns] : NormalFunctionCache) {
-      for (const auto &[Set, EF] : NormalFns.EdgeFunctionMap) {
-        std::invoke(Fn, EF, EdgeFunctionKind::Normal);
+    {
+      std::lock_guard Guard(NormalFunctionCacheMutex);
+      for (const auto &[Key, NormalFns] : NormalFunctionCache) {
+        for (const auto &[Set, EF] : NormalFns.EdgeFunctionMap) {
+          std::invoke(Fn, EF, EdgeFunctionKind::Normal);
+        }
       }
     }
 
-    for (const auto &[Key, EF] : CallEdgeFunctionCache) {
-      std::invoke(Fn, EF, EdgeFunctionKind::Call);
-    }
-
-    for (const auto &[Key, EF] : ReturnEdgeFunctionCache) {
-      std::invoke(Fn, EF, EdgeFunctionKind::Return);
-    }
-
-    for (const auto &[Key, CTRFns] : CallToRetEdgeFunctionCache) {
-      for (const auto &[Set, EF] : CTRFns) {
-        std::invoke(Fn, EF, EdgeFunctionKind::CallToReturn);
+    {
+      std::lock_guard Guard(CallEdgeFunctionCacheMutex);
+      for (const auto &[Key, EF] : CallEdgeFunctionCache) {
+        std::invoke(Fn, EF, EdgeFunctionKind::Call);
       }
     }
 
-    for (const auto &[Key, EF] : SummaryEdgeFunctionCache) {
-      std::invoke(Fn, EF, EdgeFunctionKind::Summary);
+    {
+      std::lock_guard Guard(ReturnEdgeFunctionCacheMutex);
+      for (const auto &[Key, EF] : ReturnEdgeFunctionCache) {
+        std::invoke(Fn, EF, EdgeFunctionKind::Return);
+      }
+    }
+
+    {
+      std::lock_guard Guard(CallToRetEdgeFunctionCacheMutex);
+      for (const auto &[Key, CTRFns] : CallToRetEdgeFunctionCache) {
+        for (const auto &[Set, EF] : CTRFns) {
+          std::invoke(Fn, EF, EdgeFunctionKind::CallToReturn);
+        }
+      }
+    }
+
+    {
+      std::lock_guard Guard(SummaryEdgeFunctionCacheMutex);
+      for (const auto &[Key, EF] : SummaryEdgeFunctionCache) {
+        std::invoke(Fn, EF, EdgeFunctionKind::Summary);
+      }
     }
   }
 

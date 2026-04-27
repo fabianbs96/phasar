@@ -192,8 +192,7 @@ public:
     // Returns the value corresponding to the given row and column keys, or V()
     // if no such mapping exists.
 
-    // TODO: nicht thread safe, auseinanderziehen.
-
+    std::lock_guard Guard(TabMutex);
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 

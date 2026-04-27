@@ -34,11 +34,6 @@
 
 namespace psr {
 
-// Forward declare the IDETabulationProblem as we require its toString
-// functionality.
-template <IdeAnalysisDomain AnalysisDomainTy, typename Container>
-class IDETabulationProblem;
-
 template <typename AnalysisDomainTy, typename Container> class JumpFunctions {
 public:
   using l_t = typename AnalysisDomainTy::l_t;
