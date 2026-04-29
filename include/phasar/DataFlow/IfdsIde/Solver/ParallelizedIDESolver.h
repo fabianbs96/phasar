@@ -386,6 +386,37 @@ public:
     OS << getEdgeFunctionStatistics() << '\n';
   }
 
+  void solve() {
+    doInitialize();
+
+    while (true) {
+      auto WorkListItem = [this] {
+        std::optional<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> Ret;
+        std::lock_guard Guard(WorkListMutex);
+        if (WorkList.empty()) {
+          return Ret;
+        }
+        Ret.emplace(std::move(WorkList.back()));
+        WorkList.pop_back();
+        return Ret;
+      }();
+
+      if (!WorkListItem) {
+        break;
+      }
+
+      auto &[Edge, EF] = *WorkListItem;
+
+      auto [SourceVal, Target, TargetVal] = Edge.consume();
+      TPool.async(&ParallelizedIDESolver::propagate, this, std::move(SourceVal),
+                  std::move(Target), std::move(TargetVal), std::move(EF));
+    }
+
+    TPool.wait();
+
+    doFinalize();
+  }
+
 protected:
   Nullable<n_t> getNextUserOrNull(ByConstRef<f_t> Fun, ByConstRef<d_t> d3,
                                   ByConstRef<n_t> n) {
@@ -1895,29 +1926,6 @@ private:
 
     // We start our analysis and construct exploded supergraph
     submitInitialSeeds();
-  }
-
-  bool doNext() {
-    while (!WorkList.empty()) {
-      // If there are no threads available, wait for one to finish
-      if (TPool.getThreadCount() == std::thread::hardware_concurrency() - 1) {
-        continue;
-      }
-
-      auto [Edge, EF] = [this] {
-        std::lock_guard Guard(WorkListMutex);
-        auto ReturnValue = std::move(WorkList.back());
-        WorkList.pop_back();
-        return ReturnValue;
-      }();
-
-      auto [SourceVal, Target, TargetVal] = Edge.consume();
-      TPool.async(&ParallelizedIDESolver::propagate, this, std::move(SourceVal),
-                  std::move(Target), std::move(TargetVal), std::move(EF));
-    }
-
-    TPool.wait();
-    return false;
   }
 
   void finalizeInternal() {

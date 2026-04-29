@@ -120,8 +120,6 @@ private:
 
   std::mutex NormalFunctionCacheMutex;
   std::mutex CallFlowFunctionCacheMutex;
-  std::mutex ReturnFlowFunctionCacheMutex;
-  std::mutex CallToRetFlowFunctionCacheMutex;
 
   std::mutex CallEdgeFunctionCacheMutex;
   std::mutex ReturnEdgeFunctionCacheMutex;
@@ -187,30 +185,36 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Curr Inst : " << NToString(Curr));
         PHASAR_LOG_LEVEL(DEBUG, "(N) Succ Inst : " << NToString(Succ)));
     auto Key = createEdgeFunctionInstKey(Curr, Succ);
-    std::lock_guard Guard(NormalFunctionCacheMutex);
-    auto SearchNormalFlowFunction = NormalFunctionCache.find(Key);
-    if (SearchNormalFlowFunction != NormalFunctionCache.end()) {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Normal-FF Cache Hit", 1, Full);
-      if (SearchNormalFlowFunction->second.FlowFuncPtr != nullptr) {
-        return SearchNormalFlowFunction->second.FlowFuncPtr;
-      }
-      auto FF = (AutoAddZero)
+
+    FlowFunctionPtrType ReturnType{};
+    NormalFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Normal-FF Cache Hit", 1, Full);
+          if (Val.second.FlowFuncPtr != nullptr) {
+            ReturnType = Val.second.FlowFuncPtr;
+          } else {
+            auto FF =
+                (AutoAddZero)
                     ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
                           Problem.getNormalFlowFunction(Curr, Succ), ZV)
                     : Problem.getNormalFlowFunction(Curr, Succ);
-      SearchNormalFlowFunction->second.FlowFuncPtr = FF;
-      return FF;
-    }
-    INC_COUNTER("Normal-FF Construction", 1, Full);
-    auto FF = (AutoAddZero)
-                  ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
-                        Problem.getNormalFlowFunction(Curr, Succ), ZV)
-                  : Problem.getNormalFlowFunction(Curr, Succ);
-    NormalFunctionCache.insert(std::make_pair(Key, NormalEdgeFlowData(FF)));
-    PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+            ReturnType = FF;
+          }
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Normal-FF Construction", 1, Full);
+          auto FF = (AutoAddZero)
+                        ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
+                              Problem.getNormalFlowFunction(Curr, Succ), ZV)
+                        : Problem.getNormalFlowFunction(Curr, Succ);
+          ReturnType = FF;
+          PSR_FWD(Ctor)(Key, std::move(FF));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
 
-    return FF;
+    return ReturnType;
   }
 
   FlowFunctionPtrType getCallFlowFunction(n_t CallSite, f_t DestFun) {
@@ -222,21 +226,27 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Call Stmt : " << NToString(CallSite));
         PHASAR_LOG_LEVEL(DEBUG, "(F) Dest Fun : " << FToString(DestFun)));
     auto Key = std::tie(CallSite, DestFun);
-    std::lock_guard Guard(CallFlowFunctionCacheMutex);
-    auto SearchCallFlowFunction = CallFlowFunctionCache.find(Key);
-    if (SearchCallFlowFunction != CallFlowFunctionCache.end()) {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Call-FF Cache Hit", 1, Full);
-      return SearchCallFlowFunction->second;
-    }
-    INC_COUNTER("Call-FF Construction", 1, Full);
-    auto FF = (AutoAddZero)
+
+    FlowFunctionPtrType ReturnType;
+    CallFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Call-FF Cache Hit", 1, Full);
+          ReturnType = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Call-FF Construction", 1, Full);
+          auto FF =
+              (AutoAddZero)
                   ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
                         Problem.getCallFlowFunction(CallSite, DestFun), ZV)
                   : Problem.getCallFlowFunction(CallSite, DestFun);
-    CallFlowFunctionCache.insert(std::make_pair(Key, FF));
-    PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    return FF;
+          ReturnType = FF;
+          PSR_FWD(Ctor)(Key, std::move(FF));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
+    return ReturnType;
   }
 
   FlowFunctionPtrType getRetFlowFunction(n_t CallSite, f_t CalleeFun,
@@ -254,24 +264,29 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite)));
     auto Key = std::tie(CallSite, CalleeFun, ExitInst, RetSite);
 
-    std::lock_guard Guard(ReturnFlowFunctionCacheMutex);
-    auto SearchReturnFlowFunction = ReturnFlowFunctionCache.find(Key);
-    if (SearchReturnFlowFunction != ReturnFlowFunctionCache.end()) {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Return-FF Cache Hit", 1, Full);
-      return SearchReturnFlowFunction->second;
-    }
-    INC_COUNTER("Return-FF Construction", 1, Full);
-    auto FF = (AutoAddZero)
-                  ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
-                        Problem.getRetFlowFunction(CallSite, CalleeFun,
-                                                   ExitInst, RetSite),
-                        ZV)
-                  : Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
-                                               RetSite);
-    ReturnFlowFunctionCache.insert(std::make_pair(Key, FF));
-    PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    return FF;
+    FlowFunctionPtrType ReturnType{};
+    ReturnFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Return-FF Cache Hit", 1, Full);
+          ReturnType = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Return-FF Construction", 1, Full);
+          auto FF = (AutoAddZero)
+                        ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
+                              Problem.getRetFlowFunction(CallSite, CalleeFun,
+                                                         ExitInst, RetSite),
+                              ZV)
+                        : Problem.getRetFlowFunction(CallSite, CalleeFun,
+                                                     ExitInst, RetSite);
+          ReturnType = FF;
+          PSR_FWD(Ctor)(Key, std::move(FF));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
+
+    return ReturnType;
   }
 
   FlowFunctionPtrType getCallToRetFlowFunction(n_t CallSite, n_t RetSite,
@@ -286,28 +301,34 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Call Site : " << NToString(CallSite));
         PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite));
         PHASAR_LOG_LEVEL(DEBUG, "(F) Callee's  : ");
-        for (auto callee : Callees) {
-          PHASAR_LOG_LEVEL(DEBUG, "  " << FToString(callee));
+        for (auto Callee : Callees) {
+          PHASAR_LOG_LEVEL(DEBUG, "  " << FToString(Callee));
         };);
     auto Key = std::tie(CallSite, RetSite);
 
-    std::lock_guard Guard(CallToRetFlowFunctionCacheMutex);
-    auto SearchCallToRetFlowFunction = CallToRetFlowFunctionCache.find(Key);
-    if (SearchCallToRetFlowFunction != CallToRetFlowFunctionCache.end()) {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
-      return SearchCallToRetFlowFunction->second;
-    }
-    INC_COUNTER("CallToRet-FF Construction", 1, Full);
-    auto FF =
-        (AutoAddZero)
-            ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
-                  Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees),
-                  ZV)
-            : Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees);
-    CallToRetFlowFunctionCache.insert(std::make_pair(Key, FF));
-    PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    return FF;
+    FlowFunctionPtrType ReturnType{};
+    CallToRetFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
+          ReturnType = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("CallToRet-FF Construction", 1, Full);
+          auto FF = (AutoAddZero)
+                        ? std::make_shared<ZeroedFlowFunction<d_t, Container>>(
+                              Problem.getCallToRetFlowFunction(
+                                  CallSite, RetSite, Callees),
+                              ZV)
+                        : Problem.getCallToRetFlowFunction(CallSite, RetSite,
+                                                           Callees);
+          ReturnType = FF;
+          PSR_FWD(Ctor)(Key, std::move(FF));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
+
+    return ReturnType;
   }
 
   FlowFunctionPtrType getSummaryFlowFunction(n_t CallSite, f_t DestFun) {
@@ -370,6 +391,50 @@ public:
     PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
     return EF;
+    /*
+
+    // TODO: remove rest of find() and end() instances.
+
+    EdgeFunction<l_t> ReturnValue;
+    EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(Curr, Succ);
+
+    if (NormalFunctionCache.if_contains(OuterMapKey, [&](auto &Pair) {
+          auto EFNKey = createEdgeFunctionNodeKey(CurrNode, SuccNode);
+
+          Pair.second.EdgeFunctionMap.if_contains(EFNKey, [&](auto &Val) {
+            INC_COUNTER("Normal-EF Cache Hit", 1, Full);
+            PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
+            PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " <<
+    Val.second); ReturnValue = Val.second;
+          });
+
+          INC_COUNTER("Normal-EF Construction", 1, Full);
+          auto EF =
+              Problem.getNormalEdgeFunction(Curr, CurrNode, Succ, SuccNode);
+
+          Pair.second.EdgeFunctionMap.insert(std::move(EFNKey), EF);
+
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
+          ReturnValue = EF;
+        })) {
+      return ReturnValue;
+    }
+
+        INC_COUNTER("Normal-EF Construction", 1, Full);
+        ReturnValue = Problem.getNormalEdgeFunction(Curr, CurrNode, Succ,
+    SuccNode);
+
+        NormalFunctionCache.try_emplace(
+            OuterMapKey,
+            NormalEdgeFlowData(InnerEdgeFunctionMapType{std::make_pair(
+                createEdgeFunctionNodeKey(CurrNode, SuccNode),
+    ReturnValue)}));
+
+        PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+        PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << ReturnValue);
+        return ReturnValue;
+    */
   }
 
   EdgeFunction<l_t> getCallEdgeFunction(n_t CallSite, d_t SrcNode,
@@ -389,22 +454,26 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(D) Dest Node : " << DToString(DestNode)));
     auto Key = std::tie(CallSite, SrcNode, DestinationFunction, DestNode);
 
-    std::lock_guard Guard(CallEdgeFunctionCacheMutex);
-    auto SearchCallEdgeFunction = CallEdgeFunctionCache.find(Key);
-    if (SearchCallEdgeFunction != CallEdgeFunctionCache.end()) {
-      INC_COUNTER("Call-EF Cache Hit", 1, Full);
-      PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
-      PHASAR_LOG_LEVEL(
-          DEBUG, "Provide Edge Function: " << SearchCallEdgeFunction->second);
-      return SearchCallEdgeFunction->second;
-    }
-    INC_COUNTER("Call-EF Construction", 1, Full);
-    auto EF = Problem.getCallEdgeFunction(CallSite, SrcNode,
-                                          DestinationFunction, DestNode);
-    CallEdgeFunctionCache.insert(std::make_pair(Key, EF));
-    PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
-    PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
-    return EF;
+    EdgeFunction<l_t> ReturnEF{};
+    CallEdgeFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Call-EF Cache Hit", 1, Full);
+          ReturnEF = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Val.second);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Call-EF Construction", 1, Full);
+          auto EF = Problem.getCallEdgeFunction(CallSite, SrcNode,
+                                                DestinationFunction, DestNode);
+          ReturnEF = EF;
+          PSR_FWD(Ctor)(Key, std::move(EF));
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
+        });
+
+    return ReturnEF;
   }
 
   EdgeFunction<l_t> getReturnEdgeFunction(n_t CallSite, f_t CalleeFunction,
@@ -428,22 +497,26 @@ public:
     auto Key = std::tie(CallSite, CalleeFunction, ExitInst, ExitNode, RetSite,
                         RetNode);
 
-    std::lock_guard Guard(ReturnEdgeFunctionCacheMutex);
-    auto SearchReturnEdgeFunction = ReturnEdgeFunctionCache.find(Key);
-    if (SearchReturnEdgeFunction != ReturnEdgeFunctionCache.end()) {
-      INC_COUNTER("Return-EF Cache Hit", 1, Full);
-      PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
-      PHASAR_LOG_LEVEL(
-          DEBUG, "Provide Edge Function: " << SearchReturnEdgeFunction->second);
-      return SearchReturnEdgeFunction->second;
-    }
-    INC_COUNTER("Return-EF Construction", 1, Full);
-    auto EF = Problem.getReturnEdgeFunction(CallSite, CalleeFunction, ExitInst,
-                                            ExitNode, RetSite, RetNode);
-    ReturnEdgeFunctionCache.insert(std::make_pair(Key, EF));
-    PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
-    PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
-    return EF;
+    EdgeFunction<l_t> ReturnEF{};
+    ReturnEdgeFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Return-EF Cache Hit", 1, Full);
+          ReturnEF = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Val.second);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Return-EF Construction", 1, Full);
+          auto EF = Problem.getReturnEdgeFunction(
+              CallSite, CalleeFunction, ExitInst, ExitNode, RetSite, RetNode);
+          ReturnEF = EF;
+          PSR_FWD(Ctor)(Key, std::move(EF));
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
+        });
+
+    return ReturnEF;
   }
 
   EdgeFunction<l_t> getCallToRetEdgeFunction(n_t CallSite, d_t CallNode,
@@ -521,22 +594,26 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, ' '));
     auto Key = std::tie(CallSite, CallNode, RetSite, RetSiteNode);
 
-    std::lock_guard Guard(SummaryEdgeFunctionCacheMutex);
-    auto SearchSummaryEdgeFunction = SummaryEdgeFunctionCache.find(Key);
-    if (SearchSummaryEdgeFunction != SummaryEdgeFunctionCache.end()) {
-      INC_COUNTER("Summary-EF Cache Hit", 1, Full);
-      PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
-      PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: "
-                                  << SearchSummaryEdgeFunction->second);
-      return SearchSummaryEdgeFunction->second;
-    }
-    INC_COUNTER("Summary-EF Construction", 1, Full);
-    auto EF = Problem.getSummaryEdgeFunction(CallSite, CallNode, RetSite,
-                                             RetSiteNode);
-    SummaryEdgeFunctionCache.insert(std::make_pair(Key, EF));
-    PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
-    PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
-    return EF;
+    EdgeFunction<l_t> ReturnEF{};
+    SummaryEdgeFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Val) {
+          INC_COUNTER("Summary-EF Cache Hit", 1, Full);
+          ReturnEF = Val.second;
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Val.second);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Summary-EF Construction", 1, Full);
+          auto EF = Problem.getSummaryEdgeFunction(CallSite, CallNode, RetSite,
+                                                   RetSiteNode);
+          ReturnEF = EF;
+          PSR_FWD(Ctor)(Key, std::move(EF));
+          PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+          PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
+        });
+
+    return ReturnEF;
   }
 
   void print() {

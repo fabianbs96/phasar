@@ -215,9 +215,9 @@ public:
           Find != TargetValToFunc.end()) {
         TargetValToFunc.erase(Find);
       }
-      std::lock_guard LookupGuard(NonEmptyLookupByTargetNodeMutex);
-      return NonEmptyLookupByTargetNode.erase(Target);
     }
+    std::lock_guard LookupGuard(NonEmptyLookupByTargetNodeMutex);
+    return NonEmptyLookupByTargetNode.erase(Target);
   }
 
   /**

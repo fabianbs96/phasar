@@ -40,7 +40,8 @@ int main(int Argc, const char **Argv) {
 
     llvm::outs() << "Testing ParallelizedIDESolver:\n";
     ParallelizedIDESolver Solver(Problem, &HA.getICFG());
-    auto PIDEResults = Solver.solve();
+    Solver.solve();
+    auto PIDEResults = Solver.getSolverResults();
     PIDEResults.dumpResults(HA.getICFG());
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
