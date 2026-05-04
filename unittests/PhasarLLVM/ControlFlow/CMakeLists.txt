@@ -1,4 +1,5 @@
 set(ControlFlowSources
+  SVFGTest.cpp
   LLVMBasedCFGTest.cpp
   LLVMBasedICFGTest.cpp
   LLVMBasedICFG_CHATest.cpp
