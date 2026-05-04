@@ -386,21 +386,24 @@ public:
     OS << getEdgeFunctionStatistics() << '\n';
   }
 
+  bool isWorkListEmptyThreadSafe() {
+    std::lock_guard Guard(WorkListMutex);
+    return WorkList.empty();
+  }
+
   void solve() {
     doInitialize();
 
-    int Counter = 0;
-    llvm::outs() << "WorkList.size() before while loop:\n"
-                 << WorkList.size() << "\n";
-
     while (true) {
-      if (WorkList.empty()) {
+      // new items can be added to the work list, so we need to wait and see if
+      // running threads have added new ones before we can safely exit.
+      if (isWorkListEmptyThreadSafe()) {
         TPool.wait();
-        if (WorkList.empty()) {
+        if (isWorkListEmptyThreadSafe()) {
           break;
         }
       }
-      llvm::outs() << "Counter: " << Counter << "\n";
+
       auto WorkListItem = [this] {
         std::optional<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> Ret;
         std::lock_guard Guard(WorkListMutex);
@@ -412,7 +415,6 @@ public:
         return Ret;
       }();
 
-      Counter++;
       if (!WorkListItem) {
         continue;
       }
@@ -857,13 +859,16 @@ protected:
     PAMM_GET_INSTANCE;
     INC_COUNTER("JumpFn Construction", 1, Full);
     IF_LOG_LEVEL_ENABLED(DEBUG, {
-      PHASAR_LOG_LEVEL(
-          DEBUG,
-          "-------------------------------------------- "
-              << PathEdgeCount
-              << ". Path Edge --------------------------------------------");
-      PHASAR_LOG_LEVEL(DEBUG, ' ');
-      PHASAR_LOG_LEVEL(DEBUG, "Process " << PathEdgeCount << ". path edge:");
+      {
+        std::lock_guard Guard(PathEdgeCountMutex);
+        PHASAR_LOG_LEVEL(
+            DEBUG,
+            "-------------------------------------------- "
+                << PathEdgeCount
+                << ". Path Edge --------------------------------------------");
+        PHASAR_LOG_LEVEL(DEBUG, ' ');
+        PHASAR_LOG_LEVEL(DEBUG, "Process " << PathEdgeCount << ". path edge:");
+      }
       PHASAR_LOG_LEVEL(DEBUG, "< D source: " << DToString(Edge.factAtSource())
                                              << " ;");
       PHASAR_LOG_LEVEL(DEBUG,
@@ -1347,7 +1352,10 @@ protected:
         JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
       }
       PathEdge Edge(SourceVal, Target, TargetVal);
-      PathEdgeCount++;
+      {
+        std::lock_guard Guard(PathEdgeCountMutex);
+        PathEdgeCount++;
+      }
       pathEdgeProcessingTask(std::move(Edge));
 
       IF_LOG_LEVEL_ENABLED(DEBUG, {
@@ -2029,6 +2037,7 @@ private:
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;
   std::mutex CachedFlowEdgeFunctionsMutex;
+  std::mutex PathEdgeCountMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>
