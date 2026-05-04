@@ -389,7 +389,18 @@ public:
   void solve() {
     doInitialize();
 
+    int Counter = 0;
+    llvm::outs() << "WorkList.size() before while loop:\n"
+                 << WorkList.size() << "\n";
+
     while (true) {
+      if (WorkList.empty()) {
+        TPool.wait();
+        if (WorkList.empty()) {
+          break;
+        }
+      }
+      llvm::outs() << "Counter: " << Counter << "\n";
       auto WorkListItem = [this] {
         std::optional<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> Ret;
         std::lock_guard Guard(WorkListMutex);
@@ -401,8 +412,9 @@ public:
         return Ret;
       }();
 
+      Counter++;
       if (!WorkListItem) {
-        break;
+        continue;
       }
 
       auto &[Edge, EF] = *WorkListItem;
