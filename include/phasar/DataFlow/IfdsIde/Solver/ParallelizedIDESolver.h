@@ -47,10 +47,10 @@
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/TypeName.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "BS_thread_pool.hpp"
 #include "nlohmann/json.hpp"
 #include "parallel_hashmap/phmap.h"
 
@@ -484,9 +484,8 @@ protected:
             auto DestN = GetNextUse(ReturnSiteN, d3);
 
             auto Extend = IDEProblem.extend(f, SumEdgFnE);
-
-            TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
-                        std::move(d3), Extend);
+            TPool.detach_task(
+                [&, this] { propagate(d1, DestN, std::move(d3), Extend); });
           }
         }
       } else {
@@ -515,8 +514,9 @@ protected:
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
 
-            TPool.async(&ParallelizedIDESolver::propagate, this, d3, SP, d3,
-                        EdgeIdentity<l_t>{}); // line 15
+            TPool.detach_task([&, this] {
+              propagate(d3, SP, d3, EdgeIdentity<l_t>{});
+            }); // line 15
 
             //  register the fact that <sp,d3> has an incoming edge from <n,d2>
             //  line 15.1 of Naeem/Lhotak/Rodriguez
@@ -589,9 +589,10 @@ protected:
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f);
 
                   auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
-                  TPool.async(&ParallelizedIDESolver::propagate, this, d1,
-                              DestN, std::move(d5_restoredCtx),
+                  TPool.detach_task([&, this] {
+                    propagate(d1, DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f, fPrime));
+                  });
                 }
               }
             }
@@ -628,8 +629,9 @@ protected:
                                             << fPrime);
         auto DestN = GetNextUse(ReturnSiteN, d3);
 
-        TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
-                    std::move(d3), std::move(fPrime));
+        TPool.detach_task([&, this] {
+          propagate(d1, DestN, std::move(d3), std::move(fPrime));
+        });
       }
     }
   }
@@ -677,8 +679,9 @@ protected:
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
 
-        TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
-                    std::move(d3), std::move(fPrime));
+        TPool.detach_task([&, this] {
+          propagate(d1, DestN, std::move(d3), std::move(fPrime));
+        });
       }
     }
   }
@@ -983,8 +986,9 @@ protected:
           INC_COUNTER("Gen facts", 1, Core);
         }
 
-        TPool.async(&ParallelizedIDESolver::propagate, this, Fact, StartPoint,
-                    Fact, EdgeIdentity<l_t>{});
+        TPool.detach_task([&, this] {
+          propagate(Fact, StartPoint, Fact, EdgeIdentity<l_t>{});
+        });
       }
     }
   }
@@ -1091,9 +1095,10 @@ protected:
                     return RetSiteC;
                   }();
 
-                  TPool.async(&ParallelizedIDESolver::propagate, this,
-                              std::move(d3), DestN, std::move(d5_restoredCtx),
+                  TPool.detach_task([&, this] {
+                    propagate(std::move(d3), DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f3, fPrime));
+                  });
                 }
               }
             }
@@ -1153,8 +1158,10 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
-    TPool.async(&ParallelizedIDESolver::propagate, this, ZeroValue,
-                std::move(RetSiteC), std::move(TargetVal), std::move(EdgeFunc));
+    TPool.detach_task([&, this] {
+      propagate(ZeroValue, std::move(RetSiteC), std::move(TargetVal),
+                std::move(EdgeFunc));
+    });
   }
 
   /// This method will be called for each incoming edge and can be used to
@@ -1977,7 +1984,7 @@ private:
 
   phmap::parallel_node_hash_map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
-  llvm::ThreadPool TPool;
+  BS::light_thread_pool TPool;
   std::mutex ValuePropWLMutex;
   std::mutex JumpFnMutex;
   std::mutex FSummaryReuseMutex;
