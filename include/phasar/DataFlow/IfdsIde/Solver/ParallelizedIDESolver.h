@@ -386,48 +386,8 @@ public:
     OS << getEdgeFunctionStatistics() << '\n';
   }
 
-  bool isWorkListEmptyThreadSafe() {
-    std::lock_guard Guard(WorkListMutex);
-    return WorkList.empty();
-  }
-
   void solve() {
     doInitialize();
-
-    while (true) {
-      // new items can be added to the work list, so we need to wait and see if
-      // running threads have added new ones before we can safely exit.
-      if (isWorkListEmptyThreadSafe()) {
-        TPool.wait();
-        if (isWorkListEmptyThreadSafe()) {
-          break;
-        }
-      }
-
-      auto WorkListItem = [this] {
-        std::optional<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> Ret;
-        std::lock_guard Guard(WorkListMutex);
-        if (WorkList.empty()) {
-          return Ret;
-        }
-        Ret.emplace(std::move(WorkList.back()));
-        WorkList.pop_back();
-        return Ret;
-      }();
-
-      if (!WorkListItem) {
-        continue;
-      }
-
-      auto &[Edge, EF] = *WorkListItem;
-
-      auto [SourceVal, Target, TargetVal] = Edge.consume();
-      TPool.async(&ParallelizedIDESolver::propagate, this, std::move(SourceVal),
-                  std::move(Target), std::move(TargetVal), std::move(EF));
-    }
-
-    TPool.wait();
-
     doFinalize();
   }
 
@@ -525,8 +485,8 @@ protected:
 
             auto Extend = IDEProblem.extend(f, SumEdgFnE);
 
-            std::lock_guard Guard(WorkListMutex);
-            WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)), Extend);
+            TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
+                        std::move(d3), Extend);
           }
         }
       } else {
@@ -554,11 +514,10 @@ protected:
             // create initial self-loop
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
-            {
-              std::lock_guard Guard(WorkListMutex);
-              WorkList.emplace_back(PathEdge(d3, SP, d3),
-                                    EdgeIdentity<l_t>{}); // line 15
-            }
+
+            TPool.async(&ParallelizedIDESolver::propagate, this, d3, SP, d3,
+                        EdgeIdentity<l_t>{}); // line 15
+
             //  register the fact that <sp,d3> has an incoming edge from <n,d2>
             //  line 15.1 of Naeem/Lhotak/Rodriguez
             addIncoming(SP, d3, n, d2);
@@ -630,10 +589,9 @@ protected:
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f);
 
                   auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
-                  std::lock_guard Guard(WorkListMutex);
-                  WorkList.emplace_back(
-                      PathEdge(d1, DestN, std::move(d5_restoredCtx)),
-                      IDEProblem.extend(f, fPrime));
+                  TPool.async(&ParallelizedIDESolver::propagate, this, d1,
+                              DestN, std::move(d5_restoredCtx),
+                              IDEProblem.extend(f, fPrime));
                 }
               }
             }
@@ -669,9 +627,9 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Compose: " << EdgeFnE << " * " << f << " = "
                                             << fPrime);
         auto DestN = GetNextUse(ReturnSiteN, d3);
-        std::lock_guard Guard(WorkListMutex);
-        WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
-                              std::move(fPrime));
+
+        TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
+                    std::move(d3), std::move(fPrime));
       }
     }
   }
@@ -719,11 +677,8 @@ protected:
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
 
-        {
-          std::lock_guard Guard(WorkListMutex);
-          WorkList.emplace_back(PathEdge(d1, DestN, std::move(d3)),
-                                std::move(fPrime));
-        }
+        TPool.async(&ParallelizedIDESolver::propagate, this, d1, DestN,
+                    std::move(d3), std::move(fPrime));
       }
     }
   }
@@ -859,16 +814,13 @@ protected:
     PAMM_GET_INSTANCE;
     INC_COUNTER("JumpFn Construction", 1, Full);
     IF_LOG_LEVEL_ENABLED(DEBUG, {
-      {
-        std::lock_guard Guard(PathEdgeCountMutex);
-        PHASAR_LOG_LEVEL(
-            DEBUG,
-            "-------------------------------------------- "
-                << PathEdgeCount
-                << ". Path Edge --------------------------------------------");
-        PHASAR_LOG_LEVEL(DEBUG, ' ');
-        PHASAR_LOG_LEVEL(DEBUG, "Process " << PathEdgeCount << ". path edge:");
-      }
+      PHASAR_LOG_LEVEL(
+          DEBUG,
+          "-------------------------------------------- "
+              << PathEdgeCount
+              << ". Path Edge --------------------------------------------");
+      PHASAR_LOG_LEVEL(DEBUG, ' ');
+      PHASAR_LOG_LEVEL(DEBUG, "Process " << PathEdgeCount << ". path edge:");
       PHASAR_LOG_LEVEL(DEBUG, "< D source: " << DToString(Edge.factAtSource())
                                              << " ;");
       PHASAR_LOG_LEVEL(DEBUG,
@@ -1030,9 +982,9 @@ protected:
         if (!IDEProblem.isZeroValue(Fact)) {
           INC_COUNTER("Gen facts", 1, Core);
         }
-        std::lock_guard Guard(WorkListMutex);
-        WorkList.emplace_back(PathEdge(Fact, StartPoint, Fact),
-                              EdgeIdentity<l_t>{});
+
+        TPool.async(&ParallelizedIDESolver::propagate, this, Fact, StartPoint,
+                    Fact, EdgeIdentity<l_t>{});
       }
     }
   }
@@ -1139,10 +1091,9 @@ protected:
                     return RetSiteC;
                   }();
 
-                  std::lock_guard Guard(WorkListMutex);
-                  WorkList.emplace_back(
-                      PathEdge(std::move(d3), DestN, std::move(d5_restoredCtx)),
-                      IDEProblem.extend(f3, fPrime));
+                  TPool.async(&ParallelizedIDESolver::propagate, this,
+                              std::move(d3), DestN, std::move(d5_restoredCtx),
+                              IDEProblem.extend(f3, fPrime));
                 }
               }
             }
@@ -1202,10 +1153,8 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
-    std::lock_guard Guard(WorkListMutex);
-    WorkList.emplace_back(
-        PathEdge(ZeroValue, std::move(RetSiteC), std::move(TargetVal)),
-        std::move(EdgeFunc));
+    TPool.async(&ParallelizedIDESolver::propagate, this, ZeroValue,
+                std::move(RetSiteC), std::move(TargetVal), std::move(EdgeFunc));
   }
 
   /// This method will be called for each incoming edge and can be used to
@@ -1352,10 +1301,7 @@ protected:
         JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
       }
       PathEdge Edge(SourceVal, Target, TargetVal);
-      {
-        std::lock_guard Guard(PathEdgeCountMutex);
-        PathEdgeCount++;
-      }
+      PathEdgeCount++;
       pathEdgeProcessingTask(std::move(Edge));
 
       IF_LOG_LEVEL_ENABLED(DEBUG, {
@@ -1972,11 +1918,13 @@ private:
   }
 
   OwningSolverResults<n_t, d_t, l_t> doFinalize() & {
+    TPool.wait();
     finalizeInternal();
     return getSolverResults();
   }
 
   OwningSolverResults<n_t, d_t, l_t> doFinalize() && {
+    TPool.wait();
     finalizeInternal();
     return consumeSolverResults();
   }
@@ -1991,10 +1939,9 @@ private:
   Nullable<n_t> (*NextUserOrNullCB)(const void *, ByConstRef<f_t>,
                                     ByConstRef<d_t>, ByConstRef<n_t>) = nullptr;
 
-  std::vector<std::pair<PathEdge<n_t, d_t>, EdgeFunction<l_t>>> WorkList;
   std::vector<std::pair<n_t, d_t>> ValuePropWL;
 
-  size_t PathEdgeCount = 0;
+  std::atomic_size_t PathEdgeCount = 0;
 
   FlowEdgeFunctionCachePll<AnalysisDomainTy, Container> CachedFlowEdgeFunctions;
 
@@ -2031,13 +1978,11 @@ private:
   phmap::parallel_node_hash_map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   llvm::ThreadPool TPool;
-  std::mutex WorkListMutex;
   std::mutex ValuePropWLMutex;
   std::mutex JumpFnMutex;
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;
   std::mutex CachedFlowEdgeFunctionsMutex;
-  std::mutex PathEdgeCountMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>
