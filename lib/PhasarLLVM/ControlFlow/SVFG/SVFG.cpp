@@ -88,7 +88,7 @@ void SVFG::printAsDot(llvm::raw_ostream &OS) const {
     OS << "  N_" << to_underlying(Id) << " [label=\""
        << svfgNodeKindName(N.Kind) << ": ";
     if (N.IRValue) {
-      OS << llvmIRToShortString(N.IRValue);
+      OS.write_escaped(llvmIRToShortString(N.IRValue));
     }
     OS << "\"];\n";
   }

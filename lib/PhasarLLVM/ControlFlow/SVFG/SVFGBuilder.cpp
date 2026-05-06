@@ -14,7 +14,9 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
 
 #include "SVFGAliasUtils.h"
@@ -89,6 +91,19 @@ void SVFGBuilder::buildIntraSSA(const llvm::Function *F, SVFG &G) {
       }
       auto It = LocalMap.find(UserInst);
       if (It != LocalMap.end()) {
+        if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(UserInst);
+            Store && Val != Store->getValueOperand()) {
+          // store-load matching is handled in buildIndirect()
+          continue;
+        }
+        if (llvm::isa<llvm::LoadInst>(User)) {
+          // store-load matching is handled in buildIndirect()
+          continue;
+        }
+        if (llvm::isa<llvm::CallBase>(User)) {
+          // call-return matching is handled in buildInterProc()
+          continue;
+        }
         G.addEdge(FromId, It->second, SVFGEdgeKind::Direct);
       }
     }
@@ -129,6 +144,9 @@ void SVFGBuilder::buildIndirect(const llvm::Function *F, SVFG &G) {
 
 void SVFGBuilder::buildInterProc(const llvm::CallBase *CS,
                                  const llvm::Function *Callee, SVFG &G) {
+  if (llvm::isa<llvm::DbgInfoIntrinsic>(CS)) {
+    return;
+  }
   const auto *CallerFun = CS->getFunction();
 
   // Parameter binding
@@ -139,12 +157,19 @@ void SVFGBuilder::buildInterProc(const llvm::CallBase *CS,
     }
     const auto *ActualArg = CS->getArgOperand(ArgIdx++);
 
-    auto APId =
-        G.addNode({SVFGNodeKind::ActualParam, ActualArg, CS, CallerFun});
+    auto APId = G.addNode({
+        .Kind = SVFGNodeKind::ActualParam,
+        .IRValue = ActualArg,
+        .CallSite = CS,
+        .Function = CallerFun,
+    });
     auto FPNodes = G.nodesFor(&Param);
-    // Connect arg definition -> ActualParam
+    // Connect arg definition -> ActualParam; skip APId itself since addNode
+    // already registered ActualArg in ValueToNodes before this loop.
     for (auto ArgNodeId : G.nodesFor(ActualArg)) {
-      G.addEdge(ArgNodeId, APId, SVFGEdgeKind::Direct);
+      if (ArgNodeId != APId) {
+        G.addEdge(ArgNodeId, APId, SVFGEdgeKind::Direct);
+      }
     }
     // Connect ActualParam -> FormalParam (Call edge)
     for (auto FPId : FPNodes) {
@@ -175,6 +200,17 @@ void SVFGBuilder::buildInterProc(const llvm::CallBase *CS,
 }
 
 void SVFGBuilder::addFunction(const llvm::Function *F, SVFG &G) {
+  // Mirror DbgInfoIntrinsic::classof — isa<> requires an Instruction, not a
+  // Function, so we check the intrinsic ID directly.
+  switch (F->getIntrinsicID()) {
+  case llvm::Intrinsic::dbg_declare:
+  case llvm::Intrinsic::dbg_value:
+  case llvm::Intrinsic::dbg_label:
+  case llvm::Intrinsic::dbg_addr:
+    return;
+  default:
+    break;
+  }
   if (!Processed.insert(F).second) {
     return;
   }

@@ -65,6 +65,9 @@ isNonAddressTakenVariable(const llvm::Value *Val) noexcept {
 [[nodiscard]] inline bool mayAlias(const llvm::Value *Ptr1,
                                    const llvm::Value *Ptr2,
                                    LLVMAliasInfoRef AA) noexcept {
+  if (Ptr1 == Ptr2) {
+    return true;
+  }
   if (isNonAddressTakenVariable(Ptr1) || isNonAddressTakenVariable(Ptr2)) {
     return false;
   }

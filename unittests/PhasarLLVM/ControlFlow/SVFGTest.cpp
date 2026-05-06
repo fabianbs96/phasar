@@ -91,6 +91,8 @@ TEST_F(SVFGFixture, DirectEdge_LoadToCmp) {
   EXPECT_EQ(G.node(CmpNodes[0]).Kind, SVFGNodeKind::Copy);
   EXPECT_TRUE(hasEdge(G, Load0Nodes[0], CmpNodes[0], SVFGEdgeKind::Direct))
       << "Expected Direct edge from load %0 to icmp %cmp in factorial";
+
+  G.printAsDot(llvm::outs());
 }
 
 TEST_F(SVFGFixture, FormalRetNode_HasKind) {
