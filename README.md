@@ -48,7 +48,9 @@ PhASAR supports C++20 modules as an experimental feature.
 
 ## Currently Supported Version of LLVM
 
-PhASAR is currently set up to support LLVM-16.0.*
+**NEW**: PhASAR is currently set up to support LLVM versions **between LLVM-16 and LLVM-22.1**, using LLVM 16 by default. We actively test PHASAR with LLVM-16 and LLVM-22.1, so if something does not work, try these versions instead.<br>
+Specify the `PHASAR_LLVM_VERSION` cmake-variable to change the LLVM version to use.
+
 
 ## Breaking Changes
 

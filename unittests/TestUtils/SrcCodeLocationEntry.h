@@ -148,6 +148,7 @@ struct RetVal {
     return std::string("RetVal { InFunction: ") + InFunction.str() + " }";
   }
 };
+
 struct RetStmt {
   llvm::StringRef InFunction;
 
@@ -179,11 +180,25 @@ struct OperandOf {
   }
 };
 
+struct FuncByName {
+  llvm::StringRef FuncName;
+
+  friend bool operator<(FuncByName F1, FuncByName F2) noexcept {
+    return F1.FuncName < F2.FuncName;
+  }
+  friend bool operator==(FuncByName F1, FuncByName F2) noexcept {
+    return F1.FuncName == F2.FuncName;
+  }
+  [[nodiscard]] std::string str() const {
+    return std::string("FuncByName { FuncName: ") + FuncName.str() + " }";
+  }
+};
+
 struct TestingSrcLocation
     : public std::variant<LineCol, LineColFun, LineColFunOp, GlobalVar, ArgNo,
-                          ArgInFun, RetVal, RetStmt, OperandOf> {
+                          ArgInFun, RetVal, RetStmt, OperandOf, FuncByName> {
   using VarT = std::variant<LineCol, LineColFun, LineColFunOp, GlobalVar, ArgNo,
-                            ArgInFun, RetVal, RetStmt, OperandOf>;
+                            ArgInFun, RetVal, RetStmt, OperandOf, FuncByName>;
   using VarT::variant;
 
   template <typename T> [[nodiscard]] constexpr bool isa() const noexcept {
@@ -267,6 +282,12 @@ template <> struct hash<psr::unittest::OperandOf> {
   }
 };
 
+template <> struct hash<psr::unittest::FuncByName> {
+  size_t operator()(psr::unittest::FuncByName Fun) const noexcept {
+    return llvm::hash_value(Fun.FuncName);
+  }
+};
+
 template <> struct hash<psr::unittest::TestingSrcLocation> {
   size_t
   operator()(const psr::unittest::TestingSrcLocation &Loc) const noexcept {
@@ -288,6 +309,8 @@ getInstAtOrNull(const llvm::Function *F, uint32_t ReqLine,
     }
 
     auto [Line, Column] = psr::getLineAndColFromIR(&I);
+    // llvm::errs() << "For Inst at " << Line << ":" << Column << ": "
+    //              << llvmIRToString(&I) << '\n';
     if (Line == ReqLine && (ReqColumn == 0 || ReqColumn == Column) &&
         std::invoke(Pred, &I)) {
       return &I;
@@ -297,8 +320,7 @@ getInstAtOrNull(const llvm::Function *F, uint32_t ReqLine,
 }
 
 [[nodiscard]] inline const llvm::Value *
-testingLocInIR(TestingSrcLocation Loc,
-               const ProjectIRDBBase<LLVMProjectIRDB> &IRDB,
+testingLocInIR(TestingSrcLocation Loc, const LLVMProjectIRDB &IRDB,
                const llvm::Function *InterestingFunction = nullptr) {
   const auto GetFunction = [&IRDB](llvm::StringRef Name) {
     const auto *InFun = IRDB.getFunctionDefinition(Name);
@@ -399,7 +421,13 @@ testingLocInIR(TestingSrcLocation Loc,
 
             return Inst->getOperand(Op.OperandIndex);
           },
-      },
+          [&](FuncByName F) -> llvm::Value const * {
+            const auto *Func = GetFunction(F.FuncName);
+            if (Func) {
+              return Func;
+            }
+            llvm::report_fatal_error("No function named " + F.FuncName);
+          }},
       Loc);
   if (!Ret) {
     llvm::report_fatal_error("Cannot convert " + llvm::Twine(Loc.str()) +
@@ -411,7 +439,7 @@ testingLocInIR(TestingSrcLocation Loc,
 template <typename SetTy>
 [[nodiscard]] inline std::set<const llvm::Value *>
 convertTestingLocationSetInIR(
-    const SetTy &Locs, const ProjectIRDBBase<LLVMProjectIRDB> &IRDB,
+    const SetTy &Locs, const LLVMProjectIRDB &IRDB,
     const llvm::Function *InterestingFunction = nullptr) {
   std::set<const llvm::Value *> Ret;
   llvm::transform(Locs, std::inserter(Ret, Ret.end()),
@@ -423,7 +451,7 @@ convertTestingLocationSetInIR(
 
 template <typename MapTy>
 [[nodiscard]] inline auto convertTestingLocationSetMapInIR(
-    const MapTy &Locs, const ProjectIRDBBase<LLVMProjectIRDB> &IRDB,
+    const MapTy &Locs, const LLVMProjectIRDB &IRDB,
     const llvm::Function *InterestingFunction = nullptr) {
   std::map<const llvm::Instruction *, std::set<const llvm::Value *>> Ret;
   llvm::transform(

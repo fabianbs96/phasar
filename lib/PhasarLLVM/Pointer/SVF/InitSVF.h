@@ -1,15 +1,19 @@
 #pragma once
 
-#include "llvm/Support/Compiler.h"
+/******************************************************************************
+ * Copyright (c) 2025 Fabian Schiebel.
+ * All rights reserved. This program and the accompanying materials are made
+ * available under the terms of LICENSE.txt.
+ *
+ * Contributors:
+ *     Fabian Schiebel and others
+ *****************************************************************************/
 
-namespace SVF {
-class SVFModule;
-} // namespace SVF
+#include "llvm/Support/Compiler.h"
 
 namespace psr {
 class LLVMProjectIRDB;
 
 LLVM_LIBRARY_VISIBILITY void initializeSVF();
-LLVM_LIBRARY_VISIBILITY SVF::SVFModule *
-initSVFModule(psr::LLVMProjectIRDB &IRDB);
+LLVM_LIBRARY_VISIBILITY void initSVFModule(psr::LLVMProjectIRDB &IRDB);
 } // namespace psr

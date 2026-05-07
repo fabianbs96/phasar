@@ -18,9 +18,11 @@
 
 namespace psr {
 template <typename AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
-class PathAwareIDESolver : public IDESolver<AnalysisDomainTy, Container> {
-  using base_t = IDESolver<AnalysisDomainTy, Container>;
+          typename Container = std::set<typename AnalysisDomainTy::d_t>,
+          ICFG ICFGTy = typename AnalysisDomainTy::i_t>
+class PathAwareIDESolver
+    : public IDESolver<AnalysisDomainTy, Container, ICFGTy> {
+  using base_t = IDESolver<AnalysisDomainTy, Container, ICFGTy>;
 
 public:
   using domain_t = AnalysisDomainTy;
@@ -30,10 +32,10 @@ public:
   using container_type = typename base_t::container_type;
 
   explicit PathAwareIDESolver(
-      IDETabulationProblem<domain_t, container_type> &Problem, const i_t *ICF)
-      : base_t(Problem, ICF), ESG(Problem.getZeroValue()) {
+      IDETabulationProblem<domain_t, container_type> *Problem, const i_t *ICF)
+      : base_t(Problem, ICF), ESG(Problem->getZeroValue()) {
 
-    if (Problem.getIFDSIDESolverConfig().autoAddZero()) {
+    if (Problem->getIFDSIDESolverConfig().autoAddZero()) {
       PHASAR_LOG_LEVEL(
           WARNING,
           "The PathAwareIDESolver is initialized with the option 'autoAddZero' "
@@ -41,12 +43,16 @@ public:
     }
   }
 
+  explicit PathAwareIDESolver(
+      IDETabulationProblem<domain_t, container_type> &Problem, const i_t *ICF)
+      : PathAwareIDESolver(&Problem, ICF) {}
+
   [[nodiscard]] const ExplodedSuperGraph<domain_t> &
-  getExplicitESG() const &noexcept {
+  getExplicitESG() const & noexcept {
     return ESG;
   }
 
-  [[nodiscard]] ExplodedSuperGraph<domain_t> &&getExplicitESG() &&noexcept {
+  [[nodiscard]] ExplodedSuperGraph<domain_t> &&getExplicitESG() && noexcept {
     return std::move(ESG);
   }
 
@@ -60,9 +66,15 @@ private:
   ExplodedSuperGraph<domain_t> ESG;
 };
 
-template <typename ProblemTy>
-PathAwareIDESolver(ProblemTy &)
-    -> PathAwareIDESolver<typename ProblemTy::ProblemAnalysisDomain>;
+template <typename ProblemTy, ICFG ICFGTy>
+PathAwareIDESolver(ProblemTy &, const ICFGTy *)
+    -> PathAwareIDESolver<typename ProblemTy::ProblemAnalysisDomain,
+                          typename ProblemTy::container_type, ICFGTy>;
+
+template <typename ProblemTy, ICFG ICFGTy>
+PathAwareIDESolver(ProblemTy *, const ICFGTy *)
+    -> PathAwareIDESolver<typename ProblemTy::ProblemAnalysisDomain,
+                          typename ProblemTy::container_type, ICFGTy>;
 
 } // namespace psr
 

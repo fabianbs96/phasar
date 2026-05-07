@@ -1,23 +1,21 @@
 #pragma once
 
+/******************************************************************************
+ * Copyright (c) 2026 Fabian Schiebel.
+ * All rights reserved. This program and the accompanying materials are made
+ * available under the terms of LICENSE.txt.
+ *
+ * Contributors:
+ *     Fabian Schiebel and others
+ *****************************************************************************/
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Compiler.h"
 
-inline LLVM_LIBRARY_VISIBILITY const llvm::Function *
-getFunction(const llvm::Value *V) {
-  if (const auto *Inst = llvm::dyn_cast<llvm::Instruction>(V)) {
-    return Inst->getFunction();
-  }
-  if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(V)) {
-    return Arg->getParent();
-  }
-  return nullptr;
-}
-
-[[nodiscard]] inline LLVM_LIBRARY_VISIBILITY bool
+[[nodiscard]] LLVM_LIBRARY_VISIBILITY inline bool
 isConstantGlobalValue(const llvm::GlobalValue *GlobV) {
   if (const auto *Glob = llvm::dyn_cast<llvm::GlobalVariable>(GlobV)) {
     return Glob->isConstant();
@@ -31,7 +29,7 @@ isConstantGlobalValue(const llvm::GlobalValue *GlobV) {
   return true;
 }
 
-inline LLVM_LIBRARY_VISIBILITY bool mustNoalias(const llvm::Value *P1,
+LLVM_LIBRARY_VISIBILITY inline bool mustNoalias(const llvm::Value *P1,
                                                 const llvm::Value *P2) {
   if (P1 == P2) {
     return false;

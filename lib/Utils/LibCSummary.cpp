@@ -1,12 +1,14 @@
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/LibCSummary.h"
+#include "phasar/Utils/LibCSummary.h"
 
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/FunctionDataFlowFacts.h"
+#include "phasar/Utils/FunctionDataFlowFacts.h"
 
 using namespace psr;
 using namespace psr::library_summary;
 
 static library_summary::FunctionDataFlowFacts createLibCSummary() {
   FunctionDataFlowFacts Sum;
+
+  Sum.addElement("atoi", 0, ReturnValue{});
 
   // abs
   Sum.addElement("abs", 0, ReturnValue{});

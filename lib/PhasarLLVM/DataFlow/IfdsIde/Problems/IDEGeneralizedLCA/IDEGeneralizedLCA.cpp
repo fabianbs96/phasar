@@ -53,7 +53,7 @@ IDEGeneralizedLCA::IDEGeneralizedLCA(const LLVMProjectIRDB *IRDB,
 }
 
 // flow functions
-std::shared_ptr<FlowFunction<IDEGeneralizedLCA::d_t>>
+MaybeUniquePtr<FlowFunction<IDEGeneralizedLCA::d_t>>
 IDEGeneralizedLCA::getNormalFlowFunction(IDEGeneralizedLCA::n_t Curr,
                                          IDEGeneralizedLCA::n_t /*Succ*/) {
   if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
@@ -153,7 +153,7 @@ IDEGeneralizedLCA::getNormalFlowFunction(IDEGeneralizedLCA::n_t Curr,
   return identityFlow();
 }
 
-std::shared_ptr<FlowFunction<IDEGeneralizedLCA::d_t>>
+MaybeUniquePtr<FlowFunction<IDEGeneralizedLCA::d_t>>
 IDEGeneralizedLCA::getCallFlowFunction(IDEGeneralizedLCA::n_t CallStmt,
                                        IDEGeneralizedLCA::f_t DestMthd) {
   assert(llvm::isa<llvm::CallBase>(CallStmt));
@@ -161,11 +161,11 @@ IDEGeneralizedLCA::getCallFlowFunction(IDEGeneralizedLCA::n_t CallStmt,
     // kill all data-flow facts at calls to string constructors
     return killAllFlows();
   }
-  return std::make_shared<MapFactsToCalleeFlowFunction>(
+  return std::make_unique<MapFactsToCalleeFlowFunction>(
       llvm::cast<llvm::CallBase>(CallStmt), DestMthd);
 }
 
-std::shared_ptr<FlowFunction<IDEGeneralizedLCA::d_t>>
+MaybeUniquePtr<FlowFunction<IDEGeneralizedLCA::d_t>>
 IDEGeneralizedLCA::getRetFlowFunction(IDEGeneralizedLCA::n_t CallSite,
                                       IDEGeneralizedLCA::f_t CalleeMthd,
                                       IDEGeneralizedLCA::n_t ExitStmt,
@@ -173,16 +173,16 @@ IDEGeneralizedLCA::getRetFlowFunction(IDEGeneralizedLCA::n_t CallSite,
   assert(llvm::isa<llvm::CallBase>(CallSite));
   // llvm::outs() << "Ret flow: " << llvmIRToString(ExitStmt) <<
   // std::endl;
-  /*return std::make_shared<MapFactsToCaller>(
+  /*return std::make_unique<MapFactsToCaller>(
       llvm::ImmutableCallSite(callSite), calleeMthd, exitStmt,
       [](const llvm::Value *v) -> bool {
         return v && v->getType()->isPointerTy();
       });*/
-  return std::make_shared<MapFactsToCallerFlowFunction>(
+  return std::make_unique<MapFactsToCallerFlowFunction>(
       llvm::cast<llvm::CallBase>(CallSite), ExitStmt, CalleeMthd);
 }
 
-std::shared_ptr<FlowFunction<IDEGeneralizedLCA::d_t>>
+MaybeUniquePtr<FlowFunction<IDEGeneralizedLCA::d_t>>
 IDEGeneralizedLCA::getCallToRetFlowFunction(IDEGeneralizedLCA::n_t CallSite,
                                             IDEGeneralizedLCA::n_t /*RetSite*/,
                                             llvm::ArrayRef<f_t> /*Callees*/) {
@@ -212,7 +212,7 @@ IDEGeneralizedLCA::getCallToRetFlowFunction(IDEGeneralizedLCA::n_t CallSite,
   return identityFlow();
 }
 
-std::shared_ptr<FlowFunction<IDEGeneralizedLCA::d_t>>
+MaybeUniquePtr<FlowFunction<IDEGeneralizedLCA::d_t>>
 IDEGeneralizedLCA::getSummaryFlowFunction(IDEGeneralizedLCA::n_t /*CallStmt*/,
                                           IDEGeneralizedLCA::f_t /*DestMthd*/) {
   // llvm::outs() << "Summary flow: " << llvmIRToString(callStmt) <<
@@ -264,7 +264,7 @@ EdgeFunction<IDEGeneralizedLCA::l_t> IDEGeneralizedLCA::getNormalEdgeFunction(
   PHASAR_LOG_LEVEL(DEBUG, "(D) Succ Node :   " << DToString(SuccNode));
   // Initialize global variables at entry point
   if (!isZeroValue(CurrNode) && ICF->isStartPoint(Curr) &&
-      isEntryPoint(ICF->getFunctionOf(Curr)->getName().str()) &&
+      isEntryPoint(IRDB->getFunctionOf(Curr)->getName().str()) &&
       llvm::isa<llvm::GlobalVariable>(CurrNode) && CurrNode == SuccNode) {
     PHASAR_LOG_LEVEL(DEBUG, "Case: Intialize global variable at entry point.");
     PHASAR_LOG_LEVEL(DEBUG, ' ');
@@ -315,7 +315,7 @@ EdgeFunction<IDEGeneralizedLCA::l_t> IDEGeneralizedLCA::getNormalEdgeFunction(
       // Case II: Storing an integer typed value.
       /*if (currNode != succNode && valueOperand->getType()->isIntegerTy()) {
         return IdentityEdgeFunction::getInstance(maxSetSize);
-        // return std::make_shared<DebugIdentityEdgeFunction>(curr, succ,
+        // return std::make_unique<DebugIdentityEdgeFunction>(curr, succ,
         //                                                  maxSetSize);
       }*/
     }
@@ -327,7 +327,7 @@ EdgeFunction<IDEGeneralizedLCA::l_t> IDEGeneralizedLCA::getNormalEdgeFunction(
       // llvm::outs() << "LOAD " << llvmIRToString(curr) << " TO "
       //           << llvmIRToString(succ) << std::endl;
       // return EdgeIdentity<l_t>::getInstance();
-      // return std::make_shared<DebugIdentityEdgeFunction>(curr, succ,
+      // return std::make_unique<DebugIdentityEdgeFunction>(curr, succ,
       //                                                  maxSetSize);
       return IdentityEdgeFunction::getInstance(maxSetSize);
     }
@@ -513,11 +513,11 @@ void IDEGeneralizedLCA::emitTextReport(
     // Emit only IR code, function name and module info
     Os << "\nWARNING: No Debug Info available - emiting results without "
           "source code mapping!\n";
-    for (const auto *F : ICF->getAllFunctions()) {
+    for (const auto *F : IRDB->getAllFunctions()) {
       std::string FName = getFunctionNameFromIR(F);
       Os << "\nFunction: " << FName << "\n----------"
          << std::string(FName.size(), '-') << '\n';
-      for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
+      for (const auto *Stmt : IRDB->getAllInstructionsOf(F)) {
         auto Results = SR.resultsAt(Stmt, true);
         stripBottomResults(Results);
         if (!Results.empty()) {
@@ -564,12 +564,12 @@ IDEGeneralizedLCA::lca_results_t IDEGeneralizedLCA::getLCAResults(
         SR) {
   std::map<std::string, std::map<unsigned, LCAResult>> AggResults;
   llvm::outs() << "\n==== Computing LCA Results ====\n";
-  for (const auto *F : ICF->getAllFunctions()) {
+  for (const auto *F : IRDB->getAllFunctions()) {
     std::string FName = getFunctionNameFromIR(F);
     llvm::outs() << "\n-- Function: " << FName << " --\n";
     std::map<unsigned, LCAResult> FResults;
     std::set<std::string> AllocatedVars;
-    for (const auto *Stmt : ICF->getAllInstructionsOf(F)) {
+    for (const auto *Stmt : IRDB->getAllInstructionsOf(F)) {
       unsigned Lnr = getLineFromIR(Stmt);
       llvm::outs() << "\nIR : " << NToString(Stmt) << "\nLNR: " << Lnr << '\n';
       // We skip statements with no source code mapping

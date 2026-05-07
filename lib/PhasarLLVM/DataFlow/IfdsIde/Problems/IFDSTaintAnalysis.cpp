@@ -13,15 +13,16 @@
 #include "phasar/DataFlow/IfdsIde/FlowFunctions.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/CFLFieldSensIFDSProblem.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMFlowFunctions.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/LibCSummary.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TaintConfig/TaintConfigUtilities.h"
 #include "phasar/PhasarLLVM/Utils/DataFlowAnalysisType.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
+#include "phasar/Utils/LibCSummary.h"
 #include "phasar/Utils/Logger.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -33,6 +34,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <utility>
@@ -45,10 +47,14 @@ IFDSTaintAnalysis::IFDSTaintAnalysis(const LLVMProjectIRDB *IRDB,
                                      LLVMAliasInfoRef PT,
                                      const LLVMTaintConfig *Config,
                                      std::vector<std::string> EntryPoints,
-                                     bool TaintMainArgs)
+                                     bool TaintMainArgs,
+                                     bool EnableStrongUpdateStore)
     : IFDSTabulationProblem(IRDB, std::move(EntryPoints), createZeroValue()),
       Config(Config), PT(PT), TaintMainArgs(TaintMainArgs),
-      Llvmfdff(library_summary::readFromFDFF(getLibCSummary(), *IRDB)) {
+      EnableStrongUpdateStore(EnableStrongUpdateStore),
+      Llvmfdff(library_summary::readFromFDFF(
+          getLibCSummary(),
+          [IRDB](llvm::StringRef FName) { return IRDB->getFunction(FName); })) {
   assert(Config != nullptr);
   assert(PT);
 }
@@ -266,6 +272,11 @@ transferAndKillTwoFlows(d_t To, d_t From1, d_t From2) {
 auto IFDSTaintAnalysis::getNormalFlowFunction(n_t Curr,
                                               [[maybe_unused]] n_t Succ)
     -> FlowFunctionPtrType {
+  PHASAR_LOG_LEVEL_CAT(DEBUG, "IFDSTaintAnalysis",
+                       "getNormalFlowFunction: " << llvmIRToString(Curr)
+                                                 << " --> "
+                                                 << llvmIRToString(Succ));
+
   // If a tainted value is stored, the store location must be tainted too
   if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
     container_type Gen;
@@ -275,17 +286,47 @@ auto IFDSTaintAnalysis::getNormalFlowFunction(n_t Curr,
       Gen.insert(Store->getValueOperand());
     }
 
-    return lambdaFlow(
-        [Store, Gen{std::move(Gen)}](d_t Source) -> container_type {
-          if (Store->getPointerOperand() == Source) {
-            return {};
-          }
-          if (Store->getValueOperand() == Source) {
-            return Gen;
-          }
+    auto Ret = [&]() -> FlowFunctionPtrType {
+      if (EnableStrongUpdateStore) {
+        return lambdaFlow(
+            [Store, Gen{std::move(Gen)}](d_t Source) -> container_type {
+              if (Store->getPointerOperand() == Source) {
+                return {};
+              }
+              if (Store->getValueOperand() == Source) {
+                return Gen;
+              }
 
-          return {Source};
-        });
+              return {Source};
+            });
+      }
+
+      // Only weak update on store
+      return lambdaFlow(
+          [Store, Gen{std::move(Gen)}](d_t Source) -> container_type {
+            if (Store->getValueOperand() == Source) {
+              return Gen;
+            }
+
+            return {Source};
+          });
+    }();
+
+    if (Config->isSink(Store->getPointerOperand())) {
+      // Handle sink variables:
+
+      return lambdaFlow([this, Store, Ret = std::move(Ret)](d_t Source) {
+        if (Store->getValueOperand() == Source) {
+          if (Leaks[Store].insert(Source).second) {
+            Printer->onResult(Store, Source,
+                              DataFlowAnalysisType::IFDSTaintAnalysis);
+          }
+        }
+
+        return Ret->computeTargets(Source);
+      });
+    }
+    return Ret;
   }
   // If a tainted value is loaded, the loaded value is of course tainted
   if (const auto *Load = llvm::dyn_cast<llvm::LoadInst>(Curr)) {
@@ -309,6 +350,16 @@ auto IFDSTaintAnalysis::getNormalFlowFunction(n_t Curr,
 
   if (const auto *Cast = llvm::dyn_cast<llvm::CastInst>(Curr)) {
     return transferFlow(Cast, Cast->getOperand(0));
+  }
+
+  if (llvm::isa<llvm::BinaryOperator>(Curr)) {
+    return lambdaFlow([Curr](d_t Source) -> container_type {
+      if (llvm::is_contained(Curr->operand_values(), Source)) {
+        return {Source, Curr};
+      }
+
+      return {Source};
+    });
   }
 
   // Otherwise we do not care and leave everything as it is
@@ -372,7 +423,7 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
   // $sSS1poiyS2S_SStFZ is Swift's String append method
   // if concat a tainted string with something else the
   // result should be tainted
-  if (DestFun->getName().equals("$sSS1poiyS2S_SStFZ")) {
+  if (DestFun->getName() == "$sSS1poiyS2S_SStFZ") {
     const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
 
     return generateFlowIf(CallSite, [CS](d_t Source) {
@@ -397,14 +448,6 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
   // populateWithMayAliases(Leak, CallSite);
   populateWithMustAliases(Kill, CallSite);
 
-  if (CS->hasStructRetAttr()) {
-    const auto *SRet = CS->getArgOperand(0);
-    if (!Gen.count(SRet)) {
-      // SRet is guaranteed to be written to by the call. If it does not
-      // generate it, we can freely kill it
-      Kill.insert(SRet);
-    }
-  }
   if (Gen.empty() && Leak.empty() && Kill.empty()) {
     if (Llvmfdff.contains(DestFun)) {
       // Note: The LLVMfdff is constant during the lifetime of the analysis, so
@@ -437,6 +480,15 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
 
     // not found
     return nullptr;
+  }
+
+  if (CS->hasStructRetAttr()) {
+    const auto *SRet = CS->getArgOperand(0);
+    if (!Gen.count(SRet)) {
+      // SRet is guaranteed to be written to by the call. If it does not
+      // generate it, we can freely kill it
+      Kill.insert(SRet);
+    }
   }
   if (Gen.empty()) {
     if (!Leak.empty() || !Kill.empty()) {
@@ -484,7 +536,10 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
 auto IFDSTaintAnalysis::initialSeeds() -> InitialSeeds<n_t, d_t, l_t> {
   PHASAR_LOG_LEVEL(DEBUG, "IFDSTaintAnalysis::initialSeeds()");
 
-  InitialSeeds<n_t, d_t, l_t> Seeds;
+  // Instructions are generated from zero on-the-fly, but args must be generated
+  // explicitly as seeds
+  InitialSeeds<n_t, d_t, l_t> Seeds =
+      Config->makeInitialSeeds(LLVMTaintConfig::SeedConfig::Arguments);
 
   LLVMBasedCFG C;
   addSeedsForStartingPoints(EntryPoints, IRDB, C, Seeds, getZeroValue(),
@@ -500,6 +555,13 @@ auto IFDSTaintAnalysis::initialSeeds() -> InitialSeeds<n_t, d_t, l_t> {
         Seeds.addSeed(SP, &Arg);
       }
     }
+  }
+
+  if (Seeds.empty()) {
+    llvm::WithColor::warning()
+        << "No initial seeds specified, skip the analysis. "
+           "Please specify an entrypoint function or in the "
+           "TaintConfig a source llvm::Instruction*\n";
   }
 
   return Seeds;
@@ -531,6 +593,33 @@ bool IFDSTaintAnalysis::isInteresting(
     return true;
   }
   return Config->mayLeakValuesAt(Inst, nullptr);
+}
+
+std::optional<int32_t>
+IFDSTaintAnalysis::KillsAtFn::operator()(n_t Curr, d_t CurrNode) const {
+  const auto *CS = llvm::dyn_cast<llvm::CallBase>(Curr);
+  if (!CS) {
+    return std::nullopt;
+  }
+
+  const auto *DestFun = CS->getCalledFunction();
+  if (!DestFun) {
+    return std::nullopt;
+  }
+
+  container_type Kill;
+  psr::collectSanitizedFacts(Kill, *Self->Config, CS, DestFun);
+
+  const auto &DL = Self->IRDB->getModule()->getDataLayout();
+
+  for (const auto *KillFact : Kill) {
+    auto [BasePtr, Offset] = psr::cfl_fieldsens::getBaseAndOffset(KillFact, DL);
+    if (BasePtr == CurrNode) {
+      return Offset;
+    }
+  }
+
+  return std::nullopt;
 }
 
 } // namespace psr

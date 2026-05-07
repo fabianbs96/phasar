@@ -1,7 +1,6 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_COMPRESSOR_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_COMPRESSOR_H
 
-#include "phasar/DB/ProjectIRDBBase.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/Compressor.h"
 
@@ -9,27 +8,6 @@
 #include <type_traits>
 
 namespace psr {
-
-struct NoneCompressor final {
-  constexpr NoneCompressor() noexcept = default;
-
-  template <typename T>
-    requires(!std::is_same_v<NoneCompressor, T>)
-  constexpr NoneCompressor(const T & /*unused*/) noexcept {}
-
-  template <typename T>
-  [[nodiscard]] decltype(auto) getOrInsert(T &&Val) const noexcept {
-    return std::forward<T>(Val);
-  }
-  template <typename T>
-  [[nodiscard]] decltype(auto) operator[](T &&Val) const noexcept {
-    return std::forward<T>(Val);
-  }
-  void reserve(size_t /*unused*/) const noexcept {}
-
-  [[nodiscard]] size_t size() const noexcept { return 0; }
-  [[nodiscard]] size_t capacity() const noexcept { return 0; }
-};
 
 class LLVMProjectIRDB;
 
@@ -39,8 +17,8 @@ class LLVMProjectIRDB;
 template <typename T> struct NodeCompressorTraits {
   using type = Compressor<T>;
 
-  static type create(const ProjectIRDBBase<LLVMProjectIRDB>
-                         * /*IRDB*/) noexcept(noexcept(type())) {
+  static type
+  create(const LLVMProjectIRDB * /*IRDB*/) noexcept(noexcept(type())) {
     return type();
   }
 };

@@ -154,20 +154,20 @@ public:
     print(OS);
     return Ret;
   }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const IDEIIAFlowFact &FlowFact) {
+    FlowFact.print(OS);
+    return OS;
+  }
+
+  friend std::ostream &operator<<(std::ostream &OS,
+                                  const IDEIIAFlowFact &FlowFact) {
+    llvm::raw_os_ostream Rso(OS);
+    FlowFact.print(Rso);
+    return OS;
+  }
 };
-
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                     const IDEIIAFlowFact &FlowFact) {
-  FlowFact.print(OS);
-  return OS;
-}
-
-inline std::ostream &operator<<(std::ostream &OS,
-                                const IDEIIAFlowFact &FlowFact) {
-  llvm::raw_os_ostream Rso(OS);
-  FlowFact.print(Rso);
-  return OS;
-}
 
 } // namespace psr
 
@@ -952,17 +952,6 @@ public:
 
     l_t computeTarget(ByConstRef<l_t> /* Src */) const { return Replacement; }
 
-    static EdgeFunction<l_t>
-    compose(EdgeFunctionRef<IIAAKillOrReplaceEF> /*This*/,
-            const EdgeFunction<l_t> /*SecondFunction*/) {
-      llvm::report_fatal_error("Implemented in 'extend'");
-    }
-
-    static EdgeFunction<l_t> join(EdgeFunctionRef<IIAAKillOrReplaceEF> /*This*/,
-                                  const EdgeFunction<l_t> & /*OtherFunction*/) {
-      llvm::report_fatal_error("Implemented in 'combine'");
-    }
-
     bool operator==(const IIAAKillOrReplaceEF &Other) const noexcept {
       return Replacement == Other.Replacement;
     }
@@ -1004,17 +993,6 @@ public:
 
     l_t computeTarget(ByConstRef<l_t> Src) const {
       return IDEInstInteractionAnalysisT::joinImpl(Src, Data);
-    }
-
-    static EdgeFunction<l_t>
-    compose(EdgeFunctionRef<IIAAAddLabelsEF> /*This*/,
-            const EdgeFunction<l_t> & /*SecondFunction*/) {
-      llvm::report_fatal_error("Implemented in 'extend'");
-    }
-
-    static EdgeFunction<l_t> join(EdgeFunctionRef<IIAAAddLabelsEF> /*This*/,
-                                  const EdgeFunction<l_t> & /*OtherFunction*/) {
-      llvm::report_fatal_error("Implemented in 'combine'");
     }
 
     bool operator==(const IIAAAddLabelsEF &Other) const noexcept {
@@ -1115,11 +1093,11 @@ public:
     //   // Emit only IR code, function name and module info
     //   OS << "\nWARNING: No Debug Info available - emiting results without "
     //         "source code mapping!\n";
-    for (const auto *f : this->ICF->getAllFunctions()) {
+    for (const auto *f : this->IRDB->getAllFunctions()) {
       std::string FunName = getFunctionNameFromIR(f);
       OS << "\nFunction: " << FunName << "\n----------"
          << std::string(FunName.size(), '-') << '\n';
-      for (const auto *Inst : this->ICF->getAllInstructionsOf(f)) {
+      for (const auto *Inst : this->IRDB->getAllInstructionsOf(f)) {
         auto Results = SR.resultsAt(Inst, true);
         stripBottomResults(Results);
         if (!Results.empty()) {

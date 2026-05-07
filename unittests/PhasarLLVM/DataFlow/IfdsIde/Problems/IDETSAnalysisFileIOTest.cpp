@@ -64,9 +64,9 @@ protected:
   using GroundTruthMapTy =
       std::map<TestingSrcLocation, std::map<TestingSrcLocation, int>>;
 
-  [[nodiscard]] static inline auto convertTestingLocationMapMapInIR(
-      const GroundTruthMapTy &Locs,
-      const ProjectIRDBBase<LLVMProjectIRDB> &IRDB) {
+  [[nodiscard]] static inline auto
+  convertTestingLocationMapMapInIR(const GroundTruthMapTy &Locs,
+                                   const LLVMProjectIRDB &IRDB) {
     std::map<const llvm::Instruction *, std::map<const llvm::Value *, int>> Ret;
     llvm::transform(
         Locs, std::inserter(Ret, Ret.end()), [&](const auto &LocAndSet) {
@@ -90,10 +90,7 @@ protected:
    * @param groundTruth results to compare against
    * @param solver provides the results
    */
-  void compareResults(
-      const GroundTruthMapTy &GroundTruth,
-      IDESolver_P<IDETypeStateAnalysis<CSTDFILEIOTypeStateDescription>>
-          &Solver) {
+  void compareResults(const GroundTruthMapTy &GroundTruth, auto &Solver) {
     auto GroundTruthEntries =
         convertTestingLocationMapMapInIR(GroundTruth, HA->getProjectIRDB());
 
