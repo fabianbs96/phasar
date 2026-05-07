@@ -15,6 +15,8 @@
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
@@ -287,8 +289,9 @@ FlowFunctionPtrType<D, Container> mapFactsToCaller(
       if (ArgIt != ArgEnd) {
         if (const auto *VaListAlloca = getVaListTagOrNull(*DestFun)) {
           if (std::invoke(PropArg, VaListAlloca, Source)) {
-            std::transform(ArgIt, ArgEnd, std::inserter(Res, Res.end()),
-                           FactConstructor);
+            auto MapRng = llvm::map_range(llvm::make_range(ArgIt, ArgEnd),
+                                          FactConstructor);
+            Res.insert(MapRng.begin(), MapRng.end());
           }
         }
       }

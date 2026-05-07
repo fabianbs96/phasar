@@ -122,13 +122,13 @@ bool IFDSTaintAnalysis::isSanitizerCall(const llvm::CallBase * /*CB*/,
       [this](const auto &Arg) { return Config->isSanitizer(&Arg); });
 }
 
-static bool
-canSkipAtQueryInst(const llvm::Value *Val,
-                   const llvm::Instruction *AliasQueryInst) noexcept {
+static bool canSkipAtQueryInst(const llvm::Value *Val,
+                               const llvm::Instruction *AliasQueryInst,
+                               const llvm::Function *QueryFun) noexcept {
   if (const auto *Inst = llvm::dyn_cast<llvm::Instruction>(Val)) {
     /// Mapping instructions between functions is done via the call-FF and
     /// ret-FF
-    if (Inst->getFunction() != AliasQueryInst->getFunction()) {
+    if (Inst->getFunction() != QueryFun) {
       return true;
     }
     if (Inst->getParent() == AliasQueryInst->getParent() &&
@@ -141,7 +141,7 @@ canSkipAtQueryInst(const llvm::Value *Val,
 
   if (const auto *Arg = llvm::dyn_cast<llvm::Argument>(Val)) {
     // An argument is only valid in the function it belongs to
-    if (Arg->getParent() != AliasQueryInst->getFunction()) {
+    if (Arg->getParent() != QueryFun) {
       return true;
     }
   }
@@ -159,11 +159,15 @@ static bool isCompiletimeConstantData(const llvm::Value *Val) noexcept {
 
 void IFDSTaintAnalysis::populateWithMayAliases(
     container_type &Facts, const llvm::Instruction *AliasQueryInst) const {
-  container_type Tmp = Facts;
+  container_type Tmp;
+  Tmp.reserve(Facts.size() * 2);
+  const auto *QueryFun = AliasQueryInst->getFunction();
+  // container_type Tmp = Facts;
   for (const auto *Fact : Facts) {
+    Tmp.insert(Fact);
     auto Aliases = PT.getAliasSet(Fact, AliasQueryInst);
     for (const auto *Alias : *Aliases) {
-      if (canSkipAtQueryInst(Alias, AliasQueryInst)) {
+      if (canSkipAtQueryInst(Alias, AliasQueryInst, QueryFun)) {
         continue;
       }
 
@@ -177,7 +181,9 @@ void IFDSTaintAnalysis::populateWithMayAliases(
         Tmp.insert(PointerOp);
       }
 
-      Tmp.insert(Alias);
+      if (Fact != Alias) {
+        Tmp.insert(Alias);
+      }
     }
   }
 

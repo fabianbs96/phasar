@@ -256,8 +256,8 @@ struct FalseFn {
 /// Delegates to the ctor of T
 template <typename T> struct DefaultConstruct {
   template <typename... U>
-  [[nodiscard]] T
-  operator()(U &&...Val) noexcept(std::is_nothrow_constructible_v<T, U...>) {
+  [[nodiscard]] T operator()(U &&...Val) const
+      noexcept(std::is_nothrow_constructible_v<T, U...>) {
     return T(std::forward<U>(Val)...);
   }
 };

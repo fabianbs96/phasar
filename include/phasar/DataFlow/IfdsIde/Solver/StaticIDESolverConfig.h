@@ -103,7 +103,8 @@ struct DefaultIDESolverConfig : IDESolverConfig {};
 
 template <typename ProblemTy>
   requires std::is_base_of_v<
-      IFDSTabulationProblem<typename ProblemTy::ProblemAnalysisDomain>,
+      IFDSTabulationProblem<typename ProblemTy::ProblemAnalysisDomain,
+                            typename ProblemTy::container_type>,
       ProblemTy>
 struct DefaultIDESolverConfig<ProblemTy> : IFDSSolverConfig {};
 

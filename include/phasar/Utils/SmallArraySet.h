@@ -17,7 +17,9 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <algorithm>
+#include <concepts>
 #include <initializer_list>
+#include <iterator>
 #include <type_traits>
 
 namespace psr {
@@ -39,63 +41,94 @@ public:
 
   SmallArraySet() noexcept = default;
 
-  template <typename TT = T,
-            typename = std::enable_if_t<std::is_constructible_v<T, const TT &>>>
-  SmallArraySet(std::initializer_list<TT> IList) {
+  SmallArraySet(std::initializer_list<T> IList)
+      : Dirty(!std::ranges::is_sorted(IList)) {
     Arr.append(IList.begin(), IList.end());
   }
 
   void reserve(size_t NumElems) { Arr.reserve(NumElems); }
 
   template <typename TT = T>
-  std::enable_if_t<std::is_constructible_v<T, TT>> insert(TT &&Elem) {
+  void insert(TT &&Elem)
+    requires(std::is_constructible_v<T, TT>)
+  {
+    if (!empty()) {
+      if (Elem == Arr.back()) {
+        return;
+      }
+      Dirty |= !(Elem > Arr.back());
+    }
+
     Arr.emplace_back(PSR_FWD(Elem));
   }
 
-  template <typename TT = T>
-  std::enable_if_t<std::is_constructible_v<T, TT>, iterator>
-  insert(iterator /*Iter*/, TT &&Elem) {
-    Arr.emplace_back(PSR_FWD(Elem));
-    return begin() + size() - 1;
+  template <typename IterT> auto insert(IterT From, IterT To) {
+    if (requires {
+          { To - From } -> std::convertible_to<ptrdiff_t>;
+        }) {
+      reserve(size() + std::distance(From, To));
+    }
+    for (; From != To; ++From) {
+      insert(*From);
+    }
+    // Dirty |= !std::is_sorted(From, To);
+    // Arr.append(std::move(From), std::move(To));
+    // TODO: Do something clever here
   }
 
-  template <typename IterT>
-  auto insert(IterT From, IterT To)
-      -> decltype(std::declval<llvm::SmallVector<T, N> &>().append(
-          std::move(From), std::move(To))) {
-    Arr.append(std::move(From), std::move(To));
+  [[nodiscard]] iterator begin() noexcept {
+    deduplicate();
+    return Arr.begin();
+  }
+  [[nodiscard]] iterator end() noexcept {
+    deduplicate();
+    return Arr.end();
   }
 
-  [[nodiscard]] iterator begin() noexcept { return Arr.begin(); }
-  [[nodiscard]] iterator end() noexcept { return Arr.end(); }
+  [[nodiscard]] const_iterator begin() const noexcept {
+    deduplicate();
+    return Arr.begin();
+  }
+  [[nodiscard]] const_iterator end() const noexcept {
+    deduplicate();
+    return Arr.end();
+  }
 
-  [[nodiscard]] const_iterator begin() const noexcept { return Arr.begin(); }
-  [[nodiscard]] const_iterator end() const noexcept { return Arr.end(); }
-
-  [[nodiscard]] const_iterator cbegin() const noexcept { return Arr.begin(); }
-  [[nodiscard]] const_iterator cend() const noexcept { return Arr.end(); }
+  [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
+  [[nodiscard]] const_iterator cend() const noexcept { return begin(); }
 
   [[nodiscard]] bool empty() const noexcept { return Arr.empty(); }
-  [[nodiscard]] size_t size() const noexcept { return Arr.size(); }
+  [[nodiscard]] size_t size() const noexcept {
+    deduplicate();
+    return Arr.size();
+  }
 
   [[nodiscard]] int count(ByConstRef<T> Elem) const noexcept {
-    return llvm::count(Arr, Elem);
+    return contains(Elem) ? 1 : 0;
   }
   [[nodiscard]] bool contains(ByConstRef<T> Elem) const noexcept {
-    return llvm::is_contained(Arr, Elem);
+    deduplicate();
+    return std::ranges::binary_search(Arr, Elem);
   }
 
-  void deduplicate() {
+  void deduplicate() const {
+    if (!Dirty) {
+      return;
+    }
     std::sort(Arr.begin(), Arr.end());
     Arr.erase(std::unique(Arr.begin(), Arr.end()), Arr.end());
+    Dirty = false;
   }
 
   bool operator<(const SmallArraySet<T, N> &Other) const {
+    deduplicate();
     return Arr < Other.Arr;
   }
 
 private:
-  llvm::SmallVector<T, N> Arr;
+  // TODO: We should probably avoid 'mutable'
+  mutable llvm::SmallVector<T, N> Arr;
+  mutable bool Dirty = false;
 };
 
 } // namespace psr

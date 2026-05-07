@@ -13,6 +13,7 @@
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 
@@ -53,8 +54,8 @@ void collectLeakedFacts(ContainerTy &Dest, const LLVMTaintConfig &Config,
   const auto &Callback = Config.getRegisteredSinkCallBack();
   if (Callback) {
     auto CBLeaks = Callback(CB);
-    std::copy_if(CBLeaks.begin(), CBLeaks.end(),
-                 std::inserter(Dest, Dest.end()), LeakIf);
+    auto FilterRng = llvm::make_filter_range(CBLeaks, PSR_FWD(LeakIf));
+    CBLeaks.insert(FilterRng.begin(), FilterRng.end());
   }
 
   for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
