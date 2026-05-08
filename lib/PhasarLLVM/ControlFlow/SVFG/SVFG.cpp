@@ -37,14 +37,14 @@ void SVFG::addEdge(SVFGNodeId From, SVFGNodeId To, SVFGEdgeKind Kind) {
 void SVFG::finalize() {
   for (auto [Id, Edges] : Fwd.enumerate()) {
     llvm::sort(Edges);
-    Edges.erase(std::unique(Edges.begin(), Edges.end()), Edges.end());
+    Edges.erase(std::ranges::unique(Edges).begin(), Edges.end());
     for (const auto &E : Edges) {
       Rev[E.Target].push_back({Id, E.Kind});
     }
   }
   for (auto &Edges : Rev) {
     llvm::sort(Edges);
-    Edges.erase(std::unique(Edges.begin(), Edges.end()), Edges.end());
+    Edges.erase(std::ranges::unique(Edges).begin(), Edges.end());
   }
 }
 
