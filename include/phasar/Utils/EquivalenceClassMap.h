@@ -29,9 +29,11 @@ namespace psr {
 /// Meaning, that all keys that are equivalent are mapped to the same value. Two
 /// keys are treated as equivalent and merged into an equivalence class when
 /// they refer to Values that are considered equal according to operator==.
-template <typename KeyT, typename ValueT> struct EquivalenceClassMap {
-  template <typename... Ts> using SetType = std::set<Ts...>;
-  using EquivalenceClassBucketT = std::pair<SetType<KeyT>, ValueT>;
+template <typename KeyT, typename ValueT, typename Container = std::set<KeyT>>
+struct EquivalenceClassMap {
+  static_assert(std::is_same_v<typename Container::value_type, KeyT>,
+                "Container values needs to be the same as D");
+  using EquivalenceClassBucketT = std::pair<Container, ValueT>;
   // Use SmallVector here, since it has a smaller struct-size than std::vector;
   // we may store a lot of them in the FlowEdgeFunctionCache
   using StorageT = llvm::SmallVector<EquivalenceClassBucketT, 0>;
@@ -45,7 +47,7 @@ public:
   using const_iterator = typename StorageT::const_iterator;
 
   using insert_return_type =
-      std::pair<typename SetType<KeyT>::const_iterator, bool>;
+      std::pair<typename Container::const_iterator, bool>;
 
   EquivalenceClassMap(unsigned InitialEquivalenceClasses = 0) {
     StoredData.reserve(InitialEquivalenceClasses);
@@ -115,7 +117,7 @@ public:
       }
     }
 
-    StoredData.emplace_back(SetType<KeyT>{std::move(Key)}, std::move(Val));
+    StoredData.emplace_back(Container{std::move(Key)}, std::move(Val));
     return std::make_pair(StoredData.back().first.begin(), true);
   }
 
@@ -131,7 +133,7 @@ public:
       }
     }
 
-    StoredData.emplace_back(SetType<KeyT>{Key}, std::move(Val));
+    StoredData.emplace_back(Container{Key}, std::move(Val));
     return std::make_pair(StoredData.back().first.begin(), true);
   }
 

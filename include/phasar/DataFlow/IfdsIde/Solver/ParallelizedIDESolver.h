@@ -47,6 +47,7 @@
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Instruction.h"
 #include "llvm/Support/TypeName.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -481,11 +482,15 @@ protected:
             PHASAR_LOG_LEVEL(DEBUG,
                              "Compose: " << SumEdgFnE << " * " << f << '\n');
 
-            auto DestN = GetNextUse(ReturnSiteN, d3);
+            const llvm::Instruction *DestN;
+            {
+              std::lock_guard Guard(DestNMutex);
+              DestN = GetNextUse(ReturnSiteN, d3);
+            }
 
             auto Extend = IDEProblem.extend(f, SumEdgFnE);
             TPool.detach_task(
-                [&, this] { propagate(d1, DestN, std::move(d3), Extend); });
+                [&, d3, this] { propagate(d1, DestN, std::move(d3), Extend); });
           }
         }
       } else {
@@ -507,6 +512,8 @@ protected:
           HasNoCalleeInformation = false;
           saveEdges(n, SP, d2, Res, ESGEdgeKind::Call);
           // for each result node of the call-flow function
+
+          std::lock_guard Guard(ResMutex);
           for (d_t d3 : Res) {
             using CellOfTable =
                 typename TablePll<n_t, d_t, EdgeFunction<l_t>>::Cell;
@@ -588,8 +595,13 @@ protected:
                   // propagte the effects of the entire call
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f);
 
-                  auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
-                  TPool.detach_task([&, this] {
+                  const llvm::Instruction *DestN;
+                  {
+                    std::lock_guard Guard(DestNMutex);
+                    DestN = GetNextUse(RetSiteN, d5_restoredCtx);
+                  }
+
+                  TPool.detach_task([&, d5_restoredCtx, this] {
                     propagate(d1, DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f, fPrime));
                   });
@@ -627,9 +639,14 @@ protected:
         auto fPrime = IDEProblem.extend(f, EdgeFnE);
         PHASAR_LOG_LEVEL(DEBUG, "Compose: " << EdgeFnE << " * " << f << " = "
                                             << fPrime);
-        auto DestN = GetNextUse(ReturnSiteN, d3);
 
-        TPool.detach_task([&, this] {
+        const llvm::Instruction *DestN;
+        {
+          std::lock_guard Guard(DestNMutex);
+          DestN = GetNextUse(ReturnSiteN, d3);
+        }
+
+        TPool.detach_task([&, DestN, d3, fPrime, this] {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -663,13 +680,11 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Queried Normal Edge Function: " << g);
         EdgeFunction<l_t> fPrime = IDEProblem.extend(f, g);
 
-        auto DestN = [&, &n = n] {
-          if (auto &&NextUser = getNextUserOrNull(Fun, d3, n)) {
-            return psr::unwrapNullable(PSR_FWD(NextUser));
-          }
-
-          return nPrime;
-        }();
+        // TODO: talk with fabian about this data race. How to fix this?
+        std::lock_guard Guard(DestNMutex);
+        auto &&NextUser = getNextUserOrNull(Fun, d3, n);
+        auto DestN =
+            (NextUser) ? psr::unwrapNullable(PSR_FWD(NextUser)) : nPrime;
 
         if (SolverConfig.emitESG()) {
           IntermediateEdgeFunctions[std::make_tuple(n, d2, DestN, d3)]
@@ -679,7 +694,7 @@ protected:
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
 
-        TPool.detach_task([&, this] {
+        TPool.detach_task([&, d3, fPrime, this] {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -1086,16 +1101,20 @@ protected:
                   d_t d5_restoredCtx = restoreContextOnReturnedFact(c, d4, d5);
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f3);
 
-                  auto DestN = [&] {
-                    if (auto &&NextUser =
-                            getNextUserOrNull(Fun, d5_restoredCtx, c)) {
-                      return psr::unwrapNullable(PSR_FWD(NextUser));
-                    }
+                  const llvm::Instruction *DestN;
+                  {
+                    std::lock_guard Guard(DestNMutex);
+                    DestN = [&] {
+                      if (auto &&NextUser =
+                              getNextUserOrNull(Fun, d5_restoredCtx, c)) {
+                        return psr::unwrapNullable(PSR_FWD(NextUser));
+                      }
 
-                    return RetSiteC;
-                  }();
+                      return RetSiteC;
+                    }();
+                  }
 
-                  TPool.detach_task([&, this] {
+                  TPool.detach_task([&, d3, d5_restoredCtx, this] {
                     propagate(std::move(d3), DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f3, fPrime));
                   });
@@ -1158,7 +1177,7 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
-    TPool.detach_task([&, this] {
+    TPool.detach_task([&, RetSiteC, TargetVal, EdgeFunc, this] {
       propagate(ZeroValue, std::move(RetSiteC), std::move(TargetVal),
                 std::move(EdgeFunc));
     });
@@ -1990,6 +2009,8 @@ private:
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;
   std::mutex CachedFlowEdgeFunctionsMutex;
+  std::mutex ResMutex;
+  std::mutex DestNMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>
