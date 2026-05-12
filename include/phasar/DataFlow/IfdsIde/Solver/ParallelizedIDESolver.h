@@ -19,25 +19,21 @@
 
 #include "phasar/Config/Configuration.h"
 #include "phasar/ControlFlow/SparseCFGProvider.h"
-#include "phasar/DB/ProjectIRDBBase.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionStats.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
-#include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
-#include "phasar/DataFlow/IfdsIde/IFDSTabulationProblem.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/Solver/ESGEdgeKind.h"
+#include "phasar/DataFlow/IfdsIde/Solver/EdgeFunctionKind.h"
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCachePll.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverAPIMixin.h"
 #include "phasar/DataFlow/IfdsIde/Solver/JumpFunctionsPll.h"
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
-#include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/Utils/Average.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DOTGraph.h"
-#include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/Nullable.h"
@@ -48,7 +44,6 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instruction.h"
-#include "llvm/Support/TypeName.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "BS_thread_pool.hpp"
@@ -60,7 +55,6 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -69,7 +63,7 @@
 
 namespace psr {
 
-template <typename AnalysisDomainTy, typename Container>
+template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
 
 /// Solves the given IDETabulationProblem as described in the 1996 paper by
@@ -77,7 +71,8 @@ class ParallelizedIDESolver;
 /// can then be queried by using resultAt() and resultsAt().
 template <typename AnalysisDomainTy,
           typename Container =
-              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>>
+              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>,
+          ICFG ICFGTy = typename AnalysisDomainTy::i_t>
 class ParallelizedIDESolver
     : public IDESolverAPIMixin<
           ParallelizedIDESolver<AnalysisDomainTy, Container>> {
@@ -90,28 +85,22 @@ public:
 
   using l_t = typename AnalysisDomainTy::l_t;
   using n_t = typename AnalysisDomainTy::n_t;
-  using i_t = typename AnalysisDomainTy::i_t;
+  using i_t = ICFGTy;
   using d_t = typename AnalysisDomainTy::d_t;
   using f_t = typename AnalysisDomainTy::f_t;
   using t_t = typename AnalysisDomainTy::t_t;
   using v_t = typename AnalysisDomainTy::v_t;
 
-  template <std::convertible_to<const i_t &> I>
   ParallelizedIDESolver(
-      IDETabulationProblem<AnalysisDomainTy, Container> &Problem, const I *ICF)
+      IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
+      const ICFGTy *ICF)
       : IDEProblem(Problem), ZeroValue(Problem.getZeroValue()),
-        ICF(&static_cast<const i_t &>(*ICF)), SVFG(ICF),
+        ICF(&assertNotNull(ICF)),
         SolverConfig(Problem.getIFDSIDESolverConfig()),
         CachedFlowEdgeFunctions(Problem), AllTop(Problem.allTopFunction()),
         JumpFn(
-            std::make_shared<JumpFunctionsPll<AnalysisDomainTy, Container>>()),
-        Seeds(Problem.initialSeeds()) {
-    assert(ICF != nullptr);
-
-    if constexpr (has_getSparseCFG_v<I, d_t>) {
-      NextUserOrNullCB = &nextUserOrNullThunk<I>;
-    }
-  }
+            std::make_unique<JumpFunctionsPll<AnalysisDomainTy, Container>>()),
+        Seeds(Problem.initialSeeds()) {}
 
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> *Problem,
@@ -233,6 +222,12 @@ public:
 
   void dumpResults(llvm::raw_ostream &OS = llvm::outs()) {
     getSolverResults().dumpResults(*ICF, OS);
+  }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const ParallelizedIDESolver &Solver) {
+    Solver.dumpResults(OS);
+    return OS;
   }
 
   void dumpAllInterPathEdges() {
@@ -393,13 +388,19 @@ public:
   }
 
 protected:
-  Nullable<n_t> getNextUserOrNull(ByConstRef<f_t> Fun, ByConstRef<d_t> d3,
-                                  ByConstRef<n_t> n) {
-    if (!NextUserOrNullCB || IDEProblem.isZeroValue(d3)) {
+  [[nodiscard]] Nullable<n_t> getNextUserOrNull(ByConstRef<f_t> Fun,
+                                                ByConstRef<d_t> d3,
+                                                ByConstRef<n_t> n) {
+    if constexpr (has_getSparseCFG_v<ICFGTy, d_t>) {
+      if (IDEProblem.isZeroValue(d3)) {
+        return {};
+      }
+
+      auto &&SCFG = ICF->getSparseCFG(Fun, d3);
+      return SCFG.nextUserOrNull(n);
+    } else {
       return {};
     }
-
-    return NextUserOrNullCB(SVFG, Fun, d3, n);
   }
 
   /// Lines 13-20 of the algorithm; processing a call site in the caller's
@@ -438,8 +439,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "  " << Callee->getName());
       }
       PHASAR_LOG_LEVEL(DEBUG, "Possible return sites:");
-      for (auto ret : ReturnSiteNs) {
-        PHASAR_LOG_LEVEL(DEBUG, "  " << NToString(ret));
+      for (auto Ret : ReturnSiteNs) {
+        PHASAR_LOG_LEVEL(DEBUG, "  " << NToString(Ret));
       }
     });
 
@@ -482,20 +483,19 @@ protected:
             PHASAR_LOG_LEVEL(DEBUG,
                              "Compose: " << SumEdgFnE << " * " << f << '\n');
 
-            const llvm::Instruction *DestN;
-            {
-              std::lock_guard Guard(DestNMutex);
-              DestN = GetNextUse(ReturnSiteN, d3);
-            }
+            auto DestN = GetNextUse(ReturnSiteN, d3);
 
             auto Extend = IDEProblem.extend(f, SumEdgFnE);
-            TPool.detach_task(
-                [&, d3, this] { propagate(d1, DestN, std::move(d3), Extend); });
+
+            TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
+                               Extend = Extend, this]() mutable {
+              propagate(d1, DestN, std::move(d3), Extend);
+            });
           }
         }
       } else {
         // compute the call-flow function
-        FlowFunctionPtrType Function =
+        auto Function =
             CachedFlowEdgeFunctions.getCallFlowFunction(n, SCalledProcN);
         INC_COUNTER("FF Queries", 1, Full);
         container_type Res = computeCallFlowFunction(Function, d1, d2);
@@ -513,7 +513,6 @@ protected:
           saveEdges(n, SP, d2, Res, ESGEdgeKind::Call);
           // for each result node of the call-flow function
 
-          std::lock_guard Guard(ResMutex);
           for (d_t d3 : Res) {
             using CellOfTable =
                 typename TablePll<n_t, d_t, EdgeFunction<l_t>>::Cell;
@@ -521,7 +520,7 @@ protected:
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
 
-            TPool.detach_task([&, this] {
+            TPool.detach_task([d3 = d3, SP = SP, this]() mutable {
               propagate(d3, SP, d3, EdgeIdentity<l_t>{});
             }); // line 15
 
@@ -549,9 +548,8 @@ protected:
               // for each return site
               for (n_t RetSiteN : ReturnSiteNs) {
                 // compute return-flow function
-                FlowFunctionPtrType RetFunction =
-                    CachedFlowEdgeFunctions.getRetFlowFunction(n, SCalledProcN,
-                                                               eP, RetSiteN);
+                auto RetFunction = CachedFlowEdgeFunctions.getRetFlowFunction(
+                    n, SCalledProcN, eP, RetSiteN);
                 INC_COUNTER("FF Queries", 1, Full);
                 const container_type ReturnedFacts = computeReturnFlowFunction(
                     RetFunction, d3, d4, n, Container{d2});
@@ -595,13 +593,11 @@ protected:
                   // propagte the effects of the entire call
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f);
 
-                  const llvm::Instruction *DestN;
-                  {
-                    std::lock_guard Guard(DestNMutex);
-                    DestN = GetNextUse(RetSiteN, d5_restoredCtx);
-                  }
+                  auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
 
-                  TPool.detach_task([&, d5_restoredCtx, this] {
+                  TPool.detach_task([d1 = d1, DestN = DestN,
+                                     d5_restoredCtx = std::move(d5_restoredCtx),
+                                     f = f, fPrime = fPrime, this]() mutable {
                     propagate(d1, DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f, fPrime));
                   });
@@ -615,9 +611,8 @@ protected:
     // line 17-19 of Naeem/Lhotak/Rodriguez
     // process intra-procedural flows along call-to-return flow functions
     for (n_t ReturnSiteN : ReturnSiteNs) {
-      FlowFunctionPtrType CallToReturnFF =
-          CachedFlowEdgeFunctions.getCallToRetFlowFunction(n, ReturnSiteN,
-                                                           Callees);
+      auto CallToReturnFF = CachedFlowEdgeFunctions.getCallToRetFlowFunction(
+          n, ReturnSiteN, Callees);
       INC_COUNTER("FF Queries", 1, Full);
       container_type ReturnFacts =
           computeCallToReturnFlowFunction(CallToReturnFF, d1, d2);
@@ -640,13 +635,10 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Compose: " << EdgeFnE << " * " << f << " = "
                                             << fPrime);
 
-        const llvm::Instruction *DestN;
-        {
-          std::lock_guard Guard(DestNMutex);
-          DestN = GetNextUse(ReturnSiteN, d3);
-        }
+        auto DestN = GetNextUse(ReturnSiteN, d3);
 
-        TPool.detach_task([&, DestN, d3, fPrime, this] {
+        TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
+                           fPrime = std::move(fPrime), this]() mutable {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -668,8 +660,7 @@ protected:
     const auto &Fun = ICF->getFunctionOf(n);
 
     for (const auto nPrime : ICF->getSuccsOf(n)) {
-      FlowFunctionPtrType FlowFunc =
-          CachedFlowEdgeFunctions.getNormalFlowFunction(n, nPrime);
+      auto FlowFunc = CachedFlowEdgeFunctions.getNormalFlowFunction(n, nPrime);
       INC_COUNTER("FF Queries", 1, Full);
       const container_type Res = computeNormalFlowFunction(FlowFunc, d1, d2);
       ADD_TO_HISTOGRAM("Data-flow facts", Res.size(), 1, Full);
@@ -680,8 +671,6 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Queried Normal Edge Function: " << g);
         EdgeFunction<l_t> fPrime = IDEProblem.extend(f, g);
 
-        // TODO: talk with fabian about this data race. How to fix this?
-        std::lock_guard Guard(DestNMutex);
         auto &&NextUser = getNextUserOrNull(Fun, d3, n);
         auto DestN =
             (NextUser) ? psr::unwrapNullable(PSR_FWD(NextUser)) : nPrime;
@@ -694,7 +683,8 @@ protected:
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
 
-        TPool.detach_task([&, d3, fPrime, this] {
+        TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
+                           fPrime = std::move(fPrime), this]() mutable {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -727,7 +717,7 @@ protected:
     PAMM_GET_INSTANCE;
     d_t Fact = NAndD.second;
     for (const f_t Callee : ICF->getCalleesOfCallAt(Stmt)) {
-      FlowFunctionPtrType CallFlowFunction =
+      auto CallFlowFunction =
           CachedFlowEdgeFunctions.getCallFlowFunction(Stmt, Callee);
       INC_COUNTER("FF Queries", 1, Full);
       for (const d_t dPrime : CallFlowFunction->computeTargets(Fact)) {
@@ -1001,9 +991,10 @@ protected:
           INC_COUNTER("Gen facts", 1, Core);
         }
 
-        TPool.detach_task([&, this] {
-          propagate(Fact, StartPoint, Fact, EdgeIdentity<l_t>{});
-        });
+        TPool.detach_task(
+            [Fact = Fact, StartPoint = StartPoint, this]() mutable {
+              propagate(Fact, StartPoint, Fact, EdgeIdentity<l_t>{});
+            });
       }
     }
   }
@@ -1048,9 +1039,8 @@ protected:
       // for each return site
       for (n_t RetSiteC : ICF->getReturnSitesOfCallAt(c)) {
         // compute return-flow function
-        FlowFunctionPtrType RetFunction =
-            CachedFlowEdgeFunctions.getRetFlowFunction(
-                c, FunctionThatNeedsSummary, n, RetSiteC);
+        auto RetFunction = CachedFlowEdgeFunctions.getRetFlowFunction(
+            c, FunctionThatNeedsSummary, n, RetSiteC);
         INC_COUNTER("FF Queries", 1, Full);
         // for each incoming-call value
         for (d_t d4 : Entry.second) {
@@ -1102,19 +1092,22 @@ protected:
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f3);
 
                   const llvm::Instruction *DestN;
-                  {
-                    std::lock_guard Guard(DestNMutex);
-                    DestN = [&] {
-                      if (auto &&NextUser =
-                              getNextUserOrNull(Fun, d5_restoredCtx, c)) {
-                        return psr::unwrapNullable(PSR_FWD(NextUser));
-                      }
+                  DestN = [&] {
+                    if (auto &&NextUser =
+                            getNextUserOrNull(Fun, d5_restoredCtx, c)) {
+                      return psr::unwrapNullable(PSR_FWD(NextUser));
+                    }
 
-                      return RetSiteC;
-                    }();
-                  }
+                    return RetSiteC;
+                  }();
 
-                  TPool.detach_task([&, d3, d5_restoredCtx, this] {
+                  // TODO: lambda mutable machen
+                  // TODO: die values die gemoved werden in der capture
+                  // zusätzlich moven
+                  // TODO: resmutex und DestNmutex kann weg
+                  TPool.detach_task([d3 = std::move(d3), DestN = DestN,
+                                     d5_restoredCtx = std::move(d5_restoredCtx),
+                                     f3 = f3, fPrime = fPrime, this]() mutable {
                     propagate(std::move(d3), DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f3, fPrime));
                   });
@@ -1137,9 +1130,8 @@ protected:
       const auto &Callers = ICF->getCallersOf(FunctionThatNeedsSummary);
       for (n_t Caller : Callers) {
         for (n_t RetSiteC : ICF->getReturnSitesOfCallAt(Caller)) {
-          FlowFunctionPtrType RetFunction =
-              CachedFlowEdgeFunctions.getRetFlowFunction(
-                  Caller, FunctionThatNeedsSummary, n, RetSiteC);
+          auto RetFunction = CachedFlowEdgeFunctions.getRetFlowFunction(
+              Caller, FunctionThatNeedsSummary, n, RetSiteC);
           INC_COUNTER("FF Queries", 1, Full);
           const container_type Targets = computeReturnFlowFunction(
               RetFunction, d1, d2, Caller, Container{ZeroValue});
@@ -1177,7 +1169,9 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
-    TPool.detach_task([&, RetSiteC, TargetVal, EdgeFunc, this] {
+    TPool.detach_task([ZeroValue = ZeroValue, RetSiteC = std::move(RetSiteC),
+                       TargetVal = std::move(TargetVal),
+                       EdgeFunc = std::move(EdgeFunc), this]() mutable {
       propagate(ZeroValue, std::move(RetSiteC), std::move(TargetVal),
                 std::move(EdgeFunc));
     });
@@ -1214,14 +1208,13 @@ protected:
   /// @param d2 The abstraction at the current node
   /// @return The set of abstractions at the successor node
   ///
-  container_type computeNormalFlowFunction(const FlowFunctionPtrType &FlowFunc,
-                                           d_t /*d1*/, d_t d2) {
+  container_type computeNormalFlowFunction(const auto &FlowFunc, d_t /*d1*/,
+                                           d_t d2) {
     return FlowFunc->computeTargets(d2);
   }
 
-  container_type
-  computeSummaryFlowFunction(const FlowFunctionPtrType &SummaryFlowFunction,
-                             d_t /*d1*/, d_t d2) {
+  container_type computeSummaryFlowFunction(const auto &SummaryFlowFunction,
+                                            d_t /*d1*/, d_t d2) {
     return SummaryFlowFunction->computeTargets(d2);
   }
 
@@ -1231,9 +1224,8 @@ protected:
   /// @param d2 The abstraction at the call site
   /// @return The set of caller-side abstractions at the callee's start node
   ///
-  container_type
-  computeCallFlowFunction(const FlowFunctionPtrType &CallFlowFunction,
-                          d_t /*d1*/, d_t d2) {
+  container_type computeCallFlowFunction(const auto &CallFlowFunction,
+                                         d_t /*d1*/, d_t d2) {
     return CallFlowFunction->computeTargets(d2);
   }
 
@@ -1245,8 +1237,9 @@ protected:
   /// @param d2 The abstraction at the call site
   /// @return The set of caller-side abstractions at the return site
   ///
-  container_type computeCallToReturnFlowFunction(
-      const FlowFunctionPtrType &CallToReturnFlowFunction, d_t /*d1*/, d_t d2) {
+  container_type
+  computeCallToReturnFlowFunction(const auto &CallToReturnFlowFunction,
+                                  d_t /*d1*/, d_t d2) {
     return CallToReturnFlowFunction->computeTargets(d2);
   }
 
@@ -1259,10 +1252,9 @@ protected:
   /// @param callerSideDs The abstractions at the call site
   /// @return The set of caller-side abstractions at the return site
   ///
-  container_type
-  computeReturnFlowFunction(const FlowFunctionPtrType &RetFlowFunction,
-                            d_t /*d1*/, d_t d2, n_t /*CallSite*/,
-                            const Container & /*CallerSideDs*/) {
+  container_type computeReturnFlowFunction(const auto &RetFlowFunction,
+                                           d_t /*d1*/, d_t d2, n_t /*CallSite*/,
+                                           const Container & /*CallerSideDs*/) {
     return RetFlowFunction->computeTargets(d2);
   }
 
@@ -1960,7 +1952,7 @@ private:
   IDETabulationProblem<AnalysisDomainTy, Container> &IDEProblem;
   d_t ZeroValue;
   const i_t *ICF;
-  const void *SVFG;
+  const void *SVFG{};
   IFDSIDESolverConfig &SolverConfig;
   Nullable<n_t> (*NextUserOrNullCB)(const void *, ByConstRef<f_t>,
                                     ByConstRef<d_t>, ByConstRef<n_t>) = nullptr;
@@ -1969,7 +1961,7 @@ private:
 
   std::atomic_size_t PathEdgeCount = 0;
 
-  FlowEdgeFunctionCachePll<AnalysisDomainTy, Container> CachedFlowEdgeFunctions;
+  FlowEdgeFunctionCachePll<AnalysisDomainTy> CachedFlowEdgeFunctions;
 
   TablePll<n_t, n_t, phmap::parallel_node_hash_map<d_t, Container>>
       ComputedIntraPathEdges;
@@ -2009,8 +2001,6 @@ private:
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;
   std::mutex CachedFlowEdgeFunctionsMutex;
-  std::mutex ResMutex;
-  std::mutex DestNMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>

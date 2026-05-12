@@ -38,39 +38,6 @@ class Value;
 
 namespace psr {
 
-enum class EdgeFunctionKind { Normal, Call, Return, CallToReturn, Summary };
-static constexpr size_t EdgeFunctionKindCount = 5;
-
-template <typename KeyT> class DefaultMapKeyCompressor {
-public:
-  using KeyType = KeyT;
-  using CompressedType = KeyT;
-
-  [[nodiscard]] CompressedType getCompressedID(KeyT Key) { return Key; }
-};
-
-template <typename... Ts> class MapKeyCompressorCombinator : public Ts... {
-public:
-  using Ts::getCompressedID...;
-};
-
-class LLVMMapKeyCompressor {
-public:
-  using KeyType = const llvm::Value *;
-  using CompressedType = uint32_t;
-
-  [[nodiscard]] CompressedType getCompressedID(KeyType Key) {
-    auto Search = Map.find(Key);
-    if (Search == Map.end()) {
-      return Map.insert(std::make_pair(Key, Map.size() + 1)).first->getSecond();
-    }
-    return Search->getSecond();
-  }
-
-private:
-  llvm::DenseMap<KeyType, CompressedType> Map{};
-};
-
 /**
  * This class caches flow and edge functions to avoid their reconstruction.
  * When a flow or edge function must be applied to multiple times, a cached

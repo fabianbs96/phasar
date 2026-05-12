@@ -7,7 +7,7 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDESolverTest.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDESolverTestPll.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
 
 #include "phasar.h"
@@ -36,7 +36,7 @@ int main(int Argc, const char **Argv) {
   }
 
   if (HA.getProjectIRDB().getFunctionDefinition("main")) {
-    auto Problem = createAnalysisProblem<IDESolverTest>(HA, EntryPoints);
+    auto Problem = createAnalysisProblem<IDESolverTestPll>(HA, EntryPoints);
 
     llvm::outs() << "Testing ParallelizedIDESolver:\n";
     ParallelizedIDESolver Solver(Problem, &HA.getICFG());

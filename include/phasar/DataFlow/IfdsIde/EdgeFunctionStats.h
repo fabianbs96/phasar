@@ -22,7 +22,7 @@ namespace psr {
 enum class EdgeFunctionKind;
 enum class EdgeFunctionAllocationPolicy;
 
-template <typename AnalysisDomainTy, typename Container>
+template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
 
 namespace detail {
@@ -79,7 +79,7 @@ private:
   template <typename AnalysisDomainTy, typename Container, ICFG I>
   friend class IDESolver;
 
-  template <typename AnalysisDomainTy, typename Container>
+  template <typename AnalysisDomainTy, typename Container, ICFG I>
   friend class ParallelizedIDESolver;
 
   constexpr EdgeFunctionStats(

@@ -159,7 +159,7 @@ public:
       }
     }
 
-    StoredData.emplace_back(SetType<KeyT>{Key}, std::move(Val));
+    StoredData.emplace_back(Container{Key}, std::move(Val));
     return StoredData.back().second;
   }
 
