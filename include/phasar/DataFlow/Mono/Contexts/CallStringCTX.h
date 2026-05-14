@@ -85,6 +85,12 @@ public:
   [[nodiscard]] bool empty() const { return CallString.empty(); }
 
   [[nodiscard]] std::size_t size() const { return CallString.size(); }
+
+  friend auto hash_value(const CallStringCTX &Ctx) noexcept {
+    auto H =
+        llvm::hash_combine_range(Ctx.CallString.begin(), Ctx.CallString.end());
+    return llvm::hash_combine(K, H);
+  }
 };
 
 } // namespace psr
@@ -92,10 +98,9 @@ public:
 namespace std {
 
 template <typename N, unsigned K> struct hash<psr::CallStringCTX<N, K>> {
-  size_t operator()(const psr::CallStringCTX<N, K> &CS) const noexcept {
-    auto H =
-        llvm::hash_combine_range(CS.CallString.begin(), CS.CallString.end());
-    return llvm::hash_combine(K, H);
+  PSR_CXX23_STATIC size_t operator()(const psr::CallStringCTX<N, K> &Ctx)
+      PSR_PRECXX23_CONST noexcept {
+    return hash_value(Ctx);
   }
 };
 

@@ -12,33 +12,20 @@
 
 #include "phasar/DataFlow/IfdsIde/Solver/ESGEdgeKind.h"
 #include "phasar/Utils/ByRef.h"
-#include "phasar/Utils/Logger.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/Printer.h"
-#include "phasar/Utils/StableVector.h"
 #include "phasar/Utils/Utilities.h"
 
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/iterator_range.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstddef>
 #include <cstdio>
-#include <numeric>
 #include <optional>
-#include <set>
-#include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 namespace psr {
@@ -260,19 +247,6 @@ public:
   }
 
 private:
-  struct PathInfoHash {
-    size_t operator()(const std::pair<n_t, d_t> &ND) const {
-      return std::hash<n_t>()(ND.first) * 31 + std::hash<d_t>()(ND.second);
-    }
-  };
-
-  struct PathInfoEq {
-    bool operator()(const std::pair<n_t, d_t> &Lhs,
-                    const std::pair<n_t, d_t> &Rhs) const {
-      return Lhs.first == Rhs.first && Lhs.second == Rhs.second;
-    }
-  };
-
   [[nodiscard]] std::optional<size_t> getNodeIdOrNull(n_t Inst,
                                                       d_t Fact) const {
     auto It = FlowFactVertexMap.find(
@@ -370,8 +344,7 @@ private:
 
   std::vector<NodeData> NodeDataOwner;
   std::vector<NodeAdj> NodeAdjOwner;
-  std::unordered_map<std::pair<n_t, d_t>, size_t, PathInfoHash, PathInfoEq>
-      FlowFactVertexMap{};
+  std::unordered_map<std::pair<n_t, d_t>, size_t, PairHash> FlowFactVertexMap{};
 
   // ZeroValue
   d_t ZeroValue;

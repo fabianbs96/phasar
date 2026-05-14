@@ -26,9 +26,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <functional>
-#include <memory>
 #include <optional>
-#include <ostream>
 #include <unordered_map>
 #include <utility>
 

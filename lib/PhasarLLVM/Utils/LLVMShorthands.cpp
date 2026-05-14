@@ -338,7 +338,7 @@ std::string psr::getMetaDataID(const llvm::Value *V) {
 }
 
 bool LLVMValueIDLess::operator()(const llvm::Value *Lhs,
-                                 const llvm::Value *Rhs) const {
+                                 const llvm::Value *Rhs) PSR_PRECXX23_CONST {
   std::string LhsId = getMetaDataID(Lhs);
   std::string RhsId = getMetaDataID(Rhs);
   return StringIDLess{}(LhsId, RhsId);

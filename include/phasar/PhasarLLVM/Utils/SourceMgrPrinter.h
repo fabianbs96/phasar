@@ -6,7 +6,6 @@
 #include "phasar/PhasarLLVM/Utils/LLVMSourceManager.h"
 #include "phasar/Utils/AnalysisPrinterBase.h"
 #include "phasar/Utils/ByRef.h"
-#include "phasar/Utils/MaybeUniquePtr.h"
 
 #include "llvm/ADT/FunctionExtras.h"
 #include "llvm/Support/SourceMgr.h"

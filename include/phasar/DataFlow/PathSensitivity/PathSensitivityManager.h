@@ -14,18 +14,8 @@
 #include "phasar/DataFlow/PathSensitivity/PathSensitivityConfig.h"
 #include "phasar/DataFlow/PathSensitivity/PathSensitivityManagerBase.h"
 #include "phasar/DataFlow/PathSensitivity/PathSensitivityManagerMixin.h"
-#include "phasar/Utils/AdjacencyList.h"
-#include "phasar/Utils/DFAMinimizer.h"
-#include "phasar/Utils/GraphTraits.h"
-#include "phasar/Utils/Logger.h"
-
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/Twine.h"
-#include "llvm/Support/ErrorHandling.h"
 
 #include <cassert>
-#include <type_traits>
-
 namespace psr {
 
 /// \brief A utility class that allows path-reconstruction for IFDS/IDE solver

@@ -80,7 +80,7 @@ bool isMangled(llvm::StringRef Name) {
 }
 
 bool StringIDLess::operator()(const std::string &Lhs,
-                              const std::string &Rhs) const {
+                              const std::string &Rhs) PSR_PRECXX23_CONST {
   char *Endptr1;
 
   char *Endptr2;

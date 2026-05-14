@@ -12,7 +12,6 @@
 
 #include "phasar/Utils/Logger.h"
 
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <atomic>

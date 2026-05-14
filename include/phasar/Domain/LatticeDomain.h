@@ -12,6 +12,7 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DebugOutput.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/TypeTraits.h"
@@ -82,7 +83,7 @@ struct LatticeDomain : public std::variant<Top, L, Bottom> {
   }
 
   friend llvm::hash_code hash_value(const LatticeDomain &LD) noexcept
-    requires is_llvm_hashable_v<L>
+    requires IsDefaultHashable<L>
   { // NOLINT
     if (LD.isBottom()) {
       return llvm::hash_value(INTPTR_MAX);
@@ -90,7 +91,7 @@ struct LatticeDomain : public std::variant<Top, L, Bottom> {
     if (LD.isTop()) {
       return llvm::hash_value(INTPTR_MIN);
     }
-    return hash_value(std::get<L>(LD));
+    return DefaultHash(std::get<L>(LD));
   }
 
   [[nodiscard]] constexpr L &assertGetValue() noexcept {
@@ -181,6 +182,22 @@ struct LatticeDomain : public std::variant<Top, L, Bottom> {
     }
     llvm_unreachable("All comparison cases should be handled above.");
   }
+
+  friend auto hash_value(const LatticeDomain &LD) noexcept {
+    if (LD.isBottom()) {
+      return SIZE_MAX;
+    }
+    if (LD.isTop()) {
+      return SIZE_MAX - 1;
+    }
+    assert(LD.getValueOrNull() != nullptr);
+    if constexpr (psr::is_std_hashable_v<L>) {
+      return std::hash<L>{}(*LD.getValueOrNull());
+    } else {
+      using llvm::hash_value;
+      return hash_value(*LD.getValueOrNull());
+    }
+  }
 };
 
 template <typename L> struct JoinLatticeTraits<LatticeDomain<L>> {
@@ -228,20 +245,9 @@ struct NonTopBotValue<LatticeDomain<L>> {
 
 namespace std {
 template <typename L> struct hash<psr::LatticeDomain<L>> {
-  constexpr size_t operator()(const psr::LatticeDomain<L> &LD) noexcept {
-    if (LD.isBottom()) {
-      return SIZE_MAX;
-    }
-    if (LD.isTop()) {
-      return SIZE_MAX - 1;
-    }
-    assert(LD.getValueOrNull() != nullptr);
-    if constexpr (psr::is_std_hashable_v<L>) {
-      return std::hash<L>{}(*LD.getValueOrNull());
-    } else {
-      using llvm::hash_value;
-      return hash_value(*LD.getValueOrNull());
-    }
+  constexpr PSR_CXX23_STATIC size_t operator()(const psr::LatticeDomain<L> &LD)
+      PSR_PRECXX23_CONST noexcept {
+    return hash_value(LD);
   }
 };
 } // namespace std

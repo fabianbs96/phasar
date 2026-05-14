@@ -112,8 +112,8 @@ public:
 
   GeneralStatistics runOnModule(const llvm::Module &M);
 
-  inline GeneralStatistics run(const llvm::Module &M,
-                               llvm::ModuleAnalysisManager & /*AM*/) {
+  GeneralStatistics run(const llvm::Module &M,
+                        llvm::ModuleAnalysisManager & /*AM*/) {
     return runOnModule(M);
   }
 };

@@ -18,9 +18,9 @@
 #define PHASAR_UTILS_IO_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "nlohmann/json_fwd.hpp"
 

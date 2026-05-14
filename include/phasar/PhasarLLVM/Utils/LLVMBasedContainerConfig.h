@@ -10,6 +10,8 @@
 #ifndef PHASAR_PHASARLLVM_UTILS_LLVMBASEDCONTAINERCONFIG_H
 #define PHASAR_PHASARLLVM_UTILS_LLVMBASEDCONTAINERCONFIG_H
 
+#include "phasar/Utils/Macros.h"
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Module.h"
@@ -19,8 +21,11 @@
 namespace psr {
 
 template <typename T> struct Ref2PointerConverter {
-  T *operator()(T &Ref) const noexcept { return std::addressof(Ref); }
-  const T *operator()(const T &Ref) const noexcept {
+  PSR_CXX23_STATIC constexpr T *operator()(T &Ref) PSR_PRECXX23_CONST noexcept {
+    return std::addressof(Ref);
+  }
+  PSR_CXX23_STATIC constexpr const T *
+  operator()(const T &Ref) PSR_PRECXX23_CONST noexcept {
     return std::addressof(Ref);
   }
 };

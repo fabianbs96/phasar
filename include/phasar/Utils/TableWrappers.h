@@ -3,6 +3,7 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/EmptyBaseOptimizationUtils.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/MemoryResource.h"
 #include "phasar/Utils/TypeTraits.h"
 
@@ -22,18 +23,6 @@
 
 namespace psr {
 
-template <typename T, typename = size_t>
-struct has_getHashCode : std::false_type {};
-template <typename T>
-struct has_getHashCode<T, decltype(std::declval<const T>().getHashCode())>
-    : std::true_type {};
-
-template <typename T, typename = size_t>
-struct has_std_hash : std::false_type {};
-template <typename T>
-struct has_std_hash<T, decltype(std::hash<T>{}(std::declval<const T>))>
-    : std::true_type {};
-
 namespace detail {
 template <typename K, typename V> struct DummyTransform {
   ByConstRef<V> Value;
@@ -47,20 +36,10 @@ template <typename K, typename V> struct DummyTransform {
 
 template <typename T> using CellVecSmallVectorTy = llvm::SmallVector<T, 8>;
 
-template <typename K> struct Hasher {
-  size_t operator()(ByConstRef<K> Key) const noexcept {
-    if constexpr (has_getHashCode<K>::value) {
-      return Key.getHashCode();
-    } else {
-      return std::hash<K>{}(Key);
-    }
-  }
-};
-
 } // namespace detail
 
 template <typename K, typename V> class UnorderedTable1d {
-  using Hasher = detail::Hasher<K>;
+  using Hasher = DefaultHashFn;
 
 public:
   using value_type = std::pair<K, V>;
@@ -168,7 +147,7 @@ private:
 };
 
 template <typename K> class UnorderedTable1d<K, EmptyType> {
-  using Hasher = detail::Hasher<K>;
+  using Hasher = DefaultHashFn;
 
 public:
   using value_type = DummyPair<K>;
@@ -257,8 +236,9 @@ private:
 
 template <typename K, typename V> class DummyUnorderedTable1d {
   struct Hasher {
-    size_t operator()(ByConstRef<K> Key) const noexcept {
-      if constexpr (has_getHashCode<K>::value) {
+    PSR_CXX23_STATIC size_t operator()(ByConstRef<K> Key)
+        PSR_PRECXX23_CONST noexcept {
+      if constexpr (has_getHashCode_v<K>) {
         return Key.getHashCode();
       } else {
         return std::hash<K>{}(Key);
@@ -444,8 +424,9 @@ public:
 
 private:
   struct Hasher {
-    size_t operator()(ByConstRef<T> Key) const noexcept {
-      if constexpr (has_getHashCode<T>::value) {
+    PSR_CXX23_STATIC size_t operator()(ByConstRef<T> Key)
+        PSR_PRECXX23_CONST noexcept {
+      if constexpr (has_getHashCode_v<T>) {
         return Key.getHashCode();
       } else {
         return std::hash<T>{}(Key);

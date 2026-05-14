@@ -10,13 +10,6 @@
 
 using namespace psr;
 
-struct FVHasher {
-  auto operator()(std::pair<const llvm::Function *, const llvm::Value *> FV)
-      const noexcept {
-    return llvm::hash_value(FV);
-  }
-};
-
 SparseLLVMBasedICFG::~SparseLLVMBasedICFG() = default;
 
 SparseLLVMBasedICFG::SparseLLVMBasedICFG(

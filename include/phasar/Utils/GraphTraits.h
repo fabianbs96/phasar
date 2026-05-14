@@ -173,7 +173,8 @@ template <is_graph GraphTy> std::decay_t<GraphTy> reverseGraph(GraphTy &&G) {
 }
 
 struct DefaultNodeTransform {
-  template <typename N> std::string operator()(const N &Nod) const {
+  template <typename N>
+  PSR_CXX23_STATIC std::string operator()(const N &Nod) PSR_PRECXX23_CONST {
     std::string Buf;
     llvm::raw_string_ostream ROS(Buf);
     ROS << Nod;

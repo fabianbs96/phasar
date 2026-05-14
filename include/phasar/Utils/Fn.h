@@ -23,8 +23,8 @@ namespace psr {
 /// indirect call overhead or wrapping a lambda around
 template <auto F> struct fn_t { // NOLINT(readability-identifier-naming)
   template <typename... ArgsT>
-  constexpr std::invoke_result_t<decltype(F), ArgsT...>
-  operator()(ArgsT &&...Args) const
+  PSR_CXX23_STATIC constexpr std::invoke_result_t<decltype(F), ArgsT...>
+  operator()(ArgsT &&...Args) PSR_PRECXX23_CONST
       noexcept(std::is_nothrow_invocable_v<decltype(F), ArgsT...>) {
     return std::invoke(F, PSR_FWD(Args)...);
   }

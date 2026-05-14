@@ -36,8 +36,10 @@ class LLVMProjectIRDB;
 class VTAResolver : public Resolver {
 public:
   struct DefaultReachableFunctions {
-    void operator()(const LLVMProjectIRDB &IRDB,
-                    llvm::function_ref<void(const llvm::Function *)> WithFun);
+    PSR_CXX23_STATIC void
+    operator()(const LLVMProjectIRDB &IRDB,
+               llvm::function_ref<void(const llvm::Function *)> WithFun)
+        PSR_PRECXX23_CONST;
   };
 
   /// Constructs a VTAResolver with a given pre-computed call-graph and

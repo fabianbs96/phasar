@@ -104,7 +104,7 @@ template <is_graph GraphTy>
 
   llvm::IntEqClasses Equiv(traits_t::size(G));
 
-  auto isEquivalent = [&Equiv](edge_t LHS, edge_t RHS) {
+  const auto IsEquivalent = [&Equiv](edge_t LHS, edge_t RHS) {
     if (traits_t::weight(LHS) != traits_t::weight(RHS)) {
       return false;
     }
@@ -117,7 +117,7 @@ template <is_graph GraphTy>
            Equiv.findLeader(traits_t::target(RHS));
   };
 
-  auto makeEquivalent = [&Equiv](vertex_t LHS, vertex_t RHS) {
+  const auto MakeEquivalent = [&Equiv](vertex_t LHS, vertex_t RHS) {
     if (LHS == RHS) {
       return;
     }
@@ -125,7 +125,7 @@ template <is_graph GraphTy>
     Equiv.join(LHS, RHS);
   };
 
-  auto removeAt = [&WorkList](size_t I) {
+  const auto RemoveAt = [&WorkList](size_t I) {
     std::swap(WorkList[I], WorkList.back());
     WorkList.pop_back();
     return I - 1;
@@ -142,15 +142,15 @@ template <is_graph GraphTy>
       bool Eq = true;
       for (auto [LSucc, RSucc] :
            llvm::zip(traits_t::outEdges(G, LHS), traits_t::outEdges(G, RHS))) {
-        if (!isEquivalent(LSucc, RSucc)) {
+        if (!IsEquivalent(LSucc, RSucc)) {
           Eq = false;
           break;
         }
       }
 
       if (Eq) {
-        makeEquivalent(LHS, RHS);
-        I = removeAt(I);
+        MakeEquivalent(LHS, RHS);
+        I = RemoveAt(I);
         Changed = true;
         continue;
       }
@@ -161,9 +161,9 @@ template <is_graph GraphTy>
         auto RFirst = *traits_t::outEdges(G, RHS).begin();
         auto RSecond = *std::next(traits_t::outEdges(G, RHS).begin());
 
-        if (isEquivalent(LFirst, RSecond) && isEquivalent(LSecond, RFirst)) {
-          makeEquivalent(LHS, RHS);
-          I = removeAt(I);
+        if (IsEquivalent(LFirst, RSecond) && IsEquivalent(LSecond, RFirst)) {
+          MakeEquivalent(LHS, RHS);
+          I = RemoveAt(I);
           Changed = true;
           continue;
         }

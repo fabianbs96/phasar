@@ -13,7 +13,6 @@
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/CRTPUtils.h"
 #include "phasar/Utils/PointerUtils.h"
-#include "phasar/Utils/TypeTraits.h"
 
 #include <optional>
 #include <type_traits>

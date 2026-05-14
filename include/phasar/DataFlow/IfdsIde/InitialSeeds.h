@@ -12,9 +12,6 @@
 
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/Utils/Printer.h"
-#include "phasar/Utils/TypeTraits.h"
-
-#include "llvm/Support/Compiler.h"
 
 #include <map>
 #include <set>

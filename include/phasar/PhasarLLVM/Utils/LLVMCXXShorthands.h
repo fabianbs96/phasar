@@ -6,7 +6,6 @@
 // for examples
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Value.h"
 
 namespace psr {
 bool isTouchVTableInst(const llvm::StoreInst *Store);

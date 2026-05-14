@@ -377,8 +377,8 @@ private:
 
 namespace std {
 template <> struct hash<psr::IDEFeatureTaintEdgeFact> {
-  size_t
-  operator()(const psr::IDEFeatureTaintEdgeFact &EdgeFact) const noexcept {
+  PSR_CXX23_STATIC size_t operator()(const psr::IDEFeatureTaintEdgeFact &
+                                         EdgeFact) PSR_PRECXX23_CONST noexcept {
     return hash_value(EdgeFact);
   }
 };

@@ -8,7 +8,6 @@
 #include "phasar/Utils/TableWrappers.h"
 #include "phasar/Utils/TypeTraits.h"
 
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"

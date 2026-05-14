@@ -51,7 +51,7 @@ struct GraphTraits<AdjacencyList<T, VtxId, EdgeTy>> {
 
   /// A vertex that is not inserted into any graph. Can be used to communicate
   /// failure of certain operations
-  static inline constexpr auto Invalid = std::numeric_limits<vertex_t>::max();
+  static constexpr auto Invalid = std::numeric_limits<vertex_t>::max();
 
   /// Adds a new node to the graph G with node-tag Val
   ///

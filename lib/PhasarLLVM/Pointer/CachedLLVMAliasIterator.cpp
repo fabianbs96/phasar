@@ -6,7 +6,7 @@
 #include "phasar/Utils/DefaultValue.h"
 #include "phasar/Utils/NlohmannLogging.h"
 
-#include "FilteredAliasesUtils.h"
+#include "nlohmann/json.hpp"
 
 using namespace psr;
 

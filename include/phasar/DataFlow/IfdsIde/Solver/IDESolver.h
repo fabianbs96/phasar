@@ -23,10 +23,7 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionStats.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
-#include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
-#include "phasar/DataFlow/IfdsIde/FlowFunctions.h"
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
-#include "phasar/DataFlow/IfdsIde/IFDSTabulationProblem.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/DataFlow/IfdsIde/Solver/ESGEdgeKind.h"
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCache.h"
@@ -34,11 +31,9 @@
 #include "phasar/DataFlow/IfdsIde/Solver/JumpFunctions.h"
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
-#include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/Utils/Average.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DOTGraph.h"
-#include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/Nullable.h"
@@ -53,7 +48,6 @@
 
 #include "nlohmann/json.hpp"
 
-#include <concepts>
 #include <map>
 #include <memory>
 #include <set>
@@ -400,20 +394,20 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "  " << Callee->getName());
       }
       PHASAR_LOG_LEVEL(DEBUG, "Possible return sites:");
-      for (auto ret : ReturnSiteNs) {
-        PHASAR_LOG_LEVEL(DEBUG, "  " << NToString(ret));
+      for (auto Ret : ReturnSiteNs) {
+        PHASAR_LOG_LEVEL(DEBUG, "  " << NToString(Ret));
       }
     });
 
     bool HasNoCalleeInformation = true;
 
     auto &&Fun = ICF->getFunctionOf(n);
-    auto GetNextUse = [this, &Fun, &n](n_t nPrime, ByConstRef<d_t> d3) {
+    auto GetNextUse = [this, &Fun, &n](n_t NPrime, ByConstRef<d_t> d3) {
       if (auto &&NextUser = getNextUserOrNull(Fun, d3, n)) {
         return psr::unwrapNullable(PSR_FWD(NextUser));
       }
 
-      return nPrime;
+      return NPrime;
     };
 
     // for each possible callee
@@ -1454,8 +1448,9 @@ protected:
 
               std::set<d_t> SummaryDSet;
               EndsummaryTab.get(Edge.second, D2)
-                  .foreachCell([&SummaryDSet](const auto &Row, const auto &Col,
-                                              const auto &Val) {
+                  .foreachCell([&SummaryDSet](const auto & /*Row*/,
+                                              const auto &Col,
+                                              const auto & /*Val*/) {
                     SummaryDSet.insert(Col);
                   });
 

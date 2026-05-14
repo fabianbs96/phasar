@@ -35,12 +35,11 @@ public:
   using ClassType = const llvm::DIType *;
   using f_t = const llvm::Function *;
 
-  static inline constexpr llvm::StringLiteral StructPrefix = "struct.";
-  static inline constexpr llvm::StringLiteral ClassPrefix = "class.";
-  static inline constexpr llvm::StringLiteral VTablePrefix = "_ZTV";
-  static inline constexpr llvm::StringLiteral VTablePrefixDemang =
-      "vtable for ";
-  static inline constexpr llvm::StringLiteral PureVirtualCallName =
+  static constexpr llvm::StringLiteral StructPrefix = "struct.";
+  static constexpr llvm::StringLiteral ClassPrefix = "class.";
+  static constexpr llvm::StringLiteral VTablePrefix = "_ZTV";
+  static constexpr llvm::StringLiteral VTablePrefixDemang = "vtable for ";
+  static constexpr llvm::StringLiteral PureVirtualCallName =
       "__cxa_pure_virtual";
 
   /// \brief Creates a type hierarchy based on an intermediate representation
@@ -59,7 +58,7 @@ public:
   ~DIBasedTypeHierarchy() override = default;
 
   [[nodiscard]] bool hasType(ClassType Type) const override {
-    return TypeToVertex.count(Type);
+    return TypeToVertex.contains(Type);
   }
 
   [[nodiscard]] bool isSubType(ClassType Type,

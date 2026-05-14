@@ -12,6 +12,8 @@
 #include "phasar/Utils/IO.h"
 #include "phasar/Utils/NlohmannLogging.h"
 
+#include "nlohmann/json.hpp"
+
 namespace psr {
 
 static LLVMAliasSetData getDataFromJson(const nlohmann::json &Json) {

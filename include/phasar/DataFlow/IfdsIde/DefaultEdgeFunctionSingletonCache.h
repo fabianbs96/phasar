@@ -13,6 +13,8 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionSingletonCache.h"
 
+#include "llvm/ADT/DenseMap.h"
+
 namespace psr {
 
 /// Default implementation of EdgeFunctionSingletonCache.

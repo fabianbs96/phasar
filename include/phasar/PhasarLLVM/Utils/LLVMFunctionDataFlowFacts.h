@@ -10,7 +10,6 @@
 #ifndef PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_LLVMFUNCTIONDATAFLOWFACTS_H
 #define PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_LLVMFUNCTIONDATAFLOWFACTS_H
 
-#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/Utils/DefaultValue.h"
 #include "phasar/Utils/FunctionDataFlowFacts.h"
 #include "phasar/Utils/MapUtils.h"
@@ -34,7 +33,7 @@ public:
   using ParameterMappingTy = FunctionDataFlowFacts::ParameterMappingTy;
 
   [[nodiscard]] bool contains(const llvm::Function *Fn) const {
-    return LLVMFdff.count(Fn);
+    return LLVMFdff.contains(Fn);
   }
 
   [[nodiscard]] const std::vector<DataFlowFact> &

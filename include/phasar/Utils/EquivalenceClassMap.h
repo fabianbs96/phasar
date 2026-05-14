@@ -125,7 +125,7 @@ public:
   /// is not already in the map a new equivalence class is created.
   template <typename... Ts>
   insert_return_type try_emplace(const KeyT &Key, Ts &&...Args) {
-    ValueT Val{std::forward<Ts...>(Args...)};
+    ValueT Val{std::forward<Ts...>(Args)...};
 
     for (auto &KVPair : StoredData) {
       if (KVPair.second == Val) {

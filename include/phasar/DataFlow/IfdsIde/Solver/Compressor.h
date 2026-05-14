@@ -5,7 +5,6 @@
 #include "phasar/Utils/Compressor.h"
 
 #include <cstdint>
-#include <type_traits>
 
 namespace psr {
 

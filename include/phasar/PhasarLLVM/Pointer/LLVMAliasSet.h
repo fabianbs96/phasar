@@ -69,11 +69,9 @@ public:
   explicit LLVMAliasSet(LLVMProjectIRDB *IRDB,
                         const LLVMAliasSetData &SerializedPTS);
 
-  [[nodiscard]] inline bool isInterProcedural() const noexcept {
-    return false;
-  };
+  [[nodiscard]] bool isInterProcedural() const noexcept { return false; };
 
-  [[nodiscard]] inline AliasAnalysisType getAliasAnalysisType() const noexcept {
+  [[nodiscard]] AliasAnalysisType getAliasAnalysisType() const noexcept {
     return PTA->getPointerAnalysisType();
   };
 
@@ -122,7 +120,7 @@ public:
   /// points-to sets, use 0 to show nothing.
   void drawAliasSetsDistribution(int Peak = 10) const;
 
-  [[nodiscard]] inline bool empty() const { return AnalyzedFunctions.empty(); }
+  [[nodiscard]] bool empty() const { return AnalyzedFunctions.empty(); }
 
   friend bool isInReachableAllocationSitesTy(const llvm::Value *V,
                                              const llvm::Value *PotentialValue,

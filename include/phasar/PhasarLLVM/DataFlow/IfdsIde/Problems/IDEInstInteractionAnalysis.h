@@ -174,7 +174,8 @@ public:
 // Implementations of STL traits.
 namespace std {
 template <> struct hash<psr::IDEIIAFlowFact> {
-  size_t operator()(const psr::IDEIIAFlowFact &FlowFact) const {
+  PSR_CXX23_STATIC size_t operator()(const psr::IDEIIAFlowFact &FlowFact)
+      PSR_PRECXX23_CONST {
     return std::hash<const llvm::Value *>()(FlowFact.getBase());
   }
 };
@@ -900,7 +901,7 @@ public:
         //
         //               0
         //                \
-          // %i = call H     \ \x.x \cup { commit of('%i = call H') }
+        // %i = call H     \ \x.x \cup { commit of('%i = call H') }
         //                  v
         //                  i
         //

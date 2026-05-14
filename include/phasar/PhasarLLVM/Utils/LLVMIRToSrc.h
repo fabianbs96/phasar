@@ -19,7 +19,7 @@
 
 #include "llvm/IR/DebugInfoMetadata.h"
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 #include <optional>
 #include <string>
@@ -74,8 +74,7 @@ struct SourceCodeInfo {
   [[nodiscard]] bool empty() const noexcept;
 
   [[nodiscard]] bool operator==(const SourceCodeInfo &Other) const noexcept;
-  [[nodiscard]] inline bool
-  operator!=(const SourceCodeInfo &Other) const noexcept {
+  [[nodiscard]] bool operator!=(const SourceCodeInfo &Other) const noexcept {
     return !(*this == Other);
   }
 

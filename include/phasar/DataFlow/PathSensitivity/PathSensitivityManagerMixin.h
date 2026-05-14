@@ -15,8 +15,6 @@
 #include "phasar/DataFlow/PathSensitivity/PathSensitivityConfig.h"
 #include "phasar/DataFlow/PathSensitivity/PathSensitivityManagerBase.h"
 #include "phasar/DataFlow/PathSensitivity/PathTracingFilter.h"
-#include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
-#include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/DFAMinimizer.h"
 #include "phasar/Utils/GraphTraits.h"
 #include "phasar/Utils/Printer.h"
@@ -24,14 +22,11 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstdlib>
-#include <filesystem>
-#include <system_error>
 #include <type_traits>
 
 namespace psr {

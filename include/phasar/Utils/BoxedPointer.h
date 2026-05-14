@@ -10,8 +10,9 @@
 #ifndef PHASAR_UTILS_BOXEDPOINTER_H
 #define PHASAR_UTILS_BOXEDPOINTER_H
 
+#include "phasar/Utils/Macros.h"
+
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 
 #include <cstddef>
@@ -67,27 +68,15 @@ public:
                                                  BoxedPtr RHS) noexcept {
     return LHS.Value == RHS.Value;
   }
-  [[nodiscard]] friend constexpr bool operator!=(BoxedPtr LHS,
-                                                 BoxedPtr RHS) noexcept {
-    return !(LHS == RHS);
-  }
 
   [[nodiscard]] friend constexpr bool operator<(BoxedPtr LHS,
                                                 BoxedPtr RHS) noexcept {
     return LHS.Value < RHS.Value;
   }
-  [[nodiscard]] friend constexpr bool operator>(BoxedPtr LHS,
-                                                BoxedPtr RHS) noexcept {
-    return LHS.Value > RHS.Value;
-  }
 
   [[nodiscard]] friend constexpr bool operator<=(BoxedPtr LHS,
                                                  BoxedPtr RHS) noexcept {
     return LHS.Value <= RHS.Value;
-  }
-  [[nodiscard]] friend constexpr bool operator>=(BoxedPtr LHS,
-                                                 BoxedPtr RHS) noexcept {
-    return LHS.Value >= RHS.Value;
   }
 
 private:
@@ -131,27 +120,15 @@ public:
                                                  BoxedConstPtr RHS) noexcept {
     return LHS.value() == RHS.value();
   }
-  [[nodiscard]] friend constexpr bool operator!=(BoxedConstPtr LHS,
-                                                 BoxedConstPtr RHS) noexcept {
-    return !(LHS == RHS);
-  }
 
   [[nodiscard]] friend constexpr bool operator<(BoxedConstPtr LHS,
                                                 BoxedConstPtr RHS) noexcept {
     return LHS.value() < RHS.value();
   }
-  [[nodiscard]] friend constexpr bool operator>(BoxedConstPtr LHS,
-                                                BoxedConstPtr RHS) noexcept {
-    return LHS.value() > RHS.value();
-  }
 
   [[nodiscard]] friend constexpr bool operator<=(BoxedConstPtr LHS,
                                                  BoxedConstPtr RHS) noexcept {
     return LHS.value() <= RHS.value();
-  }
-  [[nodiscard]] friend constexpr bool operator>=(BoxedConstPtr LHS,
-                                                 BoxedConstPtr RHS) noexcept {
-    return LHS.value() >= RHS.value();
   }
 };
 
@@ -159,12 +136,14 @@ public:
 
 namespace std {
 template <typename C> struct hash<psr::BoxedPtr<C>> {
-  constexpr size_t operator()(psr::BoxedPtr<C> Ptr) const noexcept {
+  PSR_CXX23_STATIC constexpr size_t
+  operator()(psr::BoxedPtr<C> Ptr) PSR_PRECXX23_CONST noexcept {
     return std::hash<C **>{}(Ptr.value());
   }
 };
 template <typename C> struct hash<psr::BoxedConstPtr<C>> {
-  constexpr size_t operator()(psr::BoxedConstPtr<C> Ptr) const noexcept {
+  PSR_CXX23_STATIC constexpr size_t
+  operator()(psr::BoxedConstPtr<C> Ptr) PSR_PRECXX23_CONST noexcept {
     return std::hash<C const *const *>{}(Ptr.value());
   }
 };
@@ -172,36 +151,36 @@ template <typename C> struct hash<psr::BoxedConstPtr<C>> {
 
 namespace llvm {
 template <typename C> struct DenseMapInfo<psr::BoxedPtr<C>> {
-  inline static psr::BoxedPtr<C> getEmptyKey() noexcept {
+  static psr::BoxedPtr<C> getEmptyKey() noexcept {
     return DenseMapInfo<C **>::getEmptyKey();
   }
-  inline static psr::BoxedPtr<C> getTombstoneKey() noexcept {
+  static psr::BoxedPtr<C> getTombstoneKey() noexcept {
     return DenseMapInfo<C **>::getTombstoneKey();
   }
 
-  inline static bool isEqual(psr::BoxedPtr<C> LHS,
-                             psr::BoxedPtr<C> RHS) noexcept {
+  static constexpr bool isEqual(psr::BoxedPtr<C> LHS,
+                                psr::BoxedPtr<C> RHS) noexcept {
     return LHS == RHS;
   }
 
-  inline static unsigned getHashValue(psr::BoxedPtr<C> Ptr) noexcept {
+  static unsigned getHashValue(psr::BoxedPtr<C> Ptr) noexcept {
     return hash_value(Ptr);
   }
 };
 template <typename C> struct DenseMapInfo<psr::BoxedConstPtr<C>> {
-  inline static psr::BoxedConstPtr<C> getEmptyKey() noexcept {
+  static psr::BoxedConstPtr<C> getEmptyKey() noexcept {
     return DenseMapInfo<C **>::getEmptyKey();
   }
-  inline static psr::BoxedConstPtr<C> getTombstoneKey() noexcept {
+  static psr::BoxedConstPtr<C> getTombstoneKey() noexcept {
     return DenseMapInfo<C **>::getTombstoneKey();
   }
 
-  inline static bool isEqual(psr::BoxedConstPtr<C> LHS,
-                             psr::BoxedConstPtr<C> RHS) noexcept {
+  static constexpr bool isEqual(psr::BoxedConstPtr<C> LHS,
+                                psr::BoxedConstPtr<C> RHS) noexcept {
     return LHS == RHS;
   }
 
-  inline static unsigned getHashValue(psr::BoxedConstPtr<C> Ptr) noexcept {
+  static unsigned getHashValue(psr::BoxedConstPtr<C> Ptr) noexcept {
     return hash_value(Ptr);
   }
 };

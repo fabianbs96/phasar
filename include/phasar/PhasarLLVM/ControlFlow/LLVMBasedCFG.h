@@ -18,7 +18,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 namespace llvm {
 class Function;
@@ -97,7 +97,6 @@ protected:
   }
   [[nodiscard]] std::string getDemangledFunctionNameImpl(f_t Fun) const;
   void printImpl(f_t Fun, llvm::raw_ostream &OS) const { OS << *Fun; }
-  [[nodiscard]] nlohmann::json getAsJsonImpl(f_t /*Fun*/) const { return ""; }
 };
 } // namespace detail
 

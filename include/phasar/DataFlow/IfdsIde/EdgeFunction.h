@@ -14,7 +14,7 @@
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/EmptyBaseOptimizationUtils.h"
 #include "phasar/Utils/ErrorFwd.h"
-#include "phasar/Utils/Macros.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/DenseMapInfo.h"
@@ -85,8 +85,7 @@ protected:
   };
 
   template <typename ConcreteEF>
-  constexpr static inline const ConcreteEF *
-  getPtr(const void *const &EF) noexcept {
+  constexpr static const ConcreteEF *getPtr(const void *const &EF) noexcept {
     if constexpr (!IsSOOCandidate<ConcreteEF>) {
       return &static_cast<const RefCounted<ConcreteEF> *>(EF)->Value;
     } else {
@@ -94,7 +93,7 @@ protected:
     }
   }
   template <typename ConcreteEF>
-  constexpr static inline const ConcreteEF *
+  constexpr static const ConcreteEF *
   getPtr(const void *const &&EF) = delete; // NOLINT
 
   template <typename ConcreteEF>
@@ -736,11 +735,8 @@ private:
 
   template <typename ConcreteEF>
   static size_t getHashCodeThunk(const void *EF, const void *VT) noexcept {
-    if constexpr (is_std_hashable_v<ConcreteEF>) {
-      return std::hash<ConcreteEF>{}(*getPtr<ConcreteEF>(EF));
-    } else if constexpr (is_llvm_hashable_v<ConcreteEF>) {
-      using llvm::hash_value;
-      return hash_value(*getPtr<ConcreteEF>(EF));
+    if constexpr (IsDefaultHashable<ConcreteEF>) {
+      return DefaultHash(*getPtr<ConcreteEF>(EF));
     } else {
       return llvm::hash_combine(EF, VT);
     }
@@ -815,7 +811,7 @@ template <typename L> struct DenseMapInfo<psr::EdgeFunction<L>> {
 
 template <typename To, typename L>
 struct CastIsPossible<To, psr::EdgeFunction<L>> {
-  static inline bool isPossible(const psr::EdgeFunction<L> &EF) noexcept {
+  static bool isPossible(const psr::EdgeFunction<L> &EF) noexcept {
     return EF.template isa<To>();
   }
 };
@@ -826,7 +822,7 @@ struct CastInfo<To, psr::EdgeFunction<L>>
       public NullableValueCastFailed<const To *>,
       public DefaultDoCastIfPossible<const To *, const psr::EdgeFunction<L> &,
                                      CastInfo<To, psr::EdgeFunction<L>>> {
-  static inline const To *doCast(const psr::EdgeFunction<L> &EF) noexcept {
+  static const To *doCast(const psr::EdgeFunction<L> &EF) noexcept {
     return EF.template cast<To>();
   }
 };

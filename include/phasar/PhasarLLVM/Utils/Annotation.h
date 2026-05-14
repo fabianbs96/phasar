@@ -6,8 +6,6 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Value.h"
 
-#include <string>
-
 namespace psr {
 
 /// \file

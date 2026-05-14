@@ -7,8 +7,6 @@
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/TableWrappers.h"
 
-#include "llvm/ADT/ArrayRef.h"
-
 #include <type_traits>
 
 namespace psr::detail {

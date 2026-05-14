@@ -17,7 +17,8 @@ using namespace psr;
 
 void VTAResolver::DefaultReachableFunctions::operator()(
     const LLVMProjectIRDB &IRDB,
-    llvm::function_ref<void(const llvm::Function *)> WithFun) {
+    llvm::function_ref<void(const llvm::Function *)> WithFun)
+    PSR_PRECXX23_CONST {
   llvm::for_each(IRDB.getAllFunctions(), WithFun);
 }
 

@@ -6,7 +6,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 
 #include <functional>
-#include <type_traits>
 
 namespace psr {
 /// A dummy type that takes no space in memory when used with the empty-base

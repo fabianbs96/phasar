@@ -3,8 +3,6 @@
 
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCacheStats.h"
 
-#include <type_traits>
-
 namespace psr {
 struct IterativeIDESolverStats {
   FlowEdgeFunctionCacheStats FEStats;

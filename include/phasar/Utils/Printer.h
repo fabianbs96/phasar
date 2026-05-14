@@ -16,7 +16,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <string>
-#include <type_traits>
 
 namespace llvm {
 class Value;

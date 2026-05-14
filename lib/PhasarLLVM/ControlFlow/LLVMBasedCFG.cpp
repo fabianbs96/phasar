@@ -20,6 +20,8 @@
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/IntrinsicInst.h"
 
+#include "nlohmann/json.hpp"
+
 #include <string>
 
 namespace psr {
@@ -116,6 +118,8 @@ auto detail::LLVMBasedCFGImpl<Derived>::getSuccsOfImpl(n_t I) const
           Succ = Succ->getNextNonDebugInstruction(
               false /*Only debug instructions*/);
         }
+#else
+        (void)IgnoreDbgInstructions;
 #endif
         return Succ;
       });

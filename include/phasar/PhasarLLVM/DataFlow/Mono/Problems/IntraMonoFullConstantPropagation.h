@@ -106,7 +106,8 @@ std::string DToString(const IntraMonoFCAFact &Fact);
 namespace std {
 
 template <> struct hash<psr::IntraMonoFCAFact> {
-  size_t operator()(const psr::IntraMonoFCAFact &P) const {
+  PSR_CXX23_STATIC size_t operator()(const psr::IntraMonoFCAFact &P)
+      PSR_PRECXX23_CONST {
     std::hash<const llvm::Value *> HashPtr;
     size_t HP = HashPtr(P.Fact);
     size_t HU = 0;

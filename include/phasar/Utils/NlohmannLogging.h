@@ -14,7 +14,7 @@
 #include "llvm/Support/FormatVariadic.h" // -- for overload resolution
 #include "llvm/Support/raw_ostream.h"
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 
 namespace psr {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const nlohmann::json &J);

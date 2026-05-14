@@ -17,6 +17,8 @@
 
 #include "llvm/IR/Function.h"
 
+#include "nlohmann/json_fwd.hpp"
+
 namespace psr {
 
 class CachedLLVMAliasIterator;
@@ -44,7 +46,7 @@ public:
 
   // --- API Functions:
 
-  [[nodiscard]] inline bool isInterProcedural() const noexcept {
+  [[nodiscard]] bool isInterProcedural() const noexcept {
     return false; // No idea, so be conservative here
   };
 
@@ -98,18 +100,18 @@ private:
   };
 
   struct ReachableAllocationSitesKeyDMI {
-    inline static ReachableAllocationSitesKey getEmptyKey() noexcept {
+    static ReachableAllocationSitesKey getEmptyKey() noexcept {
       return {{}, llvm::DenseMapInfo<v_t>::getEmptyKey()};
     }
-    inline static ReachableAllocationSitesKey getTombstoneKey() noexcept {
+    static ReachableAllocationSitesKey getTombstoneKey() noexcept {
       return {{}, llvm::DenseMapInfo<v_t>::getTombstoneKey()};
     }
-    inline static auto getHashValue(ReachableAllocationSitesKey Key) noexcept {
+    static auto getHashValue(ReachableAllocationSitesKey Key) noexcept {
       return llvm::hash_combine(Key.FunAndIntraProcOnly.getOpaqueValue(),
                                 Key.Value);
     }
-    inline static bool isEqual(ReachableAllocationSitesKey Key1,
-                               ReachableAllocationSitesKey Key2) noexcept {
+    static bool isEqual(ReachableAllocationSitesKey Key1,
+                        ReachableAllocationSitesKey Key2) noexcept {
       return Key1.FunAndIntraProcOnly == Key2.FunAndIntraProcOnly &&
              Key1.Value == Key2.Value;
     }

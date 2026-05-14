@@ -12,6 +12,7 @@
 
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/Utils/ByRef.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/JoinLattice.h"
 #include "phasar/Utils/TypeTraits.h"
 
@@ -96,16 +97,9 @@ template <typename L> struct ConstantEdgeFunction {
   }
 
   [[nodiscard]] friend auto hash_value(const ConstantEdgeFunction &CEF) noexcept
-    requires(is_std_hashable_v<typename NonTopBotValue<L>::type> ||
-             is_llvm_hashable_v<typename NonTopBotValue<L>::type>)
+    requires(IsDefaultHashable<typename NonTopBotValue<L>::type>)
   {
-    using value_type = typename ConstantEdgeFunction<L>::value_type;
-    if constexpr (is_std_hashable_v<value_type>) {
-      return std::hash<value_type>{}(CEF.Value);
-    } else {
-      using llvm::hash_value;
-      return hash_value(CEF.Value);
-    }
+    return DefaultHash(CEF.Value);
   }
 
   // -- constant data member

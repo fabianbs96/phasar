@@ -12,10 +12,6 @@
 
 #define PSR_FWD(...) ::std::forward<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
-#define PSR_CONCEPT concept
-
-#define PSR_CONSTINIT constinit
-
 #ifndef __has_feature
 #define __has_feature(x) 0
 #endif
@@ -33,6 +29,14 @@
 #define PSR_LIFETIMEBOUND [[lifetimebound]]
 #else
 #define PSR_LIFETIMEBOUND
+#endif
+
+#if __cplusplus >= 202302L
+#define PSR_CXX23_STATIC static
+#define PSR_PRECXX23_CONST
+#else
+#define PSR_CXX23_STATIC
+#define PSR_PRECXX23_CONST const
 #endif
 
 #endif // PHASAR_UTILS_MACROS_H

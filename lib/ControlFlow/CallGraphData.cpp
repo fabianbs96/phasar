@@ -13,6 +13,8 @@
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/NlohmannLogging.h"
 
+#include "nlohmann/json.hpp"
+
 namespace psr {
 static CallGraphData getDataFromJson(const nlohmann::json &Json) {
   CallGraphData ToReturn;

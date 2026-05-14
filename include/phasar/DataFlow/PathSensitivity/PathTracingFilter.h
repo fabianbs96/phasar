@@ -10,6 +10,8 @@
 #ifndef PHASAR_DATAFLOW_PATHSENSITIVITY_PATHTRACINGFILTER_H
 #define PHASAR_DATAFLOW_PATHSENSITIVITY_PATHTRACINGFILTER_H
 
+#include "phasar/Utils/TypeTraits.h"
+
 #include <type_traits>
 
 namespace psr {
@@ -21,17 +23,7 @@ template <typename EndFilter, typename ErrFilter> struct PathTracingFilter {
   [[no_unique_address]] err_filter_t IsErrorneousTransition;
 };
 
-namespace detail {
-struct False2 {
-  template <typename T, typename U>
-  constexpr bool operator()(T && /*First*/, U && /*Second*/) const noexcept {
-    return false;
-  }
-};
-} // namespace detail
-
-using DefaultPathTracingFilter =
-    PathTracingFilter<detail::False2, detail::False2>;
+using DefaultPathTracingFilter = PathTracingFilter<psr::FalseFn, psr::FalseFn>;
 
 template <typename F, typename NodeRef, typename = void>
 struct is_pathtracingfilter_for : std::false_type {};

@@ -1,13 +1,13 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_EDGEFUNCTIONCACHE_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_EDGEFUNCTIONCACHE_H
 
-#include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
+#include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
 #include "phasar/DataFlow/IfdsIde/Solver/EdgeFunctionCacheStats.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/EquivalenceClassMap.h"
 #include "phasar/Utils/StableVector.h"
 
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>

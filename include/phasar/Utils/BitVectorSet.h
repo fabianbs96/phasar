@@ -318,7 +318,8 @@ void intersectWith(BitVectorSet<T> &Dest, const BitVectorSet<T> &Src) {
 
 namespace std {
 template <typename T> struct hash<psr::BitVectorSet<T>> {
-  size_t operator()(const psr::BitVectorSet<T> &BVS) noexcept {
+  PSR_CXX23_STATIC size_t operator()(const psr::BitVectorSet<T> &BVS)
+      PSR_PRECXX23_CONST noexcept {
     return hash_value(BVS);
   }
 };

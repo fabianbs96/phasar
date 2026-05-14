@@ -13,7 +13,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -540,7 +539,7 @@ private:
     return *Ret;
   }
 
-  [[nodiscard]] inline T &subscriptHelper(size_t Index) const noexcept {
+  [[nodiscard]] T &subscriptHelper(size_t Index) const noexcept {
     if (Index < InitialCapacity) {
       return Blocks[0][Index];
     }

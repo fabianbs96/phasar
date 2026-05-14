@@ -1,9 +1,7 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_ITERATIVEIDESOLVERBASE_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_ITERATIVEIDESOLVERBASE_H
 
-#include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/EmptyBaseOptimizationUtils.h"
-#include "phasar/Utils/PointerUtils.h"
 #include "phasar/Utils/TableWrappers.h"
 
 #include "llvm/ADT/DenseMap.h"

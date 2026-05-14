@@ -1,8 +1,6 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_WORKLISTTRAITS_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_WORKLISTTRAITS_H
 
-#include "phasar/DataFlow/IfdsIde/Solver/Compressor.h"
-
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 

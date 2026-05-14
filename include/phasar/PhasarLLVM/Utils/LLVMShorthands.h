@@ -45,7 +45,6 @@ class DIDerivedType;
 } // namespace llvm
 
 namespace psr {
-class LLVMProjectIRDB;
 
 /**
  * @brief Checks if the given LLVM Type is a integer like struct.
@@ -158,7 +157,8 @@ std::string getMetaDataID(const llvm::Value *V);
  * underlying types for their ID's, size_t and string respectively.
  */
 struct LLVMValueIDLess {
-  bool operator()(const llvm::Value *Lhs, const llvm::Value *Rhs) const;
+  PSR_CXX23_STATIC bool operator()(const llvm::Value *Lhs,
+                                   const llvm::Value *Rhs) PSR_PRECXX23_CONST;
 };
 
 /**

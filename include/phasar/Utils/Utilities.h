@@ -144,7 +144,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               const std::vector<bool> &Bits);
 
 struct StringIDLess {
-  bool operator()(const std::string &LHS, const std::string &RHS) const;
+  PSR_CXX23_STATIC bool operator()(const std::string &LHS,
+                                   const std::string &RHS) PSR_PRECXX23_CONST;
 };
 
 /// See <https://en.cppreference.com/w/cpp/experimental/scope_exit/scope_exit>
@@ -279,8 +280,9 @@ template <typename T> constexpr auto copyOrRef(T &Val) noexcept {
 }
 
 struct identity {
-  template <typename T> decltype(auto) operator()(T &&Val) const noexcept {
-    return std::forward<T>(Val);
+  PSR_CXX23_STATIC constexpr decltype(auto)
+  operator()(auto &&Val) PSR_PRECXX23_CONST noexcept {
+    return PSR_FWD(Val);
   }
 };
 

@@ -50,7 +50,7 @@ class IRDBParsingErrorCategory : public std::error_category {
   }
 };
 
-PSR_CONSTINIT IRDBParsingErrorCategory IRDBParsingErrorCat{};
+constinit const IRDBParsingErrorCategory IRDBParsingErrorCat{};
 
 std::error_code make_error_code(IRDBParsingError Err) noexcept {
   return {int(Err), IRDBParsingErrorCat};

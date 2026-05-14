@@ -15,7 +15,6 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/DIBasedTypeHierarchy.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
-#include "phasar/Utils/BitVectorSet.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instruction.h"
@@ -23,21 +22,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <algorithm>
-#include <ostream>
 #include <utility>
-
-namespace std {
-template <> struct hash<pair<const llvm::Value *, unsigned>> {
-  size_t operator()(const pair<const llvm::Value *, unsigned> &P) const {
-    std::hash<const llvm::Value *> HashPtr;
-    std::hash<unsigned> HashUnsigned;
-    size_t HP = HashPtr(P.first);
-    size_t HU = HashUnsigned(P.second);
-    return HP ^ (HU << 1);
-  }
-};
-} // namespace std
 
 using namespace psr;
 namespace psr {
@@ -115,7 +100,7 @@ IntraMonoFullConstantPropagation::normalFlow(
       // get value to be stored
       LatticeDomain<IntraMonoFullConstantPropagation::plain_d_t> LatticeVal =
           Top{};
-      if (In.find(ValueOp) != In.end()) {
+      if (In.contains(ValueOp)) {
         LatticeVal = In.at(ValueOp);
       }
       // store value in variable if it is not top

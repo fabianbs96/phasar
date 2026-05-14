@@ -18,15 +18,8 @@
 #define PHASAR_DATAFLOW_IFDSIDE_EDGEFUNCTIONS_H
 
 #include "phasar/DataFlow/IfdsIde/EdgeFunction.h"
-#include "phasar/Utils/ByRef.h"
-#include "phasar/Utils/JoinLattice.h"
-#include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <type_traits>
-#include <utility>
 
 namespace psr {
 

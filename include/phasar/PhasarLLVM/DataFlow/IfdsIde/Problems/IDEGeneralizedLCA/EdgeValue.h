@@ -10,6 +10,8 @@
 #ifndef PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDEGENERALIZEDLCA_EDGEVALUE_H
 #define PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDEGENERALIZEDLCA_EDGEVALUE_H
 
+#include "phasar/Utils/Macros.h"
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Twine.h"
@@ -91,6 +93,23 @@ public:
     ROS << EV;
     return Ret;
   }
+
+  friend auto hash_value(const EdgeValue &Val) {
+    auto Hash = std::hash<int>()(Val.getKind());
+    int64_t AsInt;
+    double AsFloat;
+    std::string AsString;
+    if (Val.tryGetInt(AsInt)) {
+      return std::hash<int64_t>()(AsInt) * 31 + Hash;
+    }
+    if (Val.tryGetFP(AsFloat)) {
+      return std::hash<double>()(round(AsFloat)) * 31 + Hash;
+    }
+    if (Val.tryGetString(AsString)) {
+      return std::hash<std::string>()(AsString) * 31 + Hash;
+    }
+    return Hash;
+  }
 };
 class EdgeValueSet;
 using ev_t = EdgeValueSet;
@@ -115,22 +134,9 @@ inline std::ostream &operator<<(std::ostream &Os, const ev_t &Val) {
 namespace std {
 
 template <> struct hash<psr::glca::EdgeValue> {
-  hash() = default;
-  size_t operator()(const psr::glca::EdgeValue &Val) const {
-    auto Hash = hash<int>()(Val.getKind());
-    int64_t AsInt;
-    double AsFloat;
-    string AsString;
-    if (Val.tryGetInt(AsInt)) {
-      return hash<int64_t>()(AsInt) * 31 + Hash;
-    }
-    if (Val.tryGetFP(AsFloat)) {
-      return hash<double>()(round(AsFloat)) * 31 + Hash;
-    }
-    if (Val.tryGetString(AsString)) {
-      return hash<string>()(AsString) * 31 + Hash;
-    }
-    return Hash;
+  PSR_CXX23_STATIC size_t operator()(const psr::glca::EdgeValue &Val)
+      PSR_PRECXX23_CONST {
+    return hash_value(Val);
   }
 };
 

@@ -13,13 +13,8 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/Pointer/AliasAnalysisType.h"
 
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/DataLayout.h"
 
-#include <cstddef>
-#include <functional>
 #include <memory>
 
 namespace psr {

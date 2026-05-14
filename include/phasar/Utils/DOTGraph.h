@@ -18,6 +18,7 @@
 #define PHASAR_UTILS_DOTGRAPH_H
 
 #include "phasar/Config/Configuration.h"
+#include "phasar/Utils/MapUtils.h"
 #include "phasar/Utils/Utilities.h"
 
 #include <map>
@@ -198,8 +199,8 @@ template <typename D> struct DOTGraph {
   }
 
   bool containsFactSG(std::string &FName, unsigned FactId) {
-    if (Functions.count(FName)) {
-      if (Functions[FName].Facts.count(FactId)) {
+    if (const auto *Funs = getOrNull(Functions, FName)) {
+      if (Funs->Facts.contains(FactId)) {
         return true;
       }
     }

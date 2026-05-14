@@ -1,19 +1,13 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_ITERATIVEIDESOLVER_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_ITERATIVEIDESOLVER_H
 
-#include "phasar/DataFlow/IfdsIde/EdgeFunctions.h"
 #include "phasar/DataFlow/IfdsIde/Solver/Compressor.h"
-#include "phasar/DataFlow/IfdsIde/Solver/EdgeFunctionCache.h"
-#include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCacheNG.h"
-#include "phasar/DataFlow/IfdsIde/Solver/FlowFunctionCache.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverAPIMixin.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IdBasedSolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolverBase.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolverStats.h"
 #include "phasar/DataFlow/IfdsIde/Solver/StaticIDESolverConfig.h"
-#include "phasar/DataFlow/IfdsIde/Solver/WorkListTraits.h"
-#include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/EmptyBaseOptimizationUtils.h"
@@ -24,23 +18,17 @@
 #include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <type_traits>
 
 namespace psr {

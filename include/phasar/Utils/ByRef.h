@@ -10,8 +10,6 @@
 #ifndef PHASAR_UTILS_BYREF_H
 #define PHASAR_UTILS_BYREF_H
 
-#include "phasar/Utils/Macros.h"
-
 #include <type_traits>
 
 namespace psr {

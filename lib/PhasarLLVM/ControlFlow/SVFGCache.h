@@ -12,6 +12,7 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedCFG.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
+#include "phasar/Utils/HashUtils.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Compiler.h"
@@ -19,17 +20,11 @@
 #include <unordered_map>
 
 namespace psr {
-struct FVHasher {
-  auto operator()(std::pair<const llvm::Function *, const llvm::Value *> FV)
-      const noexcept {
-    return llvm::hash_value(FV);
-  }
-};
 
 struct SVFGCache {
   using f_t = const llvm::Function *;
   using v_t = const llvm::Value *;
-  std::unordered_map<std::pair<f_t, v_t>, SparseLLVMBasedCFG, FVHasher> Cache{};
+  std::unordered_map<std::pair<f_t, v_t>, SparseLLVMBasedCFG, PairHash> Cache{};
 
   LLVM_LIBRARY_VISIBILITY const SparseLLVMBasedCFG &
   getOrCreate(const LLVMBasedCFG &CFG, const llvm::Function *Fun,

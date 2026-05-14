@@ -230,7 +230,8 @@ template <> struct DenseMapInfo<psr::AbstractMemoryLocation> {
 
 namespace std {
 template <> struct hash<psr::AbstractMemoryLocation> {
-  size_t operator()(const psr::AbstractMemoryLocation &Val) const {
+  PSR_CXX23_STATIC size_t operator()(const psr::AbstractMemoryLocation &Val)
+      PSR_PRECXX23_CONST {
     return hash_value(Val);
   }
 };

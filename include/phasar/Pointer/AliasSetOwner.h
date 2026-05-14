@@ -16,11 +16,9 @@
 #include "phasar/Utils/StableVector.h"
 
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include <functional>
 #include <memory>
 #include <type_traits>
 

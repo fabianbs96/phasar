@@ -11,6 +11,7 @@
 #define PHASAR_UTILS_COMPRESSOR_H
 
 #include "phasar/Utils/ByRef.h"
+#include "phasar/Utils/HashUtils.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/TypedVector.h"
@@ -21,7 +22,6 @@
 #include <concepts>
 #include <cstdint>
 #include <deque>
-#include <functional>
 #include <optional>
 
 namespace psr {
@@ -222,11 +222,7 @@ private:
   struct DSI : llvm::DenseMapInfo<const T *> {
     static auto getHashValue(const T *Elem) noexcept {
       assert(Elem != nullptr);
-      if constexpr (has_llvm_dense_map_info<T>) {
-        return llvm::DenseMapInfo<T>::getHashValue(*Elem);
-      } else {
-        return std::hash<T>{}(*Elem);
-      }
+      return DefaultHash(*Elem);
     }
     static auto isEqual(const T *LHS, const T *RHS) noexcept {
       if (LHS == RHS) {

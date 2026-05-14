@@ -82,15 +82,17 @@ template <> struct DenseMapInfo<psr::vta::TAGNode> {
   using Field = psr::vta::Field;
   using Return = psr::vta::Return;
 
-  inline static TAGNode getEmptyKey() noexcept {
+  static TAGNode getEmptyKey() noexcept {
     return {Variable{llvm::DenseMapInfo<const llvm::Value *>::getEmptyKey()}};
   }
-  inline static TAGNode getTombstoneKey() noexcept {
+  static TAGNode getTombstoneKey() noexcept {
     return {
         Variable{llvm::DenseMapInfo<const llvm::Value *>::getTombstoneKey()}};
   }
-  inline static bool isEqual(TAGNode L, TAGNode R) noexcept { return L == R; }
-  inline static auto getHashValue(TAGNode TN) noexcept {
+  static constexpr bool isEqual(TAGNode L, TAGNode R) noexcept {
+    return L == R;
+  }
+  static auto getHashValue(TAGNode TN) noexcept {
     if (const auto *Var = std::get_if<Variable>(&TN.Label)) {
       return llvm::hash_combine(0, Var->Val);
     }
@@ -106,14 +108,12 @@ template <> struct DenseMapInfo<psr::vta::TAGNode> {
 
 template <> struct DenseMapInfo<psr::vta::TAGNodeId> {
   using GraphNodeId = psr::vta::TAGNodeId;
-  inline static GraphNodeId getEmptyKey() noexcept { return GraphNodeId(-1); }
-  inline static GraphNodeId getTombstoneKey() noexcept {
-    return GraphNodeId(-2);
-  }
-  inline static bool isEqual(GraphNodeId L, GraphNodeId R) noexcept {
+  static GraphNodeId getEmptyKey() noexcept { return GraphNodeId(-1); }
+  static GraphNodeId getTombstoneKey() noexcept { return GraphNodeId(-2); }
+  static constexpr bool isEqual(GraphNodeId L, GraphNodeId R) noexcept {
     return L == R;
   }
-  inline static auto getHashValue(GraphNodeId TN) noexcept {
+  static auto getHashValue(GraphNodeId TN) noexcept {
     return llvm::hash_value(uint32_t(TN));
   }
 };
@@ -132,15 +132,15 @@ struct TypeAssignmentGraph {
   llvm::SmallDenseMap<TAGNodeId, llvm::SmallDenseSet<TypeInfoTy>>
       TypeEntryPoints;
 
-  [[nodiscard]] inline std::optional<TAGNodeId> get(TAGNode TN) const noexcept {
+  [[nodiscard]] std::optional<TAGNodeId> get(TAGNode TN) const noexcept {
     return Nodes.getOrNull(TN);
   }
 
-  [[nodiscard]] inline TAGNode operator[](TAGNodeId Id) const noexcept {
+  [[nodiscard]] TAGNode operator[](TAGNodeId Id) const noexcept {
     return Nodes[Id];
   }
 
-  inline void addEdge(TAGNodeId From, TAGNodeId To) {
+  void addEdge(TAGNodeId From, TAGNodeId To) {
     assert(size_t(From) < Adj.size());
     assert(size_t(To) < Adj.size());
 

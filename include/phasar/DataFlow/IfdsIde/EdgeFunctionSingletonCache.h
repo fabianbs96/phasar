@@ -10,14 +10,7 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_EDGEFUNCTIONSINGLETONCACHE_H
 #define PHASAR_DATAFLOW_IFDSIDE_EDGEFUNCTIONSINGLETONCACHE_H
 
-#include "phasar/Utils/ByRef.h"
-
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/Support/ErrorHandling.h"
-
-#include <type_traits>
-
+#include <utility>
 namespace psr {
 
 template <typename EdgeFunctionTy> class EdgeFunctionSingletonCache;
