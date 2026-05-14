@@ -178,6 +178,8 @@ auto LLVMPathConstraints::handleCondBrInst(const llvm::BranchInst *Br,
     if (IgnoreDebugInstructions && llvm::isa<llvm::DbgInfoIntrinsic>(Ret)) {
       Ret = Ret->getNextNonDebugInstruction(false);
     }
+#else
+    (void)IgnoreDebugInstructions;
 #endif
     return Ret;
   };

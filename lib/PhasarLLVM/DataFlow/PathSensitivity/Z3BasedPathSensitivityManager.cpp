@@ -2,10 +2,12 @@
 #include "phasar/PhasarLLVM/DataFlow/PathSensitivity/Z3BasedPathSensitvityManager.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Logger.h"
+#include "phasar/Utils/StableVector.h"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Casting.h"
+
+#include <algorithm>
 
 namespace psr {
 z3::expr Z3BasedPathSensitivityManagerBase::filterOutUnreachableNodes(
@@ -425,9 +427,8 @@ private:
       return true;
     }
 
-    std::sort(LocalAtoms.begin(), LocalAtoms.end());
-    LocalAtoms.erase(std::unique(LocalAtoms.begin(), LocalAtoms.end()),
-                     LocalAtoms.end());
+    std::ranges::sort(LocalAtoms);
+    LocalAtoms.erase(std::ranges::unique(LocalAtoms).begin(), LocalAtoms.end());
     size_t NumLocalAtoms = LocalAtoms.size();
     size_t OldSize = SymbolicAtoms.size();
     SymbolicAtoms.insert(LocalAtoms.begin(), LocalAtoms.end());
@@ -491,9 +492,9 @@ auto Z3BasedPathSensitivityManagerBase::filterAndFlattenRevDag(
 
   n_t Prev = nullptr;
 
-  auto doFilter = [FinalInst, &Prev, &Filters, &RevDAG, &CurrPath, &Ret,
-                   &CompletedCtr, MaxNumPaths{Config.NumPathsThreshold},
-                   Leaf](auto &doFilter, vertex_t Vtx) {
+  const auto DoFilter = [FinalInst, &Prev, &Filters, &RevDAG, &CurrPath, &Ret,
+                         &CompletedCtr, MaxNumPaths{Config.NumPathsThreshold},
+                         Leaf](auto &DoFilter, vertex_t Vtx) {
     auto CurrPathSave = CurrPath.size();
     scope_exit RestoreCurrPath = [&CurrPath, CurrPathSave] {
       assert(CurrPathSave <= CurrPath.size());
@@ -548,12 +549,12 @@ auto Z3BasedPathSensitivityManagerBase::filterAndFlattenRevDag(
     /// TODO: Verify that we have no concurrent modification here and the
     /// iterator is never dangling!
     for (auto Edge : graph_traits_t::outEdges(RevDAG, Vtx)) {
-      doFilter(doFilter, graph_traits_t::target(Edge));
+      DoFilter(DoFilter, graph_traits_t::target(Edge));
     }
   };
 
   for (auto Rt : graph_traits_t::roots(RevDAG)) {
-    doFilter(doFilter, Rt);
+    DoFilter(DoFilter, Rt);
   }
 
   PHASAR_LOG_LEVEL_CAT(DEBUG, "PathSensitivityManager",
@@ -566,15 +567,14 @@ auto Z3BasedPathSensitivityManagerBase::filterAndFlattenRevDag(
 void Z3BasedPathSensitivityManagerBase::deduplicatePaths(
     FlowPathSequence<n_t> &Paths) {
   /// Some kind of lexical sort for being able to deduplicate the paths easily
-  std::sort(Paths.begin(), Paths.end(),
-            [](const FlowPath<n_t> &LHS, const FlowPath<n_t> &RHS) {
-              return LHS.size() < RHS.size() ||
-                     (LHS.size() == RHS.size() &&
-                      std::lexicographical_compare(LHS.begin(), LHS.end(),
-                                                   RHS.begin(), RHS.end()));
-            });
+  std::ranges::sort(Paths,
+                    [](const FlowPath<n_t> &LHS, const FlowPath<n_t> &RHS) {
+                      return LHS.size() < RHS.size() ||
+                             (LHS.size() == RHS.size() &&
+                              std::ranges::lexicographical_compare(LHS, RHS));
+                    });
 
-  Paths.erase(std::unique(Paths.begin(), Paths.end()), Paths.end());
+  Paths.erase(std::ranges::unique(Paths).begin(), Paths.end());
 }
 
 } // namespace psr

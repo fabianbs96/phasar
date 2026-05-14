@@ -1,6 +1,5 @@
 #include "phasar/PhasarLLVM/Utils/AllocatedTypes.h"
 
-#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Utils/LLVMIRToSrc.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 

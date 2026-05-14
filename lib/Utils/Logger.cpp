@@ -45,7 +45,7 @@ llvm::StringRef psr::to_string(SeverityLevel Level) noexcept {
 }
 
 namespace psr {
-namespace logger {
+namespace {
 
 struct StdOut {};
 struct StdErr {};
@@ -100,10 +100,9 @@ getLogStream(std::optional<SeverityLevel> Level,
 }
 
 template <typename StdStreamTy>
-void initializeLoggerImpl(std::optional<SeverityLevel> Level,
-                          const std::optional<std::string> &Category,
-                          StdStreamTy Stream) {
-  using namespace logger;
+static void initializeLoggerImpl(std::optional<SeverityLevel> Level,
+                                 const std::optional<std::string> &Category,
+                                 StdStreamTy Stream) {
   if (Category.has_value()) {
     CategoriesToStreamVariant[*Category].insert_or_assign(Level,
                                                           std::move(Stream));
@@ -112,7 +111,7 @@ void initializeLoggerImpl(std::optional<SeverityLevel> Level,
   }
 }
 
-} // namespace logger
+} // namespace
 
 void Logger::setLoggerFilterLevel(SeverityLevel Level) noexcept {
   assert(Level >= SeverityLevel::DEBUG && Level < SeverityLevel::INVALID);
@@ -123,7 +122,7 @@ void Logger::initializeStdoutLogger(
     std::optional<SeverityLevel> Level,
     const std::optional<std::string> &Category) {
   LoggingEnabled = true;
-  logger::initializeLoggerImpl(Level, Category, logger::StdOut{});
+  initializeLoggerImpl(Level, Category, StdOut{});
   LogFilterLevel = std::min(LogFilterLevel, Level.value_or(CRITICAL));
 }
 
@@ -131,7 +130,7 @@ void Logger::initializeStderrLogger(
     std::optional<SeverityLevel> Level,
     const std::optional<std::string> &Category) {
   LoggingEnabled = true;
-  logger::initializeLoggerImpl(Level, Category, logger::StdErr{});
+  initializeLoggerImpl(Level, Category, StdErr{});
   LogFilterLevel = std::min(LogFilterLevel, Level.value_or(CRITICAL));
 }
 
@@ -139,10 +138,9 @@ bool Logger::initializeFileLogger(llvm::StringRef Filename,
                                   std::optional<SeverityLevel> Level,
                                   const std::optional<std::string> &Category,
                                   bool Append) {
-  using logger::LogfileStreams;
 
   LoggingEnabled = true;
-  logger::initializeLoggerImpl(Level, Category, Filename.str());
+  initializeLoggerImpl(Level, Category, Filename.str());
   LogFilterLevel = std::min(LogFilterLevel, Level.value_or(CRITICAL));
 
   auto Flags = llvm::sys::fs::OpenFlags::OF_ChildInherit;
@@ -166,15 +164,14 @@ bool Logger::initializeFileLogger(llvm::StringRef Filename,
 llvm::raw_ostream &
 Logger::getLogStream(std::optional<SeverityLevel> Level,
                      const std::optional<llvm::StringRef> &Category) {
-  using namespace logger;
   if (Category.has_value()) {
     auto CategoryLookupIt = CategoriesToStreamVariant.find(*Category);
     if (CategoryLookupIt == CategoriesToStreamVariant.end()) {
       return llvm::nulls();
     }
-    return logger::getLogStream(Level, CategoryLookupIt->second);
+    return psr::getLogStream(Level, CategoryLookupIt->second);
   }
-  return logger::getLogStream(Level, LevelsToStreamVariant);
+  return psr::getLogStream(Level, LevelsToStreamVariant);
 }
 
 llvm::raw_ostream &Logger::getLogStreamWithLinePrefix(
@@ -187,7 +184,6 @@ llvm::raw_ostream &Logger::getLogStreamWithLinePrefix(
 
 bool Logger::logCategory(llvm::StringRef Category,
                          std::optional<SeverityLevel> Level) noexcept {
-  using namespace logger;
   auto CategoryLookupIt = CategoriesToStreamVariant.find(Category);
   if (CategoryLookupIt == CategoriesToStreamVariant.end()) {
     return false;
@@ -200,7 +196,7 @@ bool Logger::logCategory(llvm::StringRef Category,
     }
     return false;
   }
-  return CategoryLookupIt->second.count(Level);
+  return CategoryLookupIt->second.contains(Level);
 }
 
 void Logger::addLinePrefix(llvm::raw_ostream &OS,

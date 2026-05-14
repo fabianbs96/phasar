@@ -7,8 +7,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Casting.h"
 
-#include <cstdlib>
-
 using namespace psr;
 
 using FFTemplates = FlowFunctionTemplates<

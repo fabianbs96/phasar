@@ -15,6 +15,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include "nlohmann/json.hpp"
+
 namespace psr {
 
 static DIBasedTypeHierarchyData getDataFromJson(const nlohmann::json &Json) {

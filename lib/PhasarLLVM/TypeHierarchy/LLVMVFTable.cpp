@@ -29,7 +29,7 @@ const llvm::Function *LLVMVFTable::getFunction(unsigned Idx) const {
 }
 
 int LLVMVFTable::getIndex(const llvm::Function *F) const {
-  auto It = std::find(VFT.begin(), VFT.end(), F);
+  auto It = std::ranges::find(VFT, F);
   if (It != VFT.end()) {
     return std::distance(VFT.begin(), It);
   }

@@ -9,9 +9,11 @@
 
 #include "phasar/DataFlow/IfdsIde/IFDSIDESolverConfig.h"
 
+#include "llvm/Support/raw_os_ostream.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include <ostream>
 
-using namespace std;
 using namespace psr;
 
 namespace psr {
@@ -59,16 +61,26 @@ void IFDSIDESolverConfig::setComputePersistedSummaries(bool Set) {
 
 void IFDSIDESolverConfig::setConfig(SolverConfigOptions Opt) { Options = Opt; }
 
-ostream &operator<<(ostream &OS, const IFDSIDESolverConfig &SC) {
+} // namespace psr
+
+llvm::raw_ostream &psr::operator<<(llvm::raw_ostream &OS,
+                                   const IFDSIDESolverConfig &SC) {
+  const auto BoolStr = [](bool B) -> llvm::StringRef {
+    return B ? "true" : "false";
+  };
   return OS << "IFDSIDESolverConfig:\n"
-            << "\tfollowReturnsPastSeeds: " << SC.followReturnsPastSeeds()
-            << "\n"
-            << "\tautoAddZero: " << std::boolalpha << SC.autoAddZero() << "\n"
-            << "\tcomputeValues: " << SC.computeValues() << "\n"
-            << "\trecordEdges: " << SC.recordEdges() << "\n"
-            << "\tcomputePersistedSummaries: " << SC.computePersistedSummaries()
-            << "\n"
-            << "\temitESG: " << SC.emitESG();
+            << "\tfollowReturnsPastSeeds: "
+            << BoolStr(SC.followReturnsPastSeeds()) << '\n'
+            << "\tautoAddZero: " << BoolStr(SC.autoAddZero()) << '\n'
+            << "\tcomputeValues: " << BoolStr(SC.computeValues()) << '\n'
+            << "\trecordEdges: " << BoolStr(SC.recordEdges()) << '\n'
+            << "\tcomputePersistedSummaries: "
+            << BoolStr(SC.computePersistedSummaries()) << '\n'
+            << "\temitESG: " << BoolStr(SC.emitESG());
 }
 
-} // namespace psr
+std::ostream &psr::operator<<(std::ostream &OS, const IFDSIDESolverConfig &SC) {
+  llvm::raw_os_ostream ROS(OS);
+  ROS << SC;
+  return OS;
+}

@@ -17,14 +17,14 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "nlohmann/json.hpp"
 
 #include <string>
 
-namespace psr {
+using namespace psr;
+
 [[nodiscard]] std::string
 LLVMBasedICFG::exportICFGAsDot(bool WithSourceCodeInfo) const {
   std::string Ret;
@@ -145,12 +145,14 @@ LLVMBasedICFG::exportICFGAsDot(bool WithSourceCodeInfo) const {
   return Ret;
 }
 
+namespace {
+
 struct SourceCodeInfoWithIR : public SourceCodeInfo {
   std::string IR;
 };
 
-static void to_json(nlohmann::json &J, // NOLINT
-                    const SourceCodeInfoWithIR &Info) {
+void to_json(nlohmann::json &J, // NOLINT
+             const SourceCodeInfoWithIR &Info) {
   to_json(J, static_cast<const SourceCodeInfo &>(Info));
   J["IR"] = Info.IR;
 }
@@ -261,10 +263,10 @@ struct GetIR {
 };
 
 template <typename GetSCIFn, typename EdgeCallBack>
-static void exportICFGAsSourceCodeImpl(const LLVMBasedICFG &ICF,
-                                       GetSCIFn getSCI, // NOLINT
-                                       EdgeCallBack &&CreateEdge,
-                                       bool IgnoreDbgInstructions) {
+void exportICFGAsSourceCodeImpl(const LLVMBasedICFG &ICF,
+                                GetSCIFn getSCI, // NOLINT
+                                EdgeCallBack &&CreateEdge,
+                                bool IgnoreDbgInstructions) {
 
   // NOLINTNEXTLINE(readability-identifier-naming)
   // auto isRetVoid = [](const llvm::Instruction *Inst) noexcept {
@@ -337,6 +339,7 @@ static void exportICFGAsSourceCodeImpl(const LLVMBasedICFG &ICF,
     }
   }
 }
+} // namespace
 
 [[nodiscard]] nlohmann::json
 LLVMBasedICFG::exportICFGAsJson(bool WithSourceCodeInfo) const {
@@ -359,4 +362,3 @@ LLVMBasedICFG::exportICFGAsJson(bool WithSourceCodeInfo) const {
   }
   return J;
 }
-} // namespace psr

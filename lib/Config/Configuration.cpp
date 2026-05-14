@@ -28,7 +28,6 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 
-#include <cstdlib>
 #include <iterator>
 #include <system_error>
 

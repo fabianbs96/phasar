@@ -15,9 +15,6 @@
 #include "phasar/Pointer/AliasAnalysisType.h"
 #include "phasar/Pointer/AliasResult.h"
 
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
@@ -26,7 +23,6 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Value.h"
@@ -41,7 +37,7 @@ using namespace psr;
 namespace psr {
 
 bool LLVMBasedAliasAnalysis::hasAliasInfo(const llvm::Function &Fun) const {
-  return AAInfos.find(&Fun) != AAInfos.end();
+  return AAInfos.contains(&Fun);
 }
 
 void LLVMBasedAliasAnalysis::computeAliasInfo(llvm::Function &Fun) {
@@ -114,12 +110,12 @@ static AliasResult translateAAResult(llvm::AliasResult Res) noexcept {
   switch (Res) {
   case llvm::AliasResult::NoAlias:
     return AliasResult::NoAlias;
-  case llvm::AliasResult::MayAlias:
-    return AliasResult::MayAlias;
   case llvm::AliasResult::PartialAlias:
     return AliasResult::PartialAlias;
   case llvm::AliasResult::MustAlias:
     return AliasResult::MustAlias;
+  default:
+    return AliasResult::MayAlias;
   }
 }
 

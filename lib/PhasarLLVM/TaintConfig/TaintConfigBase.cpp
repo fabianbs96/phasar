@@ -172,7 +172,7 @@ psr::TaintConfigData psr::parseTaintConfig(const llvm::Twine &Path) {
   Validator.set_root_schema(TaintConfigSchema);
   Validator.validate(*TaintConfig);
 
-  nlohmann::json Config = *TaintConfig;
+  const auto &Config = *TaintConfig;
 
   TaintConfigData Data{};
   loadFunctions(Config, Data.Functions);

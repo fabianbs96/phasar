@@ -3,7 +3,6 @@
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/RTAResolver.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
@@ -204,7 +203,7 @@ bool Builder::constructDynamicCall(const llvm::Instruction *CS) {
 
   auto PossibleTargets = Res->resolveIndirectCall(CallSite);
 
-  assert(IndirectCalls.count(CallSite));
+  assert(IndirectCalls.contains(CallSite));
   auto &NumIndCalls = IndirectCalls[CallSite];
 
   if (NumIndCalls >= PossibleTargets.size()) {

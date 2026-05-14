@@ -631,6 +631,8 @@ psr::getVarAnnotationIntrinsicName(const llvm::CallInst *CallInst) {
   return Data->getAsCString();
 }
 
+namespace {
+
 struct PhasarModuleSlotTrackerWrapper {
   PhasarModuleSlotTrackerWrapper(const llvm::Module *M) : MST(M) {}
 
@@ -638,11 +640,13 @@ struct PhasarModuleSlotTrackerWrapper {
   size_t RefCount = 0;
 };
 
-static llvm::SmallDenseMap<const llvm::Module *,
-                           std::unique_ptr<PhasarModuleSlotTrackerWrapper>, 2>
+llvm::SmallDenseMap<const llvm::Module *,
+                    std::unique_ptr<PhasarModuleSlotTrackerWrapper>, 2>
     MToST{};
 
-static std::mutex MSTMx;
+std::mutex MSTMx;
+
+} // namespace
 
 llvm::ModuleSlotTracker &
 ModulesToSlotTracker::getSlotTrackerForModule(const llvm::Module *M) {

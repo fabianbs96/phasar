@@ -148,7 +148,7 @@ bool psr::isHeapAllocatingFunction(llvm::StringRef FName) noexcept {
   static const llvm::DenseSet<llvm::StringRef> HAFs(
       std::begin(HeapAllocatingFunNames), std::end(HeapAllocatingFunNames));
 
-  return HAFs.count(FName);
+  return HAFs.contains(FName);
 }
 
 bool psr::isSingletonReturningFunction(llvm::StringRef FName) noexcept {
@@ -156,5 +156,5 @@ bool psr::isSingletonReturningFunction(llvm::StringRef FName) noexcept {
       std::begin(SingletonReturningFunctions),
       std::end(SingletonReturningFunctions));
 
-  return SRFs.count(FName);
+  return SRFs.contains(FName);
 }

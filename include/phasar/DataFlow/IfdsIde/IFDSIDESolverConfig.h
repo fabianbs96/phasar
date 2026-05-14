@@ -20,6 +20,7 @@
 #include "phasar/Utils/EnumFlags.h"
 
 #include <cstdint>
+#include <iosfwd>
 
 namespace llvm {
 class raw_ostream;
@@ -79,6 +80,8 @@ struct IFDSIDESolverConfig {
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                        const IFDSIDESolverConfig &SC);
+  friend std::ostream &operator<<(std::ostream &OS,
+                                  const IFDSIDESolverConfig &SC);
 
 private:
   SolverConfigOptions Options =

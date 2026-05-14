@@ -178,7 +178,7 @@ void DOTFunctionSubGraph::createLayoutCFNodes() {
 void DOTFunctionSubGraph::createLayoutFactNodes() {
   for (auto &[Key, FactSG] : Facts) {
     for (const auto &Stmt : Stmts) {
-      if (FactSG.Nodes.find(Stmt.StmtId) == FactSG.Nodes.end()) {
+      if (!FactSG.Nodes.contains(Stmt.StmtId)) {
         DOTNode FactNode(Stmt.FuncName, FactSG.Label, Stmt.StmtId,
                          FactSG.FactId, false, false);
         FactSG.Nodes[Stmt.StmtId] = FactNode;
@@ -237,7 +237,7 @@ void DOTConfig::importDOTConfig(llvm::StringRef ConfigPath) {
       Iss >> JDOTConfig;
       for (const auto &El : JDOTConfig.items()) {
         std::stringstream AttrStr;
-        if (El.key().find("Node") != std::string::npos) {
+        if (El.key().contains("Node")) {
           AttrStr << "node [";
         } else {
           AttrStr << "edge [";

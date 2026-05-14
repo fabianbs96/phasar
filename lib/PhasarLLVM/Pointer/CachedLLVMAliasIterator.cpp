@@ -100,7 +100,7 @@ bool CachedLLVMAliasIterator::isInReachableAllocationSites(
 
   if (PVIsReachableAllocationSiteType) {
     const auto PTS = getAliasSet(V, I);
-    return PTS->count(PotentialValue);
+    return PTS->contains(PotentialValue);
   }
 
   return false;

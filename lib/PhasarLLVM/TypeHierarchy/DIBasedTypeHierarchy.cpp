@@ -89,10 +89,12 @@ buildVTables(const llvm::DebugInfoFinder &DIF,
   return VT;
 }
 
+namespace {
 struct TypeGraph {
   llvm::SmallBitVector Roots;
   llvm::SmallVector<llvm::SmallVector<uint32_t>> DerivedTypesOf;
 };
+} // namespace
 
 static TypeGraph
 buildTypeGraph(llvm::ArrayRef<const llvm::DICompositeType *> VertexTypes,

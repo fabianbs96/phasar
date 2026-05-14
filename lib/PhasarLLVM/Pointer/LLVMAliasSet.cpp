@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -191,7 +192,7 @@ void LLVMAliasSet::addSingletonAliasSet(const llvm::Value *V) {
   auto [It, Inserted] = AliasSets.try_emplace(V, nullptr);
 
   if (!Inserted) {
-    assert(It->second->count(V));
+    assert(It->second->contains(V));
     return;
   }
 
@@ -531,8 +532,8 @@ AliasResult LLVMAliasSet::alias(const llvm::Value *V1, const llvm::Value *V2,
   }
   computeValuesAliasSet(V1);
   computeValuesAliasSet(V2);
-  return AliasSets[V1]->count(V2) ? AliasResult::MayAlias
-                                  : AliasResult::NoAlias;
+  return AliasSets[V1]->contains(V2) ? AliasResult::MayAlias
+                                     : AliasResult::NoAlias;
 }
 
 auto LLVMAliasSet::getEmptyAliasSet() -> BoxedPtr<AliasSetTy> {
@@ -617,7 +618,7 @@ bool LLVMAliasSet::isInReachableAllocationSites(
 
   if (PVIsReachableAllocationSiteType) {
     const auto PTS = AliasSets[V];
-    return PTS->count(PotentialValue);
+    return PTS->contains(PotentialValue);
   }
 
   return false;
@@ -745,10 +746,7 @@ void LLVMAliasSet::drawAliasSetsDistribution(int Peak) const {
     }
   }
 
-  std::sort(SizeAmountPairs.begin(), SizeAmountPairs.end(),
-            [](const auto &KVPair1, const auto &KVPair2) {
-              return KVPair1.first < KVPair2.first;
-            });
+  std::ranges::sort(SizeAmountPairs, llvm::less_first{});
 
   int TotalValues = std::accumulate(
       SizeAmountPairs.begin(), SizeAmountPairs.end(), 0,

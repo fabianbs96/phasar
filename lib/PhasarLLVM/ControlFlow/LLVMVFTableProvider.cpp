@@ -119,7 +119,7 @@ LLVMVFTableProvider::LLVMVFTableProvider(const LLVMProjectIRDB &IRDB)
     : LLVMVFTableProvider(*IRDB.getModule()) {}
 
 bool LLVMVFTableProvider::hasVFTable(const llvm::DIType *Type) const {
-  return TypeVFTMap.count({Type, 0});
+  return TypeVFTMap.contains({Type, 0});
 }
 
 const LLVMVFTable *

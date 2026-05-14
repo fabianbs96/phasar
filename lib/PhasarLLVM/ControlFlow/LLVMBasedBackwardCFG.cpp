@@ -39,7 +39,7 @@ auto LLVMBasedBackwardCFG::getFunctionOfImpl(n_t Inst) const noexcept -> f_t {
 
 auto LLVMBasedBackwardCFG::getPredsOfImpl(n_t Inst) const
     -> llvm::SmallVector<n_t, 2> {
-  if (BackwardRetToFunction.count(Inst)) {
+  if (BackwardRetToFunction.contains(Inst)) {
     return this
         ->detail::LLVMBasedCFGImpl<LLVMBasedBackwardCFG>::getStartPointsOf(
             this->base_t::getFunctionOfImpl(Inst));
@@ -49,7 +49,7 @@ auto LLVMBasedBackwardCFG::getPredsOfImpl(n_t Inst) const
 
 auto LLVMBasedBackwardCFG ::getSuccsOfImpl(n_t Inst) const
     -> llvm::SmallVector<n_t, 2> {
-  if (BackwardRetToFunction.count(Inst)) {
+  if (BackwardRetToFunction.contains(Inst)) {
     return {};
   }
 
