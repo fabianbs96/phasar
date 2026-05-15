@@ -24,9 +24,11 @@
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/LibCSummary.h"
 #include "phasar/Utils/Logger.h"
+#include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
@@ -77,7 +79,7 @@ bool IFDSTaintAnalysis::isSourceCall(const llvm::CallBase *CB,
     return false;
   }
 
-  if (AdditionalFacts.count(CB)) {
+  if (AdditionalFacts.contains(CB)) {
     return true;
   }
 
@@ -105,7 +107,7 @@ bool IFDSTaintAnalysis::isSinkCall(const llvm::CallBase *CB,
     return false;
   }
 
-  if (AdditionalLeaks.count(CB)) {
+  if (AdditionalLeaks.contains(CB)) {
     return true;
   }
 
@@ -157,10 +159,11 @@ static bool isCompiletimeConstantData(const llvm::Value *Val) noexcept {
   return llvm::isa<llvm::Function>(Val) || llvm::isa<llvm::ConstantData>(Val);
 }
 
-void IFDSTaintAnalysis::populateWithMayAliases(
-    container_type &Facts, const llvm::Instruction *AliasQueryInst) const {
+static void populateWithMayAliases(container_type &Facts,
+                                   const llvm::Instruction *AliasQueryInst,
+                                   LLVMAliasInfoRef PT) {
   container_type Tmp;
-  Tmp.reserve(Facts.size() * 2);
+  reserveIfPossible(Tmp, Facts.size() * 2);
   const auto *QueryFun = AliasQueryInst->getFunction();
   // container_type Tmp = Facts;
   for (const auto *Fact : Facts) {
@@ -190,8 +193,9 @@ void IFDSTaintAnalysis::populateWithMayAliases(
   Facts = std::move(Tmp);
 }
 
-void IFDSTaintAnalysis::populateWithMustAliases(
-    container_type &Facts, const llvm::Instruction *AliasQueryInst) const {
+static void populateWithMustAliases(auto &Facts,
+                                    const llvm::Instruction *AliasQueryInst,
+                                    LLVMAliasInfoRef PT) {
   /// TODO: Find must-aliases; Currently the AliasSet only contains
   /// may-aliases
 }
@@ -287,7 +291,7 @@ auto IFDSTaintAnalysis::getNormalFlowFunction(n_t Curr,
   if (const auto *Store = llvm::dyn_cast<llvm::StoreInst>(Curr)) {
     container_type Gen;
     Gen.insert(Store->getPointerOperand());
-    populateWithMayAliases(Gen, Store);
+    populateWithMayAliases(Gen, Store, PT);
     if (Store->getValueOperand()->hasNUsesOrMore(2)) {
       Gen.insert(Store->getValueOperand());
     }
@@ -402,7 +406,7 @@ auto IFDSTaintAnalysis::getRetFlowFunction(n_t CallSite, f_t /*CalleeFun*/,
       [](d_t RetVal, d_t Source) { return RetVal == Source; }, {}, true, true,
       [this, CallSite](container_type &Res) {
         // Correctly handling return-POIs
-        populateWithMayAliases(Res, CallSite);
+        populateWithMayAliases(Res, CallSite, PT);
       });
   // All other stuff is killed at this point
 }
@@ -440,19 +444,19 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
 
   const auto *CS = llvm::cast<llvm::CallBase>(CallSite);
   container_type Gen;
-  container_type Leak;
-  container_type Kill;
+  llvm::SmallPtrSet<d_t, 4> Leak;
+  llvm::SmallPtrSet<d_t, 4> Kill;
 
   // Process the effects of source or sink functions that are called
   collectGeneratedFacts(Gen, *Config, CS, DestFun);
   collectLeakedFacts(Leak, *Config, CS, DestFun);
   collectSanitizedFacts(Kill, *Config, CS, DestFun);
 
-  populateWithMayAliases(Gen, CallSite);
+  populateWithMayAliases(Gen, CallSite, PT);
   /// We now generate all aliases within the flow functions as facts, so we can
   /// safely just check for the sink values here
   // populateWithMayAliases(Leak, CallSite);
-  populateWithMustAliases(Kill, CallSite);
+  populateWithMustAliases(Kill, CallSite, PT);
 
   if (Gen.empty() && Leak.empty() && Kill.empty()) {
     if (Llvmfdff.contains(DestFun)) {
@@ -490,7 +494,7 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
 
   if (CS->hasStructRetAttr()) {
     const auto *SRet = CS->getArgOperand(0);
-    if (!Gen.count(SRet)) {
+    if (!Gen.contains(SRet)) {
       // SRet is guaranteed to be written to by the call. If it does not
       // generate it, we can freely kill it
       Kill.insert(SRet);
@@ -500,14 +504,14 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
     if (!Leak.empty() || !Kill.empty()) {
       return lambdaFlow([Leak{std::move(Leak)}, Kill{std::move(Kill)}, this,
                          CallSite](d_t Source) -> container_type {
-        if (Leak.count(Source)) {
+        if (Leak.contains(Source)) {
           if (Leaks[CallSite].insert(Source).second) {
             Printer->onResult(CallSite, Source,
                               DataFlowAnalysisType::IFDSTaintAnalysis);
           }
         }
 
-        if (Kill.count(Source)) {
+        if (Kill.contains(Source)) {
           return {};
         }
 
@@ -528,7 +532,7 @@ auto IFDSTaintAnalysis::getSummaryFlowFunction([[maybe_unused]] n_t CallSite,
       return Gen;
     }
 
-    if (Leak.count(Source)) {
+    if (Leak.contains(Source)) {
       if (Leaks[CallSite].insert(Source).second) {
         Printer->onResult(CallSite, Source,
                           DataFlowAnalysisType::IFDSTaintAnalysis);

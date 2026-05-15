@@ -17,9 +17,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 
-#include <algorithm>
 #include <concepts>
-#include <iterator>
 #include <type_traits>
 
 namespace psr {
@@ -54,12 +52,13 @@ void collectLeakedFacts(ContainerTy &Dest, const LLVMTaintConfig &Config,
   const auto &Callback = Config.getRegisteredSinkCallBack();
   if (Callback) {
     auto CBLeaks = Callback(CB);
-    auto FilterRng = llvm::make_filter_range(CBLeaks, PSR_FWD(LeakIf));
-    CBLeaks.insert(FilterRng.begin(), FilterRng.end());
+    auto FilterRng = llvm::make_filter_range(CBLeaks, LeakIf);
+    Dest.insert(FilterRng.begin(), FilterRng.end());
   }
 
   for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
-    if (Config.isSink(Callee->getArg(I)) && LeakIf(CB->getArgOperand(I))) {
+    if (Config.isSink(Callee->getArg(I)) &&
+        std::invoke(LeakIf, CB->getArgOperand(I))) {
       Dest.insert(CB->getArgOperand(I));
     }
   }

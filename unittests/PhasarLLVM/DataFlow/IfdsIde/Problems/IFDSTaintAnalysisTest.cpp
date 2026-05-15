@@ -84,6 +84,7 @@ protected:
       TSF = getDefaultConfig();
     }
 
+    // TSF->print();
     TaintProblem =
         createAnalysisProblem<IFDSTaintAnalysis>(*HA, &*TSF, EntryPoints);
   }
@@ -114,6 +115,7 @@ TEST_F(IFDSTaintAnalysisTest, TaintTest_01) {
   initialize({PathToLlFiles + "dummy_source_sink/taint_01_cpp_dbg.ll"});
   IFDSSolver TaintSolver(*TaintProblem, &HA->getICFG());
   TaintSolver.solve();
+  // TaintSolver.dumpResults();
 
   auto Entry = LineColFun{6, 3, "main"};
   auto EntryTwo = LineColFun{6, 8, "main"};

@@ -56,24 +56,18 @@ public:
       if (Elem == Arr.back()) {
         return;
       }
-      Dirty |= !(Elem > Arr.back());
+      Dirty |= Elem < Arr.back();
     }
 
     Arr.emplace_back(PSR_FWD(Elem));
   }
 
   template <typename IterT> auto insert(IterT From, IterT To) {
-    if (requires {
-          { To - From } -> std::convertible_to<ptrdiff_t>;
-        }) {
-      reserve(size() + std::distance(From, To));
+    if (From == To) {
+      return;
     }
-    for (; From != To; ++From) {
-      insert(*From);
-    }
-    // Dirty |= !std::is_sorted(From, To);
-    // Arr.append(std::move(From), std::move(To));
-    // TODO: Do something clever here
+    Arr.append(From, To);
+    Dirty |= !(empty() || *From >= Arr.back()) || !std::is_sorted(From, To);
   }
 
   [[nodiscard]] iterator begin() noexcept {
@@ -115,8 +109,8 @@ public:
     if (!Dirty) {
       return;
     }
-    std::sort(Arr.begin(), Arr.end());
-    Arr.erase(std::unique(Arr.begin(), Arr.end()), Arr.end());
+    std::ranges::sort(Arr);
+    Arr.erase(std::ranges::unique(Arr).begin(), Arr.end());
     Dirty = false;
   }
 

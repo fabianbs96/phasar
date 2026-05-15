@@ -42,6 +42,7 @@ class LLVMTaintConfig;
  */
 class IFDSTaintAnalysis
     : public IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault,
+                                   //  std::set<const llvm::Value *>
                                    SmallArraySet<const llvm::Value *>> {
   struct KillsAtFn {
     const IFDSTaintAnalysis *Self{};
@@ -109,11 +110,6 @@ private:
   bool isSinkCall(const llvm::CallBase *CB, const llvm::Function *Callee) const;
   bool isSanitizerCall(const llvm::CallBase *CB,
                        const llvm::Function *Callee) const;
-
-  void populateWithMayAliases(container_type &Facts,
-                              const llvm::Instruction *AliasQueryInst) const;
-  void populateWithMustAliases(container_type &Facts,
-                               const llvm::Instruction *AliasQueryInst) const;
 };
 } // namespace psr
 

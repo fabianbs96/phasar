@@ -4,6 +4,7 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
 #include "phasar/Domain/LatticeDomain.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
 #include "phasar/PhasarLLVM/Utils/LLVMShorthands.h"
 #include "phasar/Utils/Fn.h"
 #include "phasar/Utils/Logger.h"
@@ -434,11 +435,9 @@ cfl_fieldsens::makeInitialSeeds(
   return {std::move(Ret)};
 }
 
-auto CFLFieldSensIFDSProblem::getStoreEdgeFunction(d_t CurrNode, d_t SuccNode,
-                                                   d_t PointerOp, d_t ValueOp,
-                                                   uint8_t DepthKLimit,
-                                                   const llvm::DataLayout &DL)
-    -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::getStoreEdgeFunction(
+    d_t CurrNode, d_t SuccNode, d_t PointerOp, d_t ValueOp, uint8_t DepthKLimit,
+    const llvm::DataLayout &DL) -> EdgeFunction<l_t> {
   auto [BasePtr, Offset] = getBaseAndOffset(PointerOp, DL);
 
   // TODO;: How to deal with BasePtr?
@@ -486,9 +485,9 @@ auto CFLFieldSensIFDSProblem::getStoreEdgeFunction(d_t CurrNode, d_t SuccNode,
   return EdgeIdentity<l_t>{};
 }
 
-auto CFLFieldSensIFDSProblem::getNormalEdgeFunction(n_t Curr, d_t CurrNode,
-                                                    n_t /*Succ*/, d_t SuccNode)
-    -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::
+    getNormalEdgeFunctionImpl(n_t Curr, d_t CurrNode, n_t /*Succ*/,
+                              d_t SuccNode) -> EdgeFunction<l_t> {
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "[getNormalEdgeFunction]:");
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "  Curr: " << NToString(Curr));
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
@@ -496,7 +495,8 @@ auto CFLFieldSensIFDSProblem::getNormalEdgeFunction(n_t Curr, d_t CurrNode,
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
                        "  SuccNode: " << DToString(SuccNode));
 
-  if (isZeroValue(CurrNode) && !isZeroValue(SuccNode)) {
+  if (LLVMZeroValue::isLLVMZeroValue(CurrNode) &&
+      !LLVMZeroValue::isLLVMZeroValue(SuccNode)) {
     // Gen from zero
 
     return CFLFieldSensEdgeFunction::fromEpsilon(DepthKLimit, Mgr);
@@ -538,10 +538,10 @@ auto CFLFieldSensIFDSProblem::getNormalEdgeFunction(n_t Curr, d_t CurrNode,
   return EdgeIdentity<l_t>{};
 }
 
-auto CFLFieldSensIFDSProblem::getCallEdgeFunction(n_t CallSite, d_t SrcNode,
-                                                  f_t /*DestinationFunction*/,
-                                                  d_t DestNode)
-    -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::
+    getCallEdgeFunctionImpl(n_t CallSite, d_t SrcNode,
+                            f_t /*DestinationFunction*/, d_t DestNode)
+        -> EdgeFunction<l_t> {
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "[getCallEdgeFunction]");
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "  Curr: " << NToString(CallSite));
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
@@ -549,7 +549,8 @@ auto CFLFieldSensIFDSProblem::getCallEdgeFunction(n_t CallSite, d_t SrcNode,
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
                        "  SuccNode: " << DToString(DestNode));
 
-  if (isZeroValue(SrcNode) && !isZeroValue(DestNode)) {
+  if (LLVMZeroValue::isLLVMZeroValue(SrcNode) &&
+      !LLVMZeroValue::isLLVMZeroValue(DestNode)) {
     // Gen from zero
 
     return CFLFieldSensEdgeFunction::fromEpsilon(DepthKLimit, Mgr);
@@ -559,9 +560,10 @@ auto CFLFieldSensIFDSProblem::getCallEdgeFunction(n_t CallSite, d_t SrcNode,
   return EdgeIdentity<l_t>{};
 }
 
-auto CFLFieldSensIFDSProblem::getReturnEdgeFunction(
-    n_t /*CallSite*/, f_t /*CalleeFunction*/, n_t ExitStmt, d_t ExitNode,
-    n_t /*RetSite*/, d_t RetNode) -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::
+    getReturnEdgeFunctionImpl(n_t /*CallSite*/, f_t /*CalleeFunction*/,
+                              n_t ExitStmt, d_t ExitNode, n_t /*RetSite*/,
+                              d_t RetNode) -> EdgeFunction<l_t> {
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "[getReturnEdgeFunction]");
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "  Curr: " << NToString(ExitStmt));
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
@@ -569,7 +571,8 @@ auto CFLFieldSensIFDSProblem::getReturnEdgeFunction(
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory,
                        "  SuccNode: " << DToString(RetNode));
 
-  if (isZeroValue(ExitNode) && !isZeroValue(RetNode)) {
+  if (LLVMZeroValue::isLLVMZeroValue(ExitNode) &&
+      !LLVMZeroValue::isLLVMZeroValue(RetNode)) {
     // Gen from zero
 
     return CFLFieldSensEdgeFunction::fromEpsilon(DepthKLimit, Mgr);
@@ -578,9 +581,11 @@ auto CFLFieldSensIFDSProblem::getReturnEdgeFunction(
   return EdgeIdentity<l_t>{};
 }
 
-auto CFLFieldSensIFDSProblem::getCallToRetEdgeFunction(
-    n_t CallSite, d_t CallNode, n_t /*RetSite*/, d_t RetSiteNode,
-    llvm::ArrayRef<f_t> /*Callees*/) -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::
+    getCallToRetEdgeFunctionImpl(n_t CallSite, d_t CallNode, n_t /*RetSite*/,
+                                 d_t RetSiteNode,
+                                 llvm::ArrayRef<f_t> /*Callees*/)
+        -> EdgeFunction<l_t> {
 
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "[getCallToRetEdgeFunction]");
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "  Curr: " << NToString(CallSite));
@@ -599,7 +604,8 @@ auto CFLFieldSensIFDSProblem::getCallToRetEdgeFunction(
     }
   }
 
-  if (isZeroValue(CallNode) && !isZeroValue(RetSiteNode)) {
+  if (LLVMZeroValue::isLLVMZeroValue(CallNode) &&
+      !LLVMZeroValue::isLLVMZeroValue(RetSiteNode)) {
     // Gen from zero
 
     return CFLFieldSensEdgeFunction::fromEpsilon(DepthKLimit, Mgr);
@@ -609,9 +615,9 @@ auto CFLFieldSensIFDSProblem::getCallToRetEdgeFunction(
   return EdgeIdentity<l_t>{};
 }
 
-auto CFLFieldSensIFDSProblem::getSummaryEdgeFunction(n_t Curr, d_t CurrNode,
-                                                     n_t /*Succ*/, d_t SuccNode)
-    -> EdgeFunction<l_t> {
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::
+    getSummaryEdgeFunctionImpl(n_t Curr, d_t CurrNode, n_t /*Succ*/,
+                               d_t SuccNode) -> EdgeFunction<l_t> {
 
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "[getSummaryEdgeFunction]");
   PHASAR_LOG_LEVEL_CAT(DEBUG, LogCategory, "  Curr: " << NToString(Curr));
@@ -635,7 +641,8 @@ auto CFLFieldSensIFDSProblem::getSummaryEdgeFunction(n_t Curr, d_t CurrNode,
     }
   }
 
-  if (isZeroValue(CurrNode) && !isZeroValue(SuccNode)) {
+  if (LLVMZeroValue::isLLVMZeroValue(CurrNode) &&
+      !LLVMZeroValue::isLLVMZeroValue(SuccNode)) {
     // Gen from zero
 
     return CFLFieldSensEdgeFunction::fromEpsilon(DepthKLimit, Mgr);
@@ -672,8 +679,8 @@ static void klimitPaths(auto &Paths, FieldStringManager &Mgr) {
 
 static constexpr ptrdiff_t BreadthKLimit = 5;
 
-auto CFLFieldSensIFDSProblem::extend(const EdgeFunction<l_t> &L,
-                                     const EdgeFunction<l_t> &R)
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::extendImpl(
+    const EdgeFunction<l_t> &L, const EdgeFunction<l_t> &R)
     -> EdgeFunction<l_t> {
   auto Ret = [&]() -> EdgeFunction<l_t> {
     if (auto DfltCompose = psr::defaultComposeOrNull(L, R)) {
@@ -719,8 +726,8 @@ auto CFLFieldSensIFDSProblem::extend(const EdgeFunction<l_t> &L,
   return Ret;
 }
 
-auto CFLFieldSensIFDSProblem::combine(const EdgeFunction<l_t> &L,
-                                      const EdgeFunction<l_t> &R)
+auto cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::combineImpl(
+    const EdgeFunction<l_t> &L, const EdgeFunction<l_t> &R)
     -> EdgeFunction<l_t> {
   auto Ret = [&]() -> EdgeFunction<l_t> {
     if (auto Dflt = defaultJoinOrNullNoId(L, R)) {

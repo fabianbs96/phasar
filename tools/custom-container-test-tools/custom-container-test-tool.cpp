@@ -26,7 +26,8 @@ int main(int Argc, const char **Argv) {
 
   HelperAnalyses HA(Argv[1], EntryPoints,
                     {
-                        .CGTy = CallGraphAnalysisType::RTA,
+                        .CGTy = CallGraphAnalysisType::VTA,
+
                     });
   if (!HA.getProjectIRDB().isValid()) {
     return 1;
@@ -39,8 +40,6 @@ int main(int Argc, const char **Argv) {
 
     auto TaintProblem = createAnalysisProblem<IFDSTaintAnalysis>(
         HA, &DefaultConfig, EntryPoints);
-
-    // TODO: InterativeTypeSolver austesten
 
     IterativeIDESolver S(&TaintProblem, &HA.getICFG());
 

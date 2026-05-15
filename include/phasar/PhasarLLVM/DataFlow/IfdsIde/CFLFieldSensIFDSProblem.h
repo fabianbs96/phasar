@@ -21,6 +21,7 @@
 #include "phasar/Utils/Compressor.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/MapUtils.h"
+#include "phasar/Utils/NonNullPtr.h"
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/TypedVector.h"
 #include "phasar/Utils/Utilities.h"
@@ -214,7 +215,7 @@ struct IFDSEdgeValue {
     return !(*this == Other);
   }
 
-  [[nodiscard]] friend auto hash_value(const IFDSEdgeValue EV) {
+  [[nodiscard]] friend auto hash_value(const IFDSEdgeValue &EV) {
     return llvm::hash_combine_range(EV.Paths.begin(), EV.Paths.end());
   }
 
@@ -363,6 +364,52 @@ bool filterFieldSensFacts(
   return true;
 }
 
+namespace detail {
+class CFLFieldSensIFDSProblemBase : IFDSDomain {
+public:
+  static constexpr llvm::StringLiteral LogCategory = "CFLFieldSensIFDSProblem";
+
+  EdgeFunction<l_t> getStoreEdgeFunction(d_t CurrNode, d_t SuccNode,
+                                         d_t PointerOp, d_t ValueOp,
+                                         uint8_t DepthKLimit,
+                                         const llvm::DataLayout &DL);
+
+  EdgeFunction<l_t> getNormalEdgeFunctionImpl(n_t Curr, d_t CurrNode, n_t Succ,
+                                              d_t SuccNode);
+
+  EdgeFunction<l_t> getCallEdgeFunctionImpl(n_t CallSite, d_t SrcNode,
+                                            f_t DestinationFunction,
+                                            d_t DestNode);
+
+  EdgeFunction<l_t> getReturnEdgeFunctionImpl(n_t CallSite, f_t CalleeFunction,
+                                              n_t ExitStmt, d_t ExitNode,
+                                              n_t RetSite, d_t RetNode);
+
+  EdgeFunction<l_t> getCallToRetEdgeFunctionImpl(n_t CallSite, d_t CallNode,
+                                                 n_t RetSite, d_t RetSiteNode,
+                                                 llvm::ArrayRef<f_t> Callees);
+
+  EdgeFunction<l_t> getSummaryEdgeFunctionImpl(n_t Curr, d_t CurrNode, n_t Succ,
+                                               d_t SuccNode);
+
+  EdgeFunction<l_t> extendImpl(const EdgeFunction<l_t> &L,
+                               const EdgeFunction<l_t> &R);
+
+  EdgeFunction<l_t> combineImpl(const EdgeFunction<l_t> &L,
+                                const EdgeFunction<l_t> &R);
+
+protected:
+  CFLFieldSensIFDSProblemBase(IFDSProblemConfig &&Config,
+                              NonNullPtr<const LLVMProjectIRDB> IRDB)
+      : Config(std::move(Config)), IRDB(IRDB) {}
+
+  FieldStringManager Mgr{};
+  IFDSProblemConfig Config{};
+  NonNullPtr<const LLVMProjectIRDB> IRDB;
+  uint8_t DepthKLimit = 5; // Original from the paper
+};
+} // namespace detail
+
 } // namespace cfl_fieldsens
 
 /// An IFDS-Problem adaptor that makes any field-insensitive IFDS analysis
@@ -375,12 +422,18 @@ bool filterFieldSensFacts(
 /// the FieldSensAllocSitesAwareIFDSProblem. For that, provide a
 /// FieldSensAllocSitesAwareIFDSProblemConfig with a proper KillsAt
 /// implementation.
+template <typename ProblemT>
+  requires std::same_as<typename ProblemT::ProblemAnalysisDomain,
+                        LLVMIFDSAnalysisDomainDefault>
 class CFLFieldSensIFDSProblem
-    : public IDETabulationProblem<cfl_fieldsens::IFDSDomain> {
-  using Base = IDETabulationProblem<cfl_fieldsens::IFDSDomain>;
+    : public IDETabulationProblem<cfl_fieldsens::IFDSDomain,
+                                  typename ProblemT::container_type>,
+      cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase {
+  using Base = IDETabulationProblem<cfl_fieldsens::IFDSDomain,
+                                    typename ProblemT::container_type>;
 
   static decltype(cfl_fieldsens::IFDSProblemConfig::KillsAt)
-  deriveKillsAt(auto *UserProblem) {
+  deriveKillsAt(ProblemT *UserProblem) {
     assert(UserProblem != nullptr);
     if constexpr (requires() {
                     {
@@ -415,26 +468,25 @@ public:
   using typename Base::t_t;
   using typename Base::v_t;
 
-  static constexpr llvm::StringLiteral LogCategory = "CFLFieldSensIFDSProblem";
+  using cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase::LogCategory;
 
   /// Constructs an IDETabulationProblem with the usual arguments, forwarded
   /// from UserProblem
   explicit CFLFieldSensIFDSProblem(
-      IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault> *UserProblem,
+      ProblemT *UserProblem,
       cfl_fieldsens::IFDSProblemConfig
           Config) noexcept(std::is_nothrow_move_constructible_v<d_t>)
       : Base(assertNotNull(UserProblem).getProjectIRDB(),
              assertNotNull(UserProblem).getEntryPoints(),
              UserProblem->getZeroValue()),
-        UserProblem(UserProblem), Config(std::move(Config)) {}
+        cfl_fieldsens::detail::CFLFieldSensIFDSProblemBase(
+            std::move(Config), UserProblem->getProjectIRDB()),
+        UserProblem(UserProblem) {}
 
   /// Constructs an IDETabulationProblem with the usual arguments, forwarded
   /// from UserProblem and tries to automatically derive the config from
   /// additional functions specified by UserProblem
-  explicit CFLFieldSensIFDSProblem(
-      proper_subclass_of<
-          IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault>> auto
-          *UserProblem)
+  explicit CFLFieldSensIFDSProblem(ProblemT *UserProblem)
       : CFLFieldSensIFDSProblem(UserProblem,
                                 cfl_fieldsens::IFDSProblemConfig{
                                     .KillsAt = deriveKillsAt(UserProblem),
@@ -482,45 +534,53 @@ public:
     return UserProblem->getCallToRetFlowFunction(CallSite, RetSite, Callees);
   }
 
-  EdgeFunction<l_t> getStoreEdgeFunction(d_t CurrNode, d_t SuccNode,
-                                         d_t PointerOp, d_t ValueOp,
-                                         uint8_t DepthKLimit,
-                                         const llvm::DataLayout &DL);
-
   EdgeFunction<l_t> getNormalEdgeFunction(n_t Curr, d_t CurrNode, n_t Succ,
-                                          d_t SuccNode) override;
+                                          d_t SuccNode) override {
+    return getNormalEdgeFunctionImpl(Curr, CurrNode, Succ, SuccNode);
+  }
 
   EdgeFunction<l_t> getCallEdgeFunction(n_t CallSite, d_t SrcNode,
                                         f_t DestinationFunction,
-                                        d_t DestNode) override;
+                                        d_t DestNode) override {
+    return getCallEdgeFunctionImpl(CallSite, SrcNode, DestinationFunction,
+                                   DestNode);
+  }
 
   EdgeFunction<l_t> getReturnEdgeFunction(n_t CallSite, f_t CalleeFunction,
                                           n_t ExitStmt, d_t ExitNode,
-                                          n_t RetSite, d_t RetNode) override;
+                                          n_t RetSite, d_t RetNode) override {
+    return getReturnEdgeFunctionImpl(CallSite, CalleeFunction, ExitStmt,
+                                     ExitNode, RetSite, RetNode);
+  }
 
   EdgeFunction<l_t>
   getCallToRetEdgeFunction(n_t CallSite, d_t CallNode, n_t RetSite,
                            d_t RetSiteNode,
-                           llvm::ArrayRef<f_t> Callees) override;
+                           llvm::ArrayRef<f_t> Callees) override {
+    return getCallToRetEdgeFunctionImpl(CallSite, CallNode, RetSite,
+                                        RetSiteNode, Callees);
+  }
 
   EdgeFunction<l_t> getSummaryEdgeFunction(n_t Curr, d_t CurrNode, n_t Succ,
-                                           d_t SuccNode) override;
+                                           d_t SuccNode) override {
+    return getSummaryEdgeFunctionImpl(Curr, CurrNode, Succ, SuccNode);
+  }
 
   EdgeFunction<l_t> extend(const EdgeFunction<l_t> &L,
-                           const EdgeFunction<l_t> &R) override;
+                           const EdgeFunction<l_t> &R) override {
+    return extendImpl(L, R);
+  }
 
   EdgeFunction<l_t> combine(const EdgeFunction<l_t> &L,
-                            const EdgeFunction<l_t> &R) override;
+                            const EdgeFunction<l_t> &R) override {
+    return combineImpl(L, R);
+  }
 
   /// The wrapped user-problem
   [[nodiscard]] const auto &base() const noexcept { return *UserProblem; }
 
 private:
-  IFDSTabulationProblem<LLVMIFDSAnalysisDomainDefault> *UserProblem{};
-  cfl_fieldsens::FieldStringManager Mgr{};
-  cfl_fieldsens::IFDSProblemConfig Config{};
-
-  uint8_t DepthKLimit = 5; // Original from the paper
+  NonNullPtr<ProblemT> UserProblem{};
 };
 } // namespace psr
 
