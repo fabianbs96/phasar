@@ -7,9 +7,6 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDESolverTestPll.h"
-#include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
-
 #include "phasar.h"
 
 #include <filesystem>
@@ -27,6 +24,14 @@ int main(int Argc, const char **Argv) {
                     "Usage: myphasartool <LLVM IR file>\n";
     return 1;
   }
+
+  // Logger::initializeStderrLogger(SeverityLevel::INFO);
+  // Logger::initializeStderrLogger(SeverityLevel::DEBUG);
+  // Logger::initializeStderrLogger(SeverityLevel::ERROR);
+  // Logger::initializeStderrLogger(SeverityLevel::CRITICAL);
+  // Logger::initializeStderrLogger(SeverityLevel::INVALID);
+  // Logger::initializeStderrLogger(SeverityLevel::WARNING);
+  // Logger::initializeStderrLogger(SeverityLevel::DFADEBUG);
 
   std::vector EntryPoints = {"main"s};
 

@@ -71,7 +71,7 @@ class ParallelizedIDESolver;
 /// can then be queried by using resultAt() and resultsAt().
 template <typename AnalysisDomainTy,
           typename Container =
-              phmap::parallel_node_hash_set<typename AnalysisDomainTy::d_t>,
+              phmap::parallel_node_hash_set_m<typename AnalysisDomainTy::d_t>,
           ICFG ICFGTy = typename AnalysisDomainTy::i_t>
 class ParallelizedIDESolver
     : public IDESolverAPIMixin<
@@ -487,8 +487,7 @@ protected:
 
             auto Extend = IDEProblem.extend(f, SumEdgFnE);
 
-            TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
-                               Extend = Extend, this]() mutable {
+            TPool.detach_task([=, d3 = std::move(d3), this]() mutable {
               propagate(d1, DestN, std::move(d3), Extend);
             });
           }
@@ -520,7 +519,7 @@ protected:
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
 
-            TPool.detach_task([d3 = d3, SP = SP, this]() mutable {
+            TPool.detach_task([=, this]() mutable {
               propagate(d3, SP, d3, EdgeIdentity<l_t>{});
             }); // line 15
 
@@ -529,7 +528,7 @@ protected:
             addIncoming(SP, d3, n, d2);
             // line 15.2, copy to avoid concurrent modification exceptions by
             // other threads
-            // const phmap::parallel_node_hash_set<CellOfTable>
+            // const phmap::parallel_node_hash_set_m<CellOfTable>
             // endSumm(endSummary(sP, d3)); llvm::outs() << "ENDSUMM" << '\n';
             // llvm::outs() << "Size: " << endSumm.size() << '\n';
             // llvm::outs() << "sP: " << NToString(sP)
@@ -595,9 +594,9 @@ protected:
 
                   auto DestN = GetNextUse(RetSiteN, d5_restoredCtx);
 
-                  TPool.detach_task([d1 = d1, DestN = DestN,
+                  TPool.detach_task([=,
                                      d5_restoredCtx = std::move(d5_restoredCtx),
-                                     f = f, fPrime = fPrime, this]() mutable {
+                                     this]() mutable {
                     propagate(d1, DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f, fPrime));
                   });
@@ -637,8 +636,8 @@ protected:
 
         auto DestN = GetNextUse(ReturnSiteN, d3);
 
-        TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
-                           fPrime = std::move(fPrime), this]() mutable {
+        TPool.detach_task([=, d3 = std::move(d3), fPrime = std::move(fPrime),
+                           this]() mutable {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -683,8 +682,8 @@ protected:
                          "Compose: " << g << " * " << f << " = " << fPrime);
         INC_COUNTER("EF Queries", 1, Full);
 
-        TPool.detach_task([d1 = d1, DestN = DestN, d3 = std::move(d3),
-                           fPrime = std::move(fPrime), this]() mutable {
+        TPool.detach_task([=, d3 = std::move(d3), fPrime = std::move(fPrime),
+                           this]() mutable {
           propagate(d1, DestN, std::move(d3), std::move(fPrime));
         });
       }
@@ -991,10 +990,9 @@ protected:
           INC_COUNTER("Gen facts", 1, Core);
         }
 
-        TPool.detach_task(
-            [Fact = Fact, StartPoint = StartPoint, this]() mutable {
-              propagate(Fact, StartPoint, Fact, EdgeIdentity<l_t>{});
-            });
+        TPool.detach_task([=, this]() mutable {
+          propagate(Fact, StartPoint, Fact, EdgeIdentity<l_t>{});
+        });
       }
     }
   }
@@ -1105,9 +1103,9 @@ protected:
                   // TODO: die values die gemoved werden in der capture
                   // zusätzlich moven
                   // TODO: resmutex und DestNmutex kann weg
-                  TPool.detach_task([d3 = std::move(d3), DestN = DestN,
+                  TPool.detach_task([=, d3 = std::move(d3),
                                      d5_restoredCtx = std::move(d5_restoredCtx),
-                                     f3 = f3, fPrime = fPrime, this]() mutable {
+                                     this]() mutable {
                     propagate(std::move(d3), DestN, std::move(d5_restoredCtx),
                               IDEProblem.extend(f3, fPrime));
                   });
@@ -1169,7 +1167,7 @@ protected:
   void propagteUnbalancedReturnFlow(n_t RetSiteC, d_t TargetVal,
                                     EdgeFunction<l_t> EdgeFunc,
                                     n_t /*RelatedCallSite*/) {
-    TPool.detach_task([ZeroValue = ZeroValue, RetSiteC = std::move(RetSiteC),
+    TPool.detach_task([=, RetSiteC = std::move(RetSiteC),
                        TargetVal = std::move(TargetVal),
                        EdgeFunc = std::move(EdgeFunc), this]() mutable {
       propagate(ZeroValue, std::move(RetSiteC), std::move(TargetVal),
@@ -1283,7 +1281,7 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
-    EdgeFunction<l_t> JumpFnE = [&]() {
+    EdgeFunction<l_t> JumpFnE = [=, this]() mutable {
       {
         std::lock_guard Guard(JumpFnMutex);
         const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
@@ -1320,7 +1318,10 @@ protected:
       }
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
-      pathEdgeProcessingTask(std::move(Edge));
+      {
+        std::lock_guard Guard(PathEdgeProcessingTaskMutex);
+        pathEdgeProcessingTask(std::move(Edge));
+      }
 
       IF_LOG_LEVEL_ENABLED(DEBUG, {
         if (!IDEProblem.isZeroValue(TargetVal)) {
@@ -1481,7 +1482,7 @@ protected:
     PAMM_GET_INSTANCE;
     // Stores all valid facts at return site in caller context; return-site is
     // key
-    phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_set<d_t>>
+    phmap::parallel_node_hash_map<n_t, phmap::parallel_node_hash_set_m<d_t>>
         ValidInCallerContext;
     size_t NumGenFacts = 0;
     size_t NumIntraPathEdges = 0;
@@ -1509,7 +1510,7 @@ protected:
         if (ICF->isCallSite(Edge.first)) {
           ValidInCallerContext[Edge.second].insert(D2s.begin(), D2s.end());
         }
-        IF_LOG_LEVEL_ENABLED(DEBUG, [this](const auto &D2s) {
+        IF_LOG_LEVEL_ENABLED(DEBUG, [this](const auto &D2s) mutable {
           for (auto D2 : D2s) {
             PHASAR_LOG_LEVEL(DEBUG, "d2: " << DToString(D2));
           }
@@ -1519,7 +1520,7 @@ protected:
       PHASAR_LOG_LEVEL(DEBUG, " ");
     }
     // Stores all pairs of (Startpoint, Fact) for which a summary was applied
-    phmap::parallel_node_hash_set<std::pair<n_t, d_t>> ProcessSummaryFacts;
+    phmap::parallel_node_hash_set_m<std::pair<n_t, d_t>> ProcessSummaryFacts;
     PHASAR_LOG_LEVEL(DEBUG, "==============================================");
     PHASAR_LOG_LEVEL(DEBUG, "INTER PATH EDGES");
     for (const auto &Cell : ComputedInterPathEdges.cellVec()) {
@@ -1552,7 +1553,7 @@ protected:
             if (ProcessSummaryFacts.find(std::make_pair(Edge.second, D2)) !=
                 ProcessSummaryFacts.end()) {
 
-              phmap::parallel_node_hash_set<d_t> SummaryDSet;
+              phmap::parallel_node_hash_set_m<d_t> SummaryDSet;
               EndsummaryTab.get(Edge.second, D2)
                   .foreachCell([&SummaryDSet](const auto &Row, const auto &Col,
                                               const auto &Val) {
@@ -1987,7 +1988,7 @@ private:
 
   // stores the return sites (inside callers) to which we have unbalanced
   // returns if SolverConfig.followReturnPastSeeds is enabled
-  phmap::parallel_node_hash_set<n_t> UnbalancedRetSites;
+  phmap::parallel_node_hash_set_m<n_t> UnbalancedRetSites;
 
   InitialSeeds<n_t, d_t, l_t> Seeds;
 
@@ -2001,6 +2002,7 @@ private:
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;
   std::mutex CachedFlowEdgeFunctionsMutex;
+  std::mutex PathEdgeProcessingTaskMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>

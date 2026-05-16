@@ -7,8 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
-#ifndef PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDESOLVERTEST_H
-#define PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDESOLVERTEST_H
+#ifndef PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDESOLVERTEST_PLL_H
+#define PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IDESOLVERTEST_PLL_H
 
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
@@ -34,9 +34,9 @@ struct IDESolverTestAnalysisDomainPll : public LLVMAnalysisDomainDefault {
 };
 
 class IDESolverTestPll
-    : public IDETabulationProblem<
-          IDESolverTestAnalysisDomainPll,
-          phmap::parallel_node_hash_set<IDESolverTestAnalysisDomainPll::d_t>> {
+    : public IDETabulationProblem<IDESolverTestAnalysisDomainPll,
+                                  phmap::parallel_node_hash_set_m<
+                                      IDESolverTestAnalysisDomainPll::d_t>> {
 
 public:
   using IDETabProblemType =
