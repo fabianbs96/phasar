@@ -24,7 +24,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <mutex>
 #include <tuple>
 #include <type_traits>
 #include <utility>

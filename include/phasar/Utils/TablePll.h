@@ -27,7 +27,6 @@
 
 #include "parallel_hashmap/phmap.h"
 
-#include <mutex>
 #include <optional>
 #include <tuple>
 #include <type_traits>
@@ -141,13 +140,16 @@ public:
   [[nodiscard]] std::vector<Cell> cellVec() {
     // Returns a vector of all row key / column key / value triplets.
     std::vector<Cell> Result;
-    std::lock_guard Guard(TabMutex);
     Result.reserve(Tab.size()); // better than nothing...
-    for (const auto &M1 : Tab) {
-      for (const auto &M2 : M1.second) {
-        Result.emplace_back(M1.first, M2.first, M2.second);
-      }
-    }
+
+    Tab.for_each_m([&Result](auto &OuterEntry) mutable {
+      OuterEntry.second.for_each_m(
+          [Result, OuterEntry](auto &InnerEntry) mutable {
+            Result.emplace_back(OuterEntry.first, InnerEntry.first,
+                                InnerEntry.second);
+          });
+    });
+
     return Result;
   }
 
@@ -191,8 +193,6 @@ public:
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
     // Returns the value corresponding to the given row and column keys, or V()
     // if no such mapping exists.
-
-    std::lock_guard Guard(TabMutex);
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
@@ -295,7 +295,7 @@ public:
     return std::move(Tab);
   }
   [[nodiscard]] const phmap::parallel_node_hash_map_m<
-      R, phmap::node_hash_map<C, V>> &
+      R, phmap::parallel_node_hash_map<C, V>> &
   rowMapView() const noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
@@ -324,8 +324,7 @@ public:
   }
 
 private:
-  phmap::parallel_node_hash_map_m<R, phmap::node_hash_map<C, V>> Tab{};
-  std::mutex TabMutex;
+  phmap::parallel_node_hash_map_m<R, phmap::parallel_node_hash_map<C, V>> Tab{};
 };
 
 } // namespace psr
