@@ -49,7 +49,7 @@ public:
   ///
   /// \returns True, iff there are more steps to process before calling
   /// finalize()
-  [[nodiscard]] constexpr bool nextN(size_t MaxNumIterations) {
+  [[nodiscard]] bool nextN(size_t MaxNumIterations) {
     PHASAR_LOG_LEVEL(DEBUG,
                      "[nextN]: Next " << MaxNumIterations << " Iterations");
 

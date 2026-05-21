@@ -744,7 +744,6 @@ protected:
     l_t LPrime = joinValueAt(NHashN, NHashD, ValNHash, L);
     if (!(LPrime == ValNHash)) {
       setVal(NHashN, NHashD, std::move(LPrime));
-      std::lock_guard Guard(ValuePropWLMutex);
       ValuePropWL.emplace_back(std::move(NHashN), std::move(NHashD));
     }
   }
@@ -935,13 +934,11 @@ protected:
     PHASAR_LOG_LEVEL(DEBUG, "Start computing values");
     // Phase II(i)
     submitInitialValues();
-    {
-      std::lock_guard Guard(ValuePropWLMutex);
-      while (!ValuePropWL.empty()) {
-        auto NAndD = std::move(ValuePropWL.back());
-        ValuePropWL.pop_back();
-        valuePropagationTask(std::move(NAndD));
-      }
+
+    while (!ValuePropWL.empty()) {
+      auto NAndD = std::move(ValuePropWL.back());
+      ValuePropWL.pop_back();
+      valuePropagationTask(std::move(NAndD));
     }
 
     // Phase II(ii)
@@ -1281,7 +1278,7 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
-    EdgeFunction<l_t> JumpFnE = [=, this]() mutable {
+    auto JumpFnE = [=, this]() mutable {
       {
         std::lock_guard Guard(JumpFnMutex);
         const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
@@ -1299,7 +1296,8 @@ protected:
       // was found
       return AllTop;
     }();
-    EdgeFunction<l_t> fPrime = IDEProblem.combine(JumpFnE, f);
+
+    auto fPrime = IDEProblem.combine(JumpFnE, f);
     bool NewFunction = fPrime != JumpFnE;
 
     IF_LOG_LEVEL_ENABLED(DEBUG, {
@@ -1962,7 +1960,8 @@ private:
 
   std::atomic_size_t PathEdgeCount = 0;
 
-  FlowEdgeFunctionCachePll<AnalysisDomainTy> CachedFlowEdgeFunctions;
+  FlowEdgeFunctionCachePll<AnalysisDomainTy, container_type>
+      CachedFlowEdgeFunctions;
 
   TablePll<n_t, n_t, phmap::parallel_node_hash_map<d_t, Container>>
       ComputedIntraPathEdges;
@@ -1997,7 +1996,6 @@ private:
   phmap::parallel_node_hash_map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   BS::light_thread_pool TPool;
-  std::mutex ValuePropWLMutex;
   std::mutex JumpFnMutex;
   std::mutex FSummaryReuseMutex;
   std::mutex ValTabMutex;

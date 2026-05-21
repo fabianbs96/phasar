@@ -76,6 +76,8 @@ public:
       const std::optional<std::string> &Category = std::nullopt,
       bool Append = false);
 
+  static inline std::mutex LogMutex;
+
 private:
   static inline bool LoggingEnabled = false;
   static inline SeverityLevel LogFilterLevel = CRITICAL;
@@ -105,6 +107,7 @@ private:
 #define PHASAR_LOG_LEVEL(level, message)                                       \
   do {                                                                         \
     IF_LOG_ENABLED_BOOL(IS_LOG_LEVEL_ENABLED(level), {                         \
+      std::lock_guard Guard(::psr::Logger::LogMutex);                          \
       auto &Stream = ::psr::Logger::getLogStreamWithLinePrefix(                \
           ::psr::SeverityLevel::level, std::nullopt);                          \
       /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                         \

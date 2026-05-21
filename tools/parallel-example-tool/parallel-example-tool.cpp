@@ -7,6 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
+
 #include "phasar.h"
 
 #include <filesystem>
@@ -41,7 +43,8 @@ int main(int Argc, const char **Argv) {
   }
 
   if (HA.getProjectIRDB().getFunctionDefinition("main")) {
-    auto Problem = createAnalysisProblem<IDESolverTestPll>(HA, EntryPoints);
+    auto Problem =
+        createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
 
     llvm::outs() << "Testing ParallelizedIDESolver:\n";
     ParallelizedIDESolver Solver(Problem, &HA.getICFG());
