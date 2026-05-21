@@ -279,14 +279,11 @@ public:
   [[nodiscard]] OwningSolverResults<n_t, d_t, l_t> getSolverResults() noexcept {
     Table<n_t, d_t, l_t> Converted;
 
-    {
-      std::lock_guard Guard(ValTabMutex);
-      const auto &ParallelTable = this->ValTab;
+    const auto &ParallelTable = this->ValTab;
 
-      for (const auto [RowKey, ColKeysToVals] : ParallelTable.rowMapView()) {
-        for (const auto [ColKey, ColVal] : ColKeysToVals) {
-          Converted.insert(RowKey, ColKey, ColVal);
-        }
+    for (const auto [RowKey, ColKeysToVals] : ParallelTable.rowMapView()) {
+      for (const auto [ColKey, ColVal] : ColKeysToVals) {
+        Converted.insert(RowKey, ColKey, ColVal);
       }
     }
 
@@ -314,23 +311,20 @@ public:
       Sampler DepthSampler{};
       Sampler UniqueDepthSampler{};
       // TODO: Cache EFs
-      {
-        std::lock_guard Guard(CachedFlowEdgeFunctionsMutex);
-        CachedFlowEdgeFunctions.foreachCachedEdgeFunction(
-            [&](EdgeFunction<l_t> EF, EdgeFunctionKind Kind) {
-              auto Depth = EF.depth();
-              DepthSampler.addSample(Depth);
-              if (Depth > Stats.MaxDepth) {
-                Stats.MaxDepth = Depth;
-              }
+      CachedFlowEdgeFunctions.foreachCachedEdgeFunction(
+          [&](EdgeFunction<l_t> EF, EdgeFunctionKind Kind) {
+            auto Depth = EF.depth();
+            DepthSampler.addSample(Depth);
+            if (Depth > Stats.MaxDepth) {
+              Stats.MaxDepth = Depth;
+            }
 
-              if (UniqueEFs[size_t(Kind)].insert(std::move(EF)).second) {
-                UniqueDepthSampler.addSample(Depth);
-              }
-              Stats.TotalEFCount[size_t(Kind)]++;
-              Stats.PerAllocCount[size_t(EF.getAllocationPolicy())]++;
-            });
-      }
+            if (UniqueEFs[size_t(Kind)].insert(std::move(EF)).second) {
+              UniqueDepthSampler.addSample(Depth);
+            }
+            Stats.TotalEFCount[size_t(Kind)]++;
+            Stats.PerAllocCount[size_t(EF.getAllocationPolicy())]++;
+          });
 
       size_t TotalUniqueNumEF = 0;
       for (size_t I = 0, End = UniqueEFs.size(); I != End; ++I) {
@@ -749,12 +743,10 @@ protected:
   }
 
   l_t val(n_t NHashN, d_t NHashD) {
-    {
-      std::lock_guard Guard(ValTabMutex);
-      if (ValTab.contains(NHashN, NHashD)) {
-        return ValTab.get(NHashN, NHashD);
-      }
+    if (ValTab.contains(NHashN, NHashD)) {
+      return ValTab.get(NHashN, NHashD);
     }
+
     // implicitly initialized to top; see line [1] of Fig. 7 in SRH96 paper
     return IDEProblem.topElement();
   }
@@ -1344,7 +1336,6 @@ protected:
   auto endSummary(n_t SP, d_t d3) {
     if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Core) {
       auto Key = std::make_pair(SP, d3);
-      std::lock_guard Guard(FSummaryReuseMutex);
       auto FindND = FSummaryReuse.find(Key);
       if (FindND == FSummaryReuse.end()) {
         FSummaryReuse.emplace(Key, 0);
@@ -1993,13 +1984,10 @@ private:
 
   TablePll<n_t, d_t, l_t> ValTab;
 
-  phmap::parallel_node_hash_map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
+  std::map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   BS::light_thread_pool TPool;
   std::mutex JumpFnMutex;
-  std::mutex FSummaryReuseMutex;
-  std::mutex ValTabMutex;
-  std::mutex CachedFlowEdgeFunctionsMutex;
   std::mutex PathEdgeProcessingTaskMutex;
 };
 
