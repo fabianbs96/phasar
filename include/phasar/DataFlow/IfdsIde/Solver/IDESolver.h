@@ -44,6 +44,7 @@
 #include "phasar/Utils/Nullable.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Table.h"
+#include "phasar/Utils/Timer.h"
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/Utilities.h"
 
@@ -1559,7 +1560,7 @@ public:
     // Sort intra-procedural path edges
     auto Cells = ComputedIntraPathEdges.cellVec();
     StmtLess Stmtless(ICF);
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1652,7 +1653,7 @@ public:
     PHASAR_LOG_LEVEL(DEBUG, "Process inter-procedural path edges");
     PHASAR_LOG_LEVEL(DEBUG, "=============================================");
     Cells = ComputedInterPathEdges.cellVec();
-    sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
+    std::sort(Cells.begin(), Cells.end(), [&Stmtless](auto Lhs, auto Rhs) {
       return Stmtless(Lhs.getRowKey(), Rhs.getRowKey());
     });
     for (const auto &Cell : Cells) {
@@ -1921,7 +1922,11 @@ OwningSolverResults<typename AnalysisDomainTy::n_t,
 solveIDEProblem(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
                 const ICFG auto &ICF) {
   IDESolver Solver(&Problem, &ICF);
+
+  SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
+  llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()
+               << "\n\n\n";
   return Solver.consumeSolverResults();
 }
 

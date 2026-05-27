@@ -21,7 +21,7 @@
 #include "phasar/DataFlow/IfdsIde/IfdsIdeDomain.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/Logger.h"
-#include "phasar/Utils/TablePll.h"
+#include "phasar/Utils/Table.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -32,6 +32,7 @@
 #include <mutex>
 #include <optional>
 #include <ostream>
+#include <unordered_map>
 #include <utility>
 
 namespace psr {
@@ -47,17 +48,17 @@ protected:
   // mapping from target node and value to a list of all source values and
   // associated functions where the list is implemented as a mapping from
   // the source value to the function we exclude empty default functions
-  TablePll<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
       NonEmptyReverseLookup;
   // mapping from source value and target node to a list of all target values
   // and associated functions where the list is implemented as a mapping from
   // the source value to the function we exclude empty default functions
-  TablePll<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
       NonEmptyForwardLookup;
   // a mapping from target node to a list of triples consisting of source value,
   // target value and associated function; the triple is implemented by a table
   // we exclude empty default functions
-  phmap::parallel_node_hash_map_m<n_t, TablePll<d_t, d_t, EdgeFunction<l_t>>>
+  phmap::parallel_node_hash_map_m<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
       NonEmptyLookupByTargetNode;
 
   std::mutex NonEmptyReverseLookupMutex;
@@ -167,7 +168,7 @@ public:
    * The return value is a set of records of the form
    * (sourceVal,targetVal,edgeFunction).
    */
-  TablePll<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
+  Table<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
     std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     return NonEmptyLookupByTargetNode[Target];
   }
@@ -251,7 +252,7 @@ public:
   }
 
   void printNonEmptyReverseLookup(llvm::raw_ostream &OS) {
-    OS << "DUMP nonEmptyReverseLookup\nTablePll<N, D, "
+    OS << "DUMP nonEmptyReverseLookup\nTable<N, D, "
           "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
     std::lock_guard Guard(NonEmptyReverseLookupMutex);
@@ -268,12 +269,13 @@ public:
   }
 
   void printNonEmptyForwardLookup(llvm::raw_ostream &OS) {
-    OS << "DUMP nonEmptyForwardLookup\nTablePll<D, N, "
+    OS << "DUMP nonEmptyForwardLookup\nTable<D, N, "
           "phmap::parallel_node_hash_map_m<D, "
           "EdgeFunctionPtrType>>\n";
-    std::vector<TableCell<
-        d_t, n_t, phmap::parallel_node_hash_map_m<d_t, EdgeFunction<l_t>>>>
-        CellVec;
+    using TableCell =
+        typename Table<d_t, n_t,
+                       std::unordered_map<d_t, EdgeFunction<l_t>>>::Cell;
+    std::vector<TableCell> CellVec;
     {
       std::lock_guard Guard(NonEmptyForwardLookupMutex);
       CellVec = NonEmptyForwardLookup.cellVec();
@@ -291,7 +293,7 @@ public:
 
   void printNonEmptyLookupByTargetNode(llvm::raw_ostream &OS) {
     OS << "DUMP nonEmptyLookupByTargetNode\nphmap::parallel_node_hash_map_m<N, "
-          "TablePll<D, D, "
+          "Table<D, D, "
           "EdgeFunctionPtrType>>\n";
     std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     for (auto Node : NonEmptyLookupByTargetNode) {

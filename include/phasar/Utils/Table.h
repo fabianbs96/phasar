@@ -33,7 +33,14 @@
 
 namespace psr {
 
-template <typename R, typename C, typename V> class Table {
+template <typename R, typename C, typename V,
+          typename Container = std::unordered_map<R, std::unordered_map<C, V>>>
+class Table {
+  // TODO: ask fabian on how to best do the static assert here.
+  // static_assert(std::is_same_v<typename Container::value_type, <R,
+  // std::unordered_map<C, V>>>::value,
+  //               "Container values needs to be the same as D");
+
 public:
   struct Cell {
     Cell() noexcept = default;
@@ -266,20 +273,17 @@ public:
     return It->second;
   }
 
-  [[nodiscard]] const std::unordered_map<R, std::unordered_map<C, V>> &
-  rowMap() const & noexcept {
+  [[nodiscard]] const Container &rowMap() const & noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return Tab;
   }
-  [[nodiscard]] std::unordered_map<R, std::unordered_map<C, V>> &&
-  rowMap() && noexcept {
+  [[nodiscard]] Container &&rowMap() && noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return std::move(Tab);
   }
-  [[nodiscard]] const std::unordered_map<R, std::unordered_map<C, V>> &
-  rowMapView() const noexcept {
+  [[nodiscard]] const Container &rowMapView() const noexcept {
     // Returns a view that associates each row key with the corresponding map
     // from column keys to values.
     return Tab;
@@ -295,19 +299,8 @@ public:
     return Tab < Other.Tab;
   }
 
-  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                       const Table<R, C, V> &Tab) {
-    for (const auto &M1 : Tab.Tab) {
-      for (const auto &M2 : M1.second) {
-        OS << "< " << M1.first << " , " << M2.first << " , " << M2.second
-           << " >\n";
-      }
-    }
-    return OS;
-  }
-
 private:
-  std::unordered_map<R, std::unordered_map<C, V>> Tab{};
+  Container Tab{};
 };
 
 } // namespace psr
