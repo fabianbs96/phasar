@@ -19,8 +19,11 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DefaultValue.h"
+#include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/Support/raw_ostream.h"
+
+#include "parallel_hashmap/phmap_fwd_decl.h"
 
 #include <optional>
 #include <set>
@@ -36,10 +39,12 @@ namespace psr {
 template <typename R, typename C, typename V,
           typename Container = std::unordered_map<R, std::unordered_map<C, V>>>
 class Table {
-  // TODO: ask fabian on how to best do the static assert here.
-  // static_assert(std::is_same_v<typename Container::value_type, <R,
-  // std::unordered_map<C, V>>>::value,
-  //               "Container values needs to be the same as D");
+  static_assert(std::is_same_v<typename Container::key_type, R>,
+                "Container key values needs to be the same as D");
+  static_assert(std::is_same_v<typename Container::mapped_type::key_type, C>,
+                "Container mapped key values needs to be the same as D");
+  static_assert(std::is_same_v<typename Container::mapped_type::mapped_type, V>,
+                "Container mapped map values needs to be the same as D");
 
 public:
   struct Cell {
@@ -81,6 +86,17 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
+    // TODO: concepts anschauen, vllt wie in TypeTraits.h
+    //       concept bauen, das prüft, ob man lazy_emplace_l (oder
+    //       try_emplace_l) aufrufen kann
+    //       Wir brauchen da keine geschweifte klammern, nur ein semicolon.
+
+    // if constexpr (has_try_emplace_l<Container, R, C, V>) {
+    //   Tab.try_emplace_l();
+    // } else {
+    //   Tab[std::move(Row)][std::move(Column)] = std::move(Val);
+    // }
+
     Tab[std::move(Row)][std::move(Column)] = std::move(Val);
   }
 
@@ -92,18 +108,17 @@ public:
 
   [[nodiscard]] size_t getApproxSizeInBytes() const noexcept {
     size_t Sz =
-        Tab.bucket_count() * sizeof(void *) +
-        Tab.size() *
-            sizeof(
-                std::tuple<void *, void *, typename decltype(Tab)::value_type>);
+        (Tab.bucket_count() * sizeof(void *)) +
+        (Tab.size() *
+         sizeof(
+             std::tuple<void *, void *, typename decltype(Tab)::value_type>));
 
     for (const auto &[RowKey, Row] : Tab) {
-      Sz +=
-          Row.bucket_count() * sizeof(void *) +
-          Row.size() *
-              sizeof(
-                  std::tuple<void *, void *,
-                             typename std::decay_t<decltype(Row)>::value_type>);
+      Sz += (Row.bucket_count() * sizeof(void *)) +
+            (Row.size() *
+             sizeof(
+                 std::tuple<void *, void *,
+                            typename std::decay_t<decltype(Row)>::value_type>));
     }
     return Sz;
   }
@@ -120,21 +135,45 @@ public:
   }
 
   template <typename Fn> void foreachCell(Fn Handler) const {
-    for (const auto &M1 : Tab) {
-      for (const auto &M2 : M1.second) {
-        std::invoke(Handler, M1.first, M2.first, M2.second);
+    // TODO: ask Fabian if this impl of concepts is good/correct. Is <Container,
+    // Fn> fine? Should I replace Fn with std::invokable? And if yes, how?
+    if constexpr (has_for_each_m<Container, Fn>) {
+      Tab.for_each_m([&](const auto &OuterEntry) {
+        OuterEntry.second.for_each_m([&](const auto &InnerEntry) {
+          std::invoke(Handler, OuterEntry.first, InnerEntry.first,
+                      InnerEntry.second);
+        });
+      });
+    } else {
+      for (const auto &M1 : Tab) {
+        for (const auto &M2 : M1.second) {
+          std::invoke(Handler, M1.first, M2.first, M2.second);
+        }
       }
     }
   }
+
   template <typename Fn> void foreachCell(Fn Handler) {
-    for (auto &M1 : Tab) {
-      for (auto &M2 : M1.second) {
-        std::invoke(Handler, M1.first, M2.first, M2.second);
+    // TODO: ask Fabian if this impl of concepts is good/correct. Is <Container,
+    // Fn> fine? Should I replace Fn with std::invokable? And if yes, how?
+    if constexpr (has_for_each_m<Container, Fn>) {
+      Tab.for_each_m([&](auto &OuterEntry) mutable {
+        OuterEntry.second.for_each_m([&](auto &InnerEntry) mutable {
+          std::invoke(Handler, OuterEntry.first, InnerEntry.first,
+                      InnerEntry.second);
+        });
+      });
+    } else {
+      for (auto &M1 : Tab) {
+        for (auto &M2 : M1.second) {
+          std::invoke(Handler, M1.first, M2.first, M2.second);
+        }
       }
     }
   }
 
   [[nodiscard]] std::vector<Cell> cellVec() const {
+    // TODO: foreachCell nutzen.
     // Returns a vector of all row key / column key / value triplets.
     std::vector<Cell> Result;
     Result.reserve(Tab.size()); // better than nothing...

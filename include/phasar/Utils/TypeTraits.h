@@ -322,6 +322,15 @@ concept invocable_r = requires(T Val, P... Params) {
 template <typename T, typename U>
 concept proper_subclass_of = std::derived_from<T, U> && !std::same_as<T, U>;
 
+template <typename T, class K, class F, class... A>
+concept has_try_emplace_l = requires(T Val, K Key, F Func, A... Args) {
+  Val.try_emplace_l(Key, Func, Args...);
+};
+
+template <typename C, typename L>
+concept has_for_each_m =
+    requires(C Container, L Lambda) { Container.for_each_m(Lambda); };
+
 // NOLINTEND(readability-identifier-naming)
 } // namespace psr
 

@@ -1922,7 +1922,6 @@ OwningSolverResults<typename AnalysisDomainTy::n_t,
 solveIDEProblem(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
                 const ICFG auto &ICF) {
   IDESolver Solver(&Problem, &ICF);
-
   SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
   llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()

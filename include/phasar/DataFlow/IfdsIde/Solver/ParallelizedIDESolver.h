@@ -377,9 +377,15 @@ public:
   }
 
   void solve() {
+    SimpleTimer SolveTimer = SimpleTimer();
+
     doInitialize();
     doFinalize();
+
+    SolveTime = SolveTimer.elapsed();
   }
+
+  hms getSolveTime() const { return SolveTime; }
 
 protected:
   [[nodiscard]] Nullable<n_t> getNextUserOrNull(ByConstRef<f_t> Fun,
@@ -2002,6 +2008,7 @@ private:
   BS::light_thread_pool TPool;
   std::mutex JumpFnMutex;
   std::mutex PathEdgeProcessingTaskMutex;
+  hms SolveTime;
 };
 
 template <typename AnalysisDomainTy, typename Container>
@@ -2036,12 +2043,7 @@ solveIDEProblemPll(
     const std::convertible_to<const typename AnalysisDomainTy::i_t &> auto
         &ICF) {
   ParallelizedIDESolver<AnalysisDomainTy, Container> Solver(&Problem, &ICF);
-
-  SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
-  llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()
-               << "\n\n\n";
-
   return Solver.consumeSolverResults();
 }
 
