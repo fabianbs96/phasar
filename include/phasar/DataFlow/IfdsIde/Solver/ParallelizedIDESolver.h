@@ -8,7 +8,7 @@
  *****************************************************************************/
 
 /*
- * IDESolverParallelized.h
+ * ParallelizedIDESolver.h
  *
  *  Created on: 10.04.2026
  *      Author: mxHuber
@@ -50,9 +50,11 @@
 #include "BS_thread_pool.hpp"
 #include "nlohmann/json.hpp"
 #include "parallel_hashmap/phmap.h"
+#include "parallel_hashmap/phmap_fwd_decl.h"
 
 #include <algorithm>
 #include <concepts>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -92,6 +94,9 @@ public:
   using t_t = typename AnalysisDomainTy::t_t;
   using v_t = typename AnalysisDomainTy::v_t;
 
+  template <typename Key, typename Val>
+  using PllMap = phmap::parallel_node_hash_map_m<Key, Val>;
+
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
       const ICFGTy *ICF)
@@ -116,7 +121,7 @@ public:
   virtual ~ParallelizedIDESolver() = default;
 
   nlohmann::json getAsJson() {
-    using TableCell = typename Table<n_t, d_t, l_t>::Cell;
+    using TableCell = typename Table<n_t, d_t, l_t, PllMap>::Cell;
     const static std::string DataFlowID = "DataFlow";
     nlohmann::json J;
     auto Results = this->ValTab.cellVec();
@@ -203,8 +208,7 @@ public:
   /// instruction(s) reflecting that the expression on the left-hand side holds
   /// if the expression on the right-hand side holds.
   [[nodiscard]]
-  phmap::parallel_node_hash_map_m<d_t, l_t>
-  resultsAtInLLVMSSA(n_t Stmt, bool StripZero = false)
+  PllMap<d_t, l_t> resultsAtInLLVMSSA(n_t Stmt, bool StripZero = false)
     requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>
   {
     return getSolverResults().resultsAtInLLVMSSA(Stmt, StripZero);
@@ -513,7 +517,8 @@ protected:
           // for each result node of the call-flow function
 
           for (d_t d3 : Res) {
-            using TableCell = typename Table<n_t, d_t, EdgeFunction<l_t>>::Cell;
+            using TableCell =
+                typename Table<n_t, d_t, EdgeFunction<l_t>, PllMap>::Cell;
             // create initial self-loop
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
@@ -868,11 +873,9 @@ protected:
     PAMM_GET_INSTANCE;
     for (n_t n : Values) {
       for (n_t SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
-        using TableCell = typename Table<d_t, d_t, EdgeFunction<l_t>>::Cell;
         std::lock_guard Guard(JumpFnMutex);
-        Table<d_t, d_t, EdgeFunction<l_t>> &LookupByTarget =
-            JumpFn->lookupByTarget(n);
-        for (const TableCell &SourceValTargetValAndFunction :
+        auto &LookupByTarget = JumpFn->lookupByTarget(n);
+        for (const auto &SourceValTargetValAndFunction :
              LookupByTarget.cellVec()) {
           d_t dPrime = SourceValTargetValAndFunction.getRowKey();
           d_t d = SourceValTargetValAndFunction.getColumnKey();
@@ -892,12 +895,8 @@ protected:
     if (!SolverConfig.recordEdges()) {
       return;
     }
-    Table<n_t, n_t, std::unordered_map<d_t, container_type>,
-          phmap::parallel_node_hash_map_m<
-              n_t,
-              std::unordered_map<n_t, std::unordered_map<d_t, container_type>>>>
-        &TgtMap = (isInterProc(Kind)) ? ComputedInterPathEdges
-                                      : ComputedIntraPathEdges;
+    auto &TgtMap =
+        (isInterProc(Kind)) ? ComputedInterPathEdges : ComputedIntraPathEdges;
     TgtMap.get(SourceNode, SinkStmt)[SourceVal].insert(DestVals.begin(),
                                                        DestVals.end());
   }
@@ -1013,7 +1012,7 @@ protected:
     d_t d2 = Edge.factAtTarget();
     // for each of the method's start points, determine incoming calls
     const auto StartPointsOf = ICF->getStartPointsOf(FunctionThatNeedsSummary);
-    phmap::parallel_node_hash_map_m<n_t, container_type> Inc;
+    PllMap<n_t, container_type> Inc;
     for (n_t SP : StartPointsOf) {
       // line 21.1 of Naeem/Lhotak/Rodriguez
       // register end-summary
@@ -1961,37 +1960,26 @@ private:
   FlowEdgeFunctionCachePll<AnalysisDomainTy, container_type>
       CachedFlowEdgeFunctions;
 
-  Table<n_t, n_t, std::unordered_map<d_t, Container>,
-        phmap::parallel_node_hash_map_m<
-            n_t, std::unordered_map<n_t, std::unordered_map<d_t, Container>>>>
-      ComputedIntraPathEdges;
+  // Table<n_t, d_t, l_t, PllMap> Test;
+  Table<n_t, n_t, PllMap<d_t, Container>, PllMap> ComputedIntraPathEdges;
 
-  Table<n_t, n_t, std::unordered_map<d_t, Container>,
-        phmap::parallel_node_hash_map_m<
-            n_t, std::unordered_map<n_t, std::unordered_map<d_t, Container>>>>
-      ComputedInterPathEdges;
+  Table<n_t, n_t, PllMap<d_t, Container>, PllMap> ComputedInterPathEdges;
 
   EdgeFunction<l_t> AllTop;
 
   std::shared_ptr<JumpFunctionsPll<AnalysisDomainTy, Container>> JumpFn;
 
-  phmap::parallel_node_hash_map_m<std::tuple<n_t, d_t, n_t, d_t>,
-                                  std::vector<EdgeFunction<l_t>>>
+  PllMap<std::tuple<n_t, d_t, n_t, d_t>, std::vector<EdgeFunction<l_t>>>
       IntermediateEdgeFunctions;
 
   // stores summaries that were queried before they were computed
   // see CC 2010 paper by Naeem, Lhotak and Rodriguez
-  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>>,
-        phmap::parallel_node_hash_map_m<
-            n_t, std::unordered_map<d_t, Table<n_t, d_t, EdgeFunction<l_t>>>>>
+  Table<n_t, d_t, Table<n_t, d_t, EdgeFunction<l_t>, PllMap>, PllMap>
       EndsummaryTab;
 
   // edges going along calls
   // see CC 2010 paper by Naeem, Lhotak and Rodriguez
-  Table<n_t, d_t, std::unordered_map<n_t, Container>,
-        phmap::parallel_node_hash_map_m<
-            n_t, std::unordered_map<d_t, std::unordered_map<n_t, Container>>>>
-      IncomingTab;
+  Table<n_t, d_t, std::unordered_map<n_t, Container>, PllMap> IncomingTab;
 
   // stores the return sites (inside callers) to which we have unbalanced
   // returns if SolverConfig.followReturnPastSeeds is enabled
@@ -1999,9 +1987,7 @@ private:
 
   InitialSeeds<n_t, d_t, l_t> Seeds;
 
-  Table<n_t, d_t, l_t,
-        phmap::parallel_node_hash_map_m<n_t, std::unordered_map<d_t, l_t>>>
-      ValTab;
+  Table<n_t, d_t, l_t, PllMap> ValTab;
 
   std::map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
@@ -2043,7 +2029,12 @@ solveIDEProblemPll(
     const std::convertible_to<const typename AnalysisDomainTy::i_t &> auto
         &ICF) {
   ParallelizedIDESolver<AnalysisDomainTy, Container> Solver(&Problem, &ICF);
+
+  SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
+  llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()
+               << "\n\n\n";
+
   return Solver.consumeSolverResults();
 }
 
