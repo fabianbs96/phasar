@@ -19,6 +19,7 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/DefaultValue.h"
+#include "phasar/Utils/TypeTraits.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -90,18 +91,17 @@ public:
 
   [[nodiscard]] size_t getApproxSizeInBytes() const noexcept {
     size_t Sz =
-        Tab.bucket_count() * sizeof(void *) +
-        Tab.size() *
-            sizeof(
-                std::tuple<void *, void *, typename decltype(Tab)::value_type>);
+        (Tab.bucket_count() * sizeof(void *)) +
+        (Tab.size() *
+         sizeof(
+             std::tuple<void *, void *, typename decltype(Tab)::value_type>));
 
     for (const auto &[RowKey, Row] : Tab) {
-      Sz +=
-          Row.bucket_count() * sizeof(void *) +
-          Row.size() *
-              sizeof(
-                  std::tuple<void *, void *,
-                             typename std::decay_t<decltype(Row)>::value_type>);
+      Sz += (Row.bucket_count() * sizeof(void *)) +
+            (Row.size() *
+             sizeof(
+                 std::tuple<void *, void *,
+                            typename std::decay_t<decltype(Row)>::value_type>));
     }
     return Sz;
   }
@@ -123,6 +123,22 @@ public:
         std::invoke(Handler, M1.first, M2.first, M2.second);
       }
     }
+#if false
+    if constexpr (has_for_each_m<Container>) {
+      Tab.for_each_m([&](const auto &OuterEntry) {
+        OuterEntry.second.for_each_m([&](const auto &InnerEntry) {
+          std::invoke(Handler, OuterEntry.first, InnerEntry.first,
+                      InnerEntry.second);
+        });
+      });
+    } else {
+      for (const auto &M1 : Tab) {
+        for (const auto &M2 : M1.second) {
+          std::invoke(Handler, M1.first, M2.first, M2.second);
+        }
+      }
+    }
+#endif
   }
   template <typename Fn> void foreachCell(Fn Handler) {
     for (auto &M1 : Tab) {
@@ -130,6 +146,22 @@ public:
         std::invoke(Handler, M1.first, M2.first, M2.second);
       }
     }
+#if false
+    if constexpr (has_for_each_m<Container>) {
+      Tab.for_each_m([&](auto &OuterEntry) mutable {
+        OuterEntry.second.for_each_m([&](auto &InnerEntry) mutable {
+          std::invoke(Handler, OuterEntry.first, InnerEntry.first,
+                      InnerEntry.second);
+        });
+      });
+    } else {
+      for (auto &M1 : Tab) {
+        for (auto &M2 : M1.second) {
+          std::invoke(Handler, M1.first, M2.first, M2.second);
+        }
+      }
+    }
+#endif
   }
 
   [[nodiscard]] std::vector<Cell> cellVec() const {

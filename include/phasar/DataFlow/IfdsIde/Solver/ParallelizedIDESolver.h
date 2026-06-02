@@ -873,7 +873,6 @@ protected:
     PAMM_GET_INSTANCE;
     for (n_t n : Values) {
       for (n_t SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
-        std::lock_guard Guard(JumpFnMutex);
         auto &LookupByTarget = JumpFn->lookupByTarget(n);
         for (const auto &SourceValTargetValAndFunction :
              LookupByTarget.cellVec()) {
