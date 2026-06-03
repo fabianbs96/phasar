@@ -327,9 +327,13 @@ concept has_try_emplace_l = requires(T Val, K Key, F Func, A... Args) {
   Val.try_emplace_l(Key, Func, Args...);
 };
 template <typename T>
-
 concept has_for_each_m = requires(T &Container) {
   Container.for_each_m(
+      psr::DummyFn<typename std::remove_cvref_t<T>::value_type &>{});
+};
+template <typename T>
+concept has_for_each = requires(T &Container) {
+  Container.for_each(
       psr::DummyFn<typename std::remove_cvref_t<T>::value_type &>{});
 };
 // NOLINTEND(readability-identifier-naming)

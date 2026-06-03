@@ -34,6 +34,35 @@
 
 namespace psr {
 
+template <typename R, typename C, typename V> struct TableCell {
+  constexpr TableCell() noexcept = default;
+  constexpr TableCell(R Row, C Col, V Val) noexcept
+      : Row(std::move(Row)), Column(std::move(Col)), Value(std::move(Val)) {}
+
+  [[nodiscard]] constexpr ByConstRef<R> getRowKey() const noexcept {
+    return Row;
+  }
+  [[nodiscard]] constexpr ByConstRef<C> getColumnKey() const noexcept {
+    return Column;
+  }
+  [[nodiscard]] constexpr ByConstRef<V> getValue() const noexcept {
+    return Value;
+  }
+
+  constexpr auto operator<=>(const TableCell &Rhs) const noexcept = default;
+  constexpr bool operator==(const TableCell &Rhs) const noexcept = default;
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                       const TableCell &Cell) {
+    return OS << "Cell: " << Cell.Row << ", " << Cell.Column << ", "
+              << Cell.Value;
+  }
+
+  R Row{};
+  C Column{};
+  V Value{};
+};
+
 template <typename R, typename C, typename V,
           template <typename, typename, typename...> class ContainerTy =
               std::unordered_map>
@@ -41,32 +70,7 @@ class Table {
   using Container = ContainerTy<R, ContainerTy<C, V>>;
 
 public:
-  struct Cell {
-    Cell() noexcept = default;
-    Cell(R Row, C Col, V Val) noexcept
-        : Row(std::move(Row)), Column(std::move(Col)), Value(std::move(Val)) {}
-
-    [[nodiscard]] ByConstRef<R> getRowKey() const noexcept { return Row; }
-    [[nodiscard]] ByConstRef<C> getColumnKey() const noexcept { return Column; }
-    [[nodiscard]] ByConstRef<V> getValue() const noexcept { return Value; }
-
-    friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                         const Cell &Cell) {
-      return OS << "Cell: " << Cell.r << ", " << Cell.c << ", " << Cell.v;
-    }
-    friend bool operator<(const Cell &Lhs, const Cell &Rhs) noexcept {
-      return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) <
-             std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
-    }
-    friend bool operator==(const Cell &Lhs, const Cell &Rhs) noexcept {
-      return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) ==
-             std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
-    }
-
-    R Row{};
-    C Column{};
-    V Value{};
-  };
+  using Cell = TableCell<R, C, V>;
 
   Table() noexcept = default;
 
@@ -109,24 +113,16 @@ public:
   [[nodiscard]] std::set<Cell> cellSet() const {
     // Returns a set of all row key / column key / value triplets.
     std::set<Cell> Result;
-    for (const auto &M1 : Tab) {
-      for (const auto &M2 : M1.second) {
-        Result.emplace(M1.first, M2.first, M2.second);
-      }
-    }
+    foreachCell([&](auto &&Row, auto &&Col, auto &&Val) {
+      Result.emplace(Row, Col, Val);
+    });
     return Result;
   }
 
   template <typename Fn> void foreachCell(Fn Handler) const {
-    for (const auto &M1 : Tab) {
-      for (const auto &M2 : M1.second) {
-        std::invoke(Handler, M1.first, M2.first, M2.second);
-      }
-    }
-#if false
-    if constexpr (has_for_each_m<Container>) {
-      Tab.for_each_m([&](const auto &OuterEntry) {
-        OuterEntry.second.for_each_m([&](const auto &InnerEntry) {
+    if constexpr (has_for_each<const Container>) {
+      Tab.for_each([&](const auto &OuterEntry) {
+        OuterEntry.second.for_each([&](const auto &InnerEntry) {
           std::invoke(Handler, OuterEntry.first, InnerEntry.first,
                       InnerEntry.second);
         });
@@ -138,18 +134,11 @@ public:
         }
       }
     }
-#endif
   }
   template <typename Fn> void foreachCell(Fn Handler) {
-    for (auto &M1 : Tab) {
-      for (auto &M2 : M1.second) {
-        std::invoke(Handler, M1.first, M2.first, M2.second);
-      }
-    }
-#if false
     if constexpr (has_for_each_m<Container>) {
-      Tab.for_each_m([&](auto &OuterEntry) mutable {
-        OuterEntry.second.for_each_m([&](auto &InnerEntry) mutable {
+      Tab.for_each_m([&](auto &OuterEntry) {
+        OuterEntry.second.for_each_m([&](auto &InnerEntry) {
           std::invoke(Handler, OuterEntry.first, InnerEntry.first,
                       InnerEntry.second);
         });
@@ -161,18 +150,15 @@ public:
         }
       }
     }
-#endif
   }
 
   [[nodiscard]] std::vector<Cell> cellVec() const {
     // Returns a vector of all row key / column key / value triplets.
     std::vector<Cell> Result;
     Result.reserve(Tab.size()); // better than nothing...
-    for (const auto &M1 : Tab) {
-      for (const auto &M2 : M1.second) {
-        Result.emplace_back(M1.first, M2.first, M2.second);
-      }
-    }
+    foreachCell([&](auto &&Row, auto &&Col, auto &&Val) {
+      Result.emplace_back(Row, Col, Val);
+    });
     return Result;
   }
 
