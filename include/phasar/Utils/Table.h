@@ -49,8 +49,12 @@ template <typename R, typename C, typename V> struct TableCell {
     return Value;
   }
 
-  constexpr auto operator<=>(const TableCell &Rhs) const noexcept = default;
-  constexpr bool operator==(const TableCell &Rhs) const noexcept = default;
+  [[nodiscard]] constexpr friend bool operator<(const TableCell &Lhs,
+                                                const TableCell &Rhs) noexcept {
+    return std::tie(Lhs.Row, Lhs.Column, Lhs.Value) <
+           std::tie(Rhs.Row, Rhs.Column, Rhs.Value);
+  }
+  [[nodiscard]] bool operator==(const TableCell &Rhs) const noexcept = default;
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                        const TableCell &Cell) {
