@@ -23,6 +23,7 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+#include <cassert>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -88,7 +89,13 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
-    Tab[std::move(Row)][std::move(Column)] = std::move(Val);
+    if constexpr (has_lazy_emplace<const Container, R>) {
+      Tab.lazy_emplace(std::move(Row), [&](auto &Entry) {
+        Entry.second.lazy_emplace(std::move(Column), std::move(Val));
+      });
+    } else {
+      Tab[std::move(Row)][std::move(Column)] = std::move(Val);
+    }
   }
 
   void clear() noexcept { Tab.clear(); }
@@ -139,6 +146,7 @@ public:
       }
     }
   }
+
   template <typename Fn> void foreachCell(Fn Handler) {
     if constexpr (has_for_each_m<Container>) {
       Tab.for_each_m([&](auto &OuterEntry) {
@@ -159,21 +167,25 @@ public:
   [[nodiscard]] std::vector<Cell> cellVec() const {
     // Returns a vector of all row key / column key / value triplets.
     std::vector<Cell> Result;
+
     Result.reserve(Tab.size()); // better than nothing...
     foreachCell([&](auto &&Row, auto &&Col, auto &&Val) {
       Result.emplace_back(Row, Col, Val);
     });
+
     return Result;
   }
 
   [[nodiscard]] Container column(ByConstRef<C> ColumnKey) const {
     // Returns a view of all mappings that have the given column key.
     std::unordered_map<R, V> Column;
-    for (const auto &Row : Tab) {
+
+    foreachCell([&](const auto &Row) {
       if (Row.second.count(ColumnKey)) {
         Column[Row.first] = Row.second[ColumnKey];
       }
-    }
+    });
+
     return Column;
   }
 
@@ -181,35 +193,58 @@ public:
                               ByConstRef<C> ColumnKey) const noexcept {
     // Returns true if the table contains a mapping with the specified row and
     // column keys.
-    if (auto RowIter = Tab.find(RowKey); RowIter != Tab.end()) {
-      return RowIter->second.find(ColumnKey) != RowIter->second.end();
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      bool DoesContain = false;
+      Tab.if_contains(RowKey, [&](const auto &Row) {
+        DoesContain =
+            Row.second.if_contains(ColumnKey, [&](const auto &Row) {});
+      });
+      return DoesContain;
+    } else {
+      if (auto RowIter = Tab.find(RowKey); RowIter != Tab.end()) {
+        return RowIter->second.find(ColumnKey) != RowIter->second.end();
+      }
+      return false;
     }
-    return false;
   }
 
   [[nodiscard]] bool containsColumn(ByConstRef<C> ColumnKey) const noexcept {
     // Returns true if the table contains a mapping with the specified column.
-    for (const auto &M1 : Tab) {
-      if (M1.second.count(ColumnKey)) {
-        return true;
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      bool DoesContain = false;
+
+      Tab.if_contains(ColumnKey, [&](const auto &Row) {
+        DoesContain = Row.second.if_contains(ColumnKey, [&](const auto &Row) {
+          DoesContain = Row.second.count(ColumnKey);
+        });
+      });
+
+      return DoesContain;
+    } else {
+      for (const auto &M1 : Tab) {
+        return M1.second.count(ColumnKey);
       }
     }
-    return false;
   }
 
   [[nodiscard]] bool containsRow(ByConstRef<R> RowKey) const noexcept {
-    // Returns true if the table contains a mapping with the specified row key.
+    // Returns true if the table contains a mapping with the specified row
+    // key.
     return Tab.count(RowKey);
   }
 
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
-    // Returns the value corresponding to the given row and column keys, or V()
-    // if no such mapping exists.
+    // Returns the value corresponding to the given row and column keys, or
+    // V() if no such mapping exists.
+    // TODO: is this thread safe?
+    // TODO: not thread safe, but how to impl? try_emplace?
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
   [[nodiscard]] V getOrDefault(ByConstRef<R> RowKey,
                                ByConstRef<C> ColumnKey) const {
+    // TODO: is this thread safe?
+    // TODO: not thread safe, but how to impl? try_emplace?
     auto OuterIt = Tab.find(RowKey);
     if (OuterIt == Tab.end()) {
       return V();
@@ -224,73 +259,115 @@ public:
 
   [[nodiscard]] std::optional<V> tryGet(ByConstRef<R> RowKey,
                                         ByConstRef<C> ColumnKey) {
-    auto OuterIt = Tab.find(RowKey);
-    if (OuterIt == Tab.end()) {
-      return std::nullopt;
-    }
-    auto InnerIt = OuterIt->second.find(ColumnKey);
-    if (InnerIt == OuterIt->second.end()) {
-      return std::nullopt;
-    }
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      std::optional<V> RetVal = std::nullopt;
 
-    return InnerIt->second;
+      // TODO: ask Fabian if this logic is sound
+      Tab.if_contains(RowKey, [&](auto &Pair) {
+        Pair.second.if_contains(
+            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      });
+
+      return RetVal;
+    } else {
+      auto OuterIt = Tab.find(RowKey);
+      if (OuterIt == Tab.end()) {
+        return std::nullopt;
+      }
+      auto InnerIt = OuterIt->second.find(ColumnKey);
+      if (InnerIt == OuterIt->second.end()) {
+        return std::nullopt;
+      }
+
+      return InnerIt->second;
+    }
   }
 
   [[nodiscard]] ByConstRef<V> get(ByConstRef<R> RowKey,
                                   ByConstRef<C> ColumnKey) const noexcept {
-    // Returns the value corresponding to the given row and column keys, or V()
-    // if no such mapping exists.
-    auto OuterIt = Tab.find(RowKey);
-    if (OuterIt == Tab.end()) {
-      return getDefaultValue<V>();
-    }
+    // Returns the value corresponding to the given row and column keys, or
+    // V() if no such mapping exists.
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      ByConstRef<V> RetVal = getDefaultValue<V>();
 
-    auto It = OuterIt->second.find(ColumnKey);
-    if (It == OuterIt->second.end()) {
-      return getDefaultValue<V>();
-    }
+      // TODO: ask Fabian if this logic is sound
+      Tab.if_contains(RowKey, [&](auto &Pair) {
+        Pair.second.if_contains(
+            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      });
 
-    return It->second;
+      return RetVal;
+    } else {
+      auto OuterIt = Tab.find(RowKey);
+      if (OuterIt == Tab.end()) {
+        return getDefaultValue<V>();
+      }
+
+      auto It = OuterIt->second.find(ColumnKey);
+      if (It == OuterIt->second.end()) {
+        return getDefaultValue<V>();
+      }
+
+      return It->second;
+    }
   }
 
   V remove(ByConstRef<R> RowKey, ByConstRef<C> ColumnKey) {
     // Removes the mapping, if any, associated with the given keys.
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      V RetVal = V();
 
-    auto OuterIt = Tab.find(RowKey);
-    if (OuterIt == Tab.end()) {
-      return V();
+      // TODO: ask Fabian if this logic is sound
+      Tab.if_contains(RowKey, [&](auto &Pair) {
+        Pair.second.erase_if(
+            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      });
+
+      return RetVal;
+    } else {
+      auto OuterIt = Tab.find(RowKey);
+      if (OuterIt == Tab.end()) {
+        return V();
+      }
+
+      auto It = OuterIt->second.find(ColumnKey);
+      if (It == OuterIt->second.end()) {
+        return V();
+      }
+
+      auto Ret = std::move(It->second);
+
+      OuterIt->second.erase(It);
+      if (OuterIt->second.empty()) {
+        Tab.erase(OuterIt);
+      }
+
+      return Ret;
     }
-
-    auto It = OuterIt->second.find(ColumnKey);
-    if (It == OuterIt->second.end()) {
-      return V();
-    }
-
-    auto Ret = std::move(It->second);
-
-    OuterIt->second.erase(It);
-    if (OuterIt->second.empty()) {
-      Tab.erase(OuterIt);
-    }
-
-    return Ret;
   }
 
   void remove(ByConstRef<R> RowKey) { Tab.erase(RowKey); }
 
-  [[nodiscard]] std::unordered_map<C, V> &row(R RowKey) {
+  [[nodiscard]] ContainerTy<C, V> &row(R RowKey) {
     // Returns a view of all mappings that have the given row key.
-    return Tab[RowKey];
+    return Tab.at(RowKey);
   }
 
-  [[nodiscard]] ByConstRef<std::unordered_map<C, V>>
+  [[nodiscard]] ByConstRef<ContainerTy<C, V>>
   row(ByConstRef<R> RowKey) const noexcept {
     // Returns a view of all mappings that have the given row key.
-    auto It = Tab.find(RowKey);
-    if (It == Tab.end()) {
-      return getDefaultValue<std::unordered_map<C, V>>();
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      ByConstRef<Container> RetVal;
+      Tab.if_contains(RowKey,
+                      [&](const auto &Entry) { RetVal = Entry.second; });
+      return RetVal;
+    } else {
+      auto It = Tab.find(RowKey);
+      if (It == Tab.end()) {
+        return getDefaultValue<std::unordered_map<C, V>>();
+      }
+      return It->second;
     }
-    return It->second;
   }
 
   [[nodiscard]] const Container &rowMap() const & noexcept {
@@ -321,12 +398,10 @@ public:
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                                        const Table<R, C, V, ContainerTy> &Tab) {
-    for (const auto &M1 : Tab.Tab) {
-      for (const auto &M2 : M1.second) {
-        OS << "< " << M1.first << " , " << M2.first << " , " << M2.second
-           << " >\n";
-      }
-    }
+    Tab.foreachCell([&](const auto &M1, const auto &M2) {
+      OS << "< " << M1.first << " , " << M2.first << " , " << M2.second
+         << " >\n";
+    });
     return OS;
   }
 
