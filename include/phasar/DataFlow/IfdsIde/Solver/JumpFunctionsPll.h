@@ -26,6 +26,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include "parallel_hashmap/phmap.h"
+#include "parallel_hashmap/phmap_fwd_decl.h"
 
 #include <functional>
 #include <memory>
@@ -57,12 +58,14 @@ protected:
   // mapping from source value and target node to a list of all target values
   // and associated functions where the list is implemented as a mapping from
   // the source value to the function we exclude empty default functions
-  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>,
+        PllMap>
       NonEmptyForwardLookup;
   // a mapping from target node to a list of triples consisting of source value,
   // target value and associated function; the triple is implemented by a table
   // we exclude empty default functions
-  phmap::parallel_node_hash_map_m<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
+  phmap::parallel_node_hash_map_m<n_t,
+                                  Table<d_t, d_t, EdgeFunction<l_t>, PllMap>>
       NonEmptyLookupByTargetNode;
 
   std::mutex NonEmptyReverseLookupMutex;
@@ -95,6 +98,11 @@ public:
     }
 
     {
+#if false
+      // TODO: how to get less lock guarding here?
+      // The idea was to use callback functions as the return value instead of
+      // references. But how does that solve the problem? It exposes the same
+      // amount.
       std::lock_guard Guard(NonEmptyReverseLookupMutex);
       auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
       if (auto Find = std::find_if(
@@ -109,7 +117,50 @@ public:
       } else {
         SourceValToFunc.emplace_back(SourceVal, EdgeFunc);
       }
+#endif
+
+      // TODO: I have no idea if this impl is better than the previous one.
+      // NOTE: I don't think if_contains works here because we need to check the
+      // first part of a pair
+      // NODE: I don't even know if the findAndDo impl is thread safe, because
+      // there is a mutex locked check and then a mutex locked edit. But doesn't
+      // it need to be mutex locked the whole time, so no other thread messes
+      // with that in the meantime?
+      // But then how do we reduce the locking?
+      // TODO: Talk with Fabian about the following: I feel like there is no way
+      // around excessive locking.
+      NonEmptyReverseLookup.ifContainsDo(
+          Target, TargetVal,
+          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
+            // it is important that existing values in JumpFunctionsPll
+            // are overwritten
+            for (auto &Entry : Tab[Target][TargetVal]) {
+              if (SourceVal == Entry.first) {
+                Entry.second = EdgeFunc;
+              }
+            }
+          },
+          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
+            Tab[Target][TargetVal].emplace_back(SourceVal, EdgeFunc);
+          });
     }
+    {
+      NonEmptyForwardLookup.ifContainsDo(
+          SourceVal, Target,
+          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
+            // it is important that existing values in JumpFunctionsPll
+            // are overwritten
+            for (auto &Entry : Tab[SourceVal][Target]) {
+              if (TargetVal == Entry.first) {
+                Entry.second = EdgeFunc;
+              }
+            }
+          },
+          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
+            Tab[SourceVal][Target].emplace_back(TargetVal, EdgeFunc);
+          });
+    }
+#if false
     {
       std::lock_guard Guard(NonEmptyForwardLookupMutex);
       auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
@@ -126,6 +177,7 @@ public:
         TargetValToFunc.emplace_back(TargetVal, EdgeFunc);
       }
     }
+#endif
 
     // V Table::insert(R r, C c, V v) always overrides (see
     // comments above)
@@ -172,7 +224,7 @@ public:
    * The return value is a set of records of the form
    * (sourceVal,targetVal,edgeFunction).
    */
-  Table<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
+  Table<d_t, d_t, EdgeFunction<l_t>, PllMap> &lookupByTarget(n_t Target) {
     std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     return NonEmptyLookupByTargetNode[Target];
   }

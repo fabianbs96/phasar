@@ -23,7 +23,10 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+#include "parallel_hashmap/phmap_fwd_decl.h"
+
 #include <cassert>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -210,21 +213,14 @@ public:
 
   [[nodiscard]] bool containsColumn(ByConstRef<C> ColumnKey) const noexcept {
     // Returns true if the table contains a mapping with the specified column.
-    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
-      bool DoesContain = false;
-
-      Tab.if_contains(ColumnKey, [&](const auto &Row) {
-        DoesContain = Row.second.if_contains(ColumnKey, [&](const auto &Row) {
-          DoesContain = Row.second.count(ColumnKey);
-        });
-      });
-
-      return DoesContain;
-    } else {
-      for (const auto &M1 : Tab) {
-        return M1.second.count(ColumnKey);
+    bool DoesContain = false;
+    foreachCell([&](const auto &Entry) {
+      if (Entry.second.count(ColumnKey)) {
+        DoesContain = true;
+        return;
       }
-    }
+    });
+    return DoesContain;
   }
 
   [[nodiscard]] bool containsRow(ByConstRef<R> RowKey) const noexcept {
@@ -236,25 +232,43 @@ public:
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    // TODO: is this thread safe?
-    // TODO: not thread safe, but how to impl? try_emplace?
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
+  // TODO: are callback return functions even better than returning a ref?
+#if false
+  [[nodiscard]] std::function<V &()> getCallback(R RowKey, C ColumnKey) {
+    // TODO: is the lock guard neccessary here?
+    std::lock_guard Guard(GetMutex);
+    V &RetVal = Tab[std::move(RowKey)][std::move(ColumnKey)];
+    return [this]() -> int & { return RetVal; };
+  }
+#endif
+
   [[nodiscard]] V getOrDefault(ByConstRef<R> RowKey,
                                ByConstRef<C> ColumnKey) const {
-    // TODO: is this thread safe?
-    // TODO: not thread safe, but how to impl? try_emplace?
-    auto OuterIt = Tab.find(RowKey);
-    if (OuterIt == Tab.end()) {
-      return V();
-    }
-    auto InnerIt = OuterIt->second.find(ColumnKey);
-    if (InnerIt == OuterIt->second.end()) {
-      return V();
-    }
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
+      V RetVal = V();
 
-    return InnerIt->second;
+      Tab.if_contains(RowKey, [&](const auto &Entry) {
+        Entry.second.if_contains(ColumnKey, [&](const auto &InnerEntry) {
+          RetVal = InnerEntry.second;
+        });
+      });
+
+      return RetVal;
+    } else {
+      auto OuterIt = Tab.find(RowKey);
+      if (OuterIt == Tab.end()) {
+        return V();
+      }
+      auto InnerIt = OuterIt->second.find(ColumnKey);
+      if (InnerIt == OuterIt->second.end()) {
+        return V();
+      }
+
+      return InnerIt->second;
+    }
   }
 
   [[nodiscard]] std::optional<V> tryGet(ByConstRef<R> RowKey,
@@ -262,10 +276,9 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       std::optional<V> RetVal = std::nullopt;
 
-      // TODO: ask Fabian if this logic is sound
-      Tab.if_contains(RowKey, [&](auto &Pair) {
-        Pair.second.if_contains(
-            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      Tab.if_contains(RowKey, [&](auto &Entry) {
+        Entry.second.if_contains(
+            ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
       });
 
       return RetVal;
@@ -290,10 +303,9 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       ByConstRef<V> RetVal = getDefaultValue<V>();
 
-      // TODO: ask Fabian if this logic is sound
-      Tab.if_contains(RowKey, [&](auto &Pair) {
-        Pair.second.if_contains(
-            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      Tab.if_contains(RowKey, [&](auto &Entry) {
+        Entry.second.if_contains(
+            ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
       });
 
       return RetVal;
@@ -318,9 +330,9 @@ public:
       V RetVal = V();
 
       // TODO: ask Fabian if this logic is sound
-      Tab.if_contains(RowKey, [&](auto &Pair) {
-        Pair.second.erase_if(
-            ColumnKey, [&](auto &InnerPair) { RetVal = InnerPair.second; });
+      Tab.if_contains(RowKey, [&](auto &Entry) {
+        Entry.second.erase_if(
+            ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
       });
 
       return RetVal;
@@ -350,7 +362,10 @@ public:
 
   [[nodiscard]] ContainerTy<C, V> &row(R RowKey) {
     // Returns a view of all mappings that have the given row key.
-    return Tab.at(RowKey);
+    // TODO: can this be made thread safe, given that it returns a reference?
+    // TODO: do we even need this to be made thread safe? Or can we just not use
+    // it and use other functions if we need thread safety?
+    return Tab[RowKey];
   }
 
   [[nodiscard]] ByConstRef<ContainerTy<C, V>>
@@ -386,6 +401,70 @@ public:
     return Tab;
   }
 
+  void ifContainsDo(
+      ByConstRef<R> RowKey, ByConstRef<C> ColumnKey, auto SuccHandler,
+      auto FailHandler = []() {}) {
+    // Runs a lambda if a value corresponding to the given row and column
+    // keys exists, or another lambda if no such mapping exists.
+
+    // TODO: Is the impl of making the lambdas thread safe any good?
+    // If I have and use mutexes in this header, I get the following error:
+    /*
+    In file included from
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/tools/example-tool/myphasartool.cpp:10:
+In file included from
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar.h:17:
+In file included from
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow.h:25:
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/Solver/IDESolver.h:273:47:
+error: no matching constructor for initialization of 'Table<const Instruction *,
+const Value *, LatticeDomain<long>>' 273 |     return OwningSolverResults<n_t,
+d_t, l_t>(std::move(this->ValTab), | ^~~~~~~~~~~~~~~~~~~~~~~
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/Solver/IDESolver.h:1929:17:
+note: in instantiation of member function
+'psr::IDESolver<psr::IDELinearConstantAnalysisDomain, std::set<const llvm::Value
+*>, psr::LLVMBasedICFG>::consumeSolverResults' requested here 1929 |   return
+Solver.consumeSolverResults(); |                 ^
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/tools/example-tool/myphasartool.cpp:40:23:
+note: in instantiation of function template specialization
+'psr::solveIDEProblem<psr::IDELinearConstantAnalysisDomain, std::set<const
+llvm::Value *>, psr::LLVMBasedICFG>' requested here 40 |     auto IDEResults =
+solveIDEProblem(M, HA.getICFG()); |                       ^
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/Utils/Table.h:83:12:
+note: explicit constructor is not a candidate 83 |   explicit Table(const Table
+&T) = default; |            ^
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/Utils/Table.h:81:3:
+note: candidate constructor not viable: requires 0 arguments, but 1 was provided
+   81 |   Table() noexcept = default;
+      |   ^
+/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/SolverResults.h:257:38:
+note: passing argument to parameter 'ResTab' here 257 |
+OwningSolverResults(Table<N, D, L> ResTab, | ^
+      */
+    if (contains(RowKey, ColumnKey)) {
+      // The requires here is kind of bad, but it should suffice for now...
+      // TODO: do a better requires check to see if we need the lock guard or
+      // not.
+      if constexpr (has_for_each_m<Container>) {
+        std::lock_guard Guard(FindAndDoMutex);
+        SuccHandler(Tab);
+      } else {
+        SuccHandler(Tab);
+      }
+      return;
+    }
+
+    // The requires here is kind of bad, but it should suffice for now...
+    // TODO: do a better requires check to see if we need the lock guard or
+    // not.
+    if constexpr (has_for_each_m<Container>) {
+      std::lock_guard Guard(FindAndDoMutex);
+      FailHandler(Tab);
+    } else {
+      FailHandler(Tab);
+    }
+  }
+
   void reserve(size_t Capacity) { Tab.reserve(Capacity); }
 
   bool operator==(const Table<R, C, V, ContainerTy> &Other) noexcept {
@@ -408,6 +487,15 @@ public:
 private:
   // std::unordered_map<R, std::unordered_map<C, V>> Tab{};
   Container Tab{};
+
+  // TODO: ask Fabian if this makes sense.
+  // If we are working with an unordered map, that means that the table is not
+  // supporting multi-threading. In that case, it must not have a mutex.
+  struct Empty {};
+  std::conditional_t<
+      std::is_same_v<ContainerTy<C, V>, std::unordered_map<C, V>>, Empty,
+      std::mutex>
+      FindAndDoMutex;
 };
 
 } // namespace psr

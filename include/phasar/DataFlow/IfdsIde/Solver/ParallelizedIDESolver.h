@@ -699,7 +699,6 @@ protected:
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
-      std::lock_guard Guard(JumpFnMutex);
       auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
       if (!LookupResults) {
         continue;
@@ -789,22 +788,20 @@ protected:
                        "   Target D: " << DToString(Edge.factAtTarget()));
     });
 
-    {
-      std::lock_guard Guard(JumpFnMutex);
-      auto FwdLookupRes =
-          JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
-      if (FwdLookupRes) {
-        auto &Ref = FwdLookupRes->get();
-        if (auto Find = std::find_if(Ref.begin(), Ref.end(),
-                                     [Edge](const auto &Pair) {
-                                       return Edge.factAtTarget() == Pair.first;
-                                     });
-            Find != Ref.end()) {
-          PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
-          return Find->second;
-        }
+    auto FwdLookupRes =
+        JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
+    if (FwdLookupRes) {
+      auto &Ref = FwdLookupRes->get();
+      if (auto Find = std::find_if(Ref.begin(), Ref.end(),
+                                   [Edge](const auto &Pair) {
+                                     return Edge.factAtTarget() == Pair.first;
+                                   });
+          Find != Ref.end()) {
+        PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
+        return Find->second;
       }
     }
+
     PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
     // JumpFn initialized to all-top, see line [2] in SRH96 paper
     return AllTop;
@@ -1070,7 +1067,6 @@ protected:
                 IDEProblem.extend(IDEProblem.extend(f4, f), f5);
             PHASAR_LOG_LEVEL(DEBUG, "       = " << fPrime);
 
-            std::lock_guard Guard(JumpFnMutex);
             // for each jump function coming into the call, propagate to
             // return site using the composed function
             auto RevLookupResult = JumpFn->reverseLookup(c, d4);
@@ -1093,10 +1089,6 @@ protected:
                     return RetSiteC;
                   }();
 
-                  // TODO: lambda mutable machen
-                  // TODO: die values die gemoved werden in der capture
-                  // zusätzlich moven
-                  // TODO: resmutex und DestNmutex kann weg
                   TPool.detach_task([=, d3 = std::move(d3),
                                      d5_restoredCtx = std::move(d5_restoredCtx),
                                      this]() mutable {
@@ -1276,19 +1268,17 @@ protected:
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
     auto JumpFnE = [=, this]() mutable {
-      {
-        std::lock_guard Guard(JumpFnMutex);
-        const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
-        if (RevLookupResult) {
-          const auto &JumpFnContainer = RevLookupResult->get();
-          const auto Find = std::find_if(
-              JumpFnContainer.begin(), JumpFnContainer.end(),
-              [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
-          if (Find != JumpFnContainer.end()) {
-            return Find->second;
-          }
+      const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
+      if (RevLookupResult) {
+        const auto &JumpFnContainer = RevLookupResult->get();
+        const auto Find = std::find_if(
+            JumpFnContainer.begin(), JumpFnContainer.end(),
+            [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
+        if (Find != JumpFnContainer.end()) {
+          return Find->second;
         }
       }
+
       // jump function is initialized to all-top if no entry
       // was found
       return AllTop;
@@ -1307,10 +1297,8 @@ protected:
       PHASAR_LOG_LEVEL(DEBUG, ' ');
     });
     if (NewFunction) {
-      {
-        std::lock_guard Guard(JumpFnMutex);
-        JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
-      }
+      JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
+
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
       {
@@ -1991,7 +1979,6 @@ private:
   std::map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   BS::light_thread_pool TPool;
-  std::mutex JumpFnMutex;
   std::mutex PathEdgeProcessingTaskMutex;
   hms SolveTime;
 };
