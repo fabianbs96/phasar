@@ -26,6 +26,7 @@
 #include "parallel_hashmap/phmap_fwd_decl.h"
 
 #include <cassert>
+#include <concepts>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -92,9 +93,10 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
-    if constexpr (has_lazy_emplace<const Container, R>) {
-      Tab.lazy_emplace(std::move(Row), [&](auto &Entry) {
-        Entry.second.lazy_emplace(std::move(Column), std::move(Val));
+    if constexpr (has_lazy_emplace<Container, R>) {
+      auto &Inner = Tab[std::move(Row)];
+      Inner.lazy_emplace(Column, [&](auto &&Ctor) {
+        Ctor(std::move(Column), std::move(Val));
       });
     } else {
       Tab[std::move(Row)][std::move(Column)] = std::move(Val);
@@ -235,15 +237,19 @@ public:
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
-  // TODO: are callback return functions even better than returning a ref?
-#if false
-  [[nodiscard]] std::function<V &()> getCallback(R RowKey, C ColumnKey) {
-    // TODO: is the lock guard neccessary here?
-    std::lock_guard Guard(GetMutex);
-    V &RetVal = Tab[std::move(RowKey)][std::move(ColumnKey)];
-    return [this]() -> int & { return RetVal; };
+  void get(R RowKey, C ColumnKey, std::invocable<V &> auto Callback) {
+    // Returns the value corresponding to the given row and column keys, or
+    // V() if no such mapping exists.
+    // TODO: below creates a data race. How to fix?
+    auto &Inner = Tab[std::move(RowKey)];
+    Inner.lazy_emplace_l(
+        ColumnKey, [&](auto &Pair) { Callback(Pair.second); },
+        [&](auto &&Ctor) {
+          V TempV = V();
+          Callback(TempV);
+          Ctor(std::move(ColumnKey), std::move(TempV));
+        });
   }
-#endif
 
   [[nodiscard]] V getOrDefault(ByConstRef<R> RowKey,
                                ByConstRef<C> ColumnKey) const {
@@ -401,70 +407,6 @@ public:
     return Tab;
   }
 
-  void ifContainsDo(
-      ByConstRef<R> RowKey, ByConstRef<C> ColumnKey, auto SuccHandler,
-      auto FailHandler = []() {}) {
-    // Runs a lambda if a value corresponding to the given row and column
-    // keys exists, or another lambda if no such mapping exists.
-
-    // TODO: Is the impl of making the lambdas thread safe any good?
-    // If I have and use mutexes in this header, I get the following error:
-    /*
-    In file included from
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/tools/example-tool/myphasartool.cpp:10:
-In file included from
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar.h:17:
-In file included from
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow.h:25:
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/Solver/IDESolver.h:273:47:
-error: no matching constructor for initialization of 'Table<const Instruction *,
-const Value *, LatticeDomain<long>>' 273 |     return OwningSolverResults<n_t,
-d_t, l_t>(std::move(this->ValTab), | ^~~~~~~~~~~~~~~~~~~~~~~
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/Solver/IDESolver.h:1929:17:
-note: in instantiation of member function
-'psr::IDESolver<psr::IDELinearConstantAnalysisDomain, std::set<const llvm::Value
-*>, psr::LLVMBasedICFG>::consumeSolverResults' requested here 1929 |   return
-Solver.consumeSolverResults(); |                 ^
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/tools/example-tool/myphasartool.cpp:40:23:
-note: in instantiation of function template specialization
-'psr::solveIDEProblem<psr::IDELinearConstantAnalysisDomain, std::set<const
-llvm::Value *>, psr::LLVMBasedICFG>' requested here 40 |     auto IDEResults =
-solveIDEProblem(M, HA.getICFG()); |                       ^
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/Utils/Table.h:83:12:
-note: explicit constructor is not a candidate 83 |   explicit Table(const Table
-&T) = default; |            ^
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/Utils/Table.h:81:3:
-note: candidate constructor not viable: requires 0 arguments, but 1 was provided
-   81 |   Table() noexcept = default;
-      |   ^
-/home/max/Desktop/dev/Arbeit/phasar-clones/phasar-f-ParallelizeIDESolver/include/phasar/DataFlow/IfdsIde/SolverResults.h:257:38:
-note: passing argument to parameter 'ResTab' here 257 |
-OwningSolverResults(Table<N, D, L> ResTab, | ^
-      */
-    if (contains(RowKey, ColumnKey)) {
-      // The requires here is kind of bad, but it should suffice for now...
-      // TODO: do a better requires check to see if we need the lock guard or
-      // not.
-      if constexpr (has_for_each_m<Container>) {
-        std::lock_guard Guard(FindAndDoMutex);
-        SuccHandler(Tab);
-      } else {
-        SuccHandler(Tab);
-      }
-      return;
-    }
-
-    // The requires here is kind of bad, but it should suffice for now...
-    // TODO: do a better requires check to see if we need the lock guard or
-    // not.
-    if constexpr (has_for_each_m<Container>) {
-      std::lock_guard Guard(FindAndDoMutex);
-      FailHandler(Tab);
-    } else {
-      FailHandler(Tab);
-    }
-  }
-
   void reserve(size_t Capacity) { Tab.reserve(Capacity); }
 
   bool operator==(const Table<R, C, V, ContainerTy> &Other) noexcept {
@@ -487,15 +429,6 @@ OwningSolverResults(Table<N, D, L> ResTab, | ^
 private:
   // std::unordered_map<R, std::unordered_map<C, V>> Tab{};
   Container Tab{};
-
-  // TODO: ask Fabian if this makes sense.
-  // If we are working with an unordered map, that means that the table is not
-  // supporting multi-threading. In that case, it must not have a mutex.
-  struct Empty {};
-  std::conditional_t<
-      std::is_same_v<ContainerTy<C, V>, std::unordered_map<C, V>>, Empty,
-      std::mutex>
-      FindAndDoMutex;
 };
 
 } // namespace psr

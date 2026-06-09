@@ -146,6 +146,7 @@ public:
     auto Key = std::tie(CallSite, DestFun);
 
     // TODO: make thread safe
+    // I feel like I can't get around a lock guard here.
     auto [It, Inserted] = CallFlowFunctionCache.try_emplace(std::move(Key));
     if (Inserted) {
       INC_COUNTER("Call-FF Construction", 1, Full);

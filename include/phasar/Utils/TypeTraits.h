@@ -336,8 +336,7 @@ concept has_for_each = requires(T &Container) {
 
 template <typename T, typename K>
 concept has_lazy_emplace = requires(T &Container, K &Key) {
-  Container.lazy_emplace(
-      Key, psr::DummyFn<typename std::remove_cvref_t<T>::value_type &>{});
+  Container.lazy_emplace(Key, [](auto &&Ctor) {});
 };
 
 template <typename T, typename K>

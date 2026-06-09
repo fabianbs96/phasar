@@ -48,6 +48,7 @@ include(GNUInstallDirs)
 set_property(GLOBAL PROPERTY TARGET_MESSAGES OFF)
 
 option(PHASAR_ENABLE_SANITIZERS "Build PhASAR with AddressSanitizer and UBSanitizer (default is OFF)" OFF)
+option(PHASAR_ENABLE_THREAD_SANITIZER "Build PhASAR with ThreadSanitizer (default is OFF)" OFF)
 
 set(PHASAR_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(PHASAR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -356,7 +357,7 @@ endif()
 option(USE_LLVM_FAT_LIB  "Link against libLLVM.so instead of the individual LLVM libraries if possible (default is OFF; always on if BUILD_SHARED_LIBS is ON)" OFF)
 
 # LLVM
-set(PHASAR_LLVM_VERSION 16 CACHE STRING "The LLVM major-version that PhASAR should use")
+set(PHASAR_LLVM_VERSION 20.1 CACHE STRING "The LLVM major-version that PhASAR should use")
 
 include(add_llvm)
 add_llvm()

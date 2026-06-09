@@ -37,7 +37,9 @@ int main(int Argc, const char **Argv) {
 
   std::vector EntryPoints = {"main"s};
 
-  HelperAnalyses HA(Argv[1], EntryPoints);
+  HelperAnalyses HA(
+      Argv[1], EntryPoints,
+      {.PTATy = AliasAnalysisType::UnionFind, .AllowLazyPTS = false});
   if (!HA.getProjectIRDB().isValid()) {
     return 1;
   }

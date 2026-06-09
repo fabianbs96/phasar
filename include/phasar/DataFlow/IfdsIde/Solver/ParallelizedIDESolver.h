@@ -788,23 +788,24 @@ protected:
                        "   Target D: " << DToString(Edge.factAtTarget()));
     });
 
-    auto FwdLookupRes =
-        JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
-    if (FwdLookupRes) {
-      auto &Ref = FwdLookupRes->get();
-      if (auto Find = std::find_if(Ref.begin(), Ref.end(),
-                                   [Edge](const auto &Pair) {
-                                     return Edge.factAtTarget() == Pair.first;
-                                   });
-          Find != Ref.end()) {
-        PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
-        return Find->second;
-      }
-    }
+    EdgeFunction<l_t> RetVal = AllTop;
+    JumpFn->forwardLookup(
+        Edge.factAtSource(), Edge.getTarget(), [&](auto &FwdLookupRes) {
+          if (auto Find = std::find_if(FwdLookupRes.begin(), FwdLookupRes.end(),
+                                       [Edge](const auto &Pair) {
+                                         return Edge.factAtTarget() ==
+                                                Pair.first;
+                                       });
+              Find != FwdLookupRes.end()) {
+            PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
+            RetVal = Find->second;
+          }
 
-    PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
-    // JumpFn initialized to all-top, see line [2] in SRH96 paper
-    return AllTop;
+          PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
+          // JumpFn initialized to all-top, see line [2] in SRH96 paper
+          // RetVal is set to all-top
+        });
+    return RetVal;
   }
 
   void addEndSummary(n_t SP, d_t d1, n_t eP, d_t d2, EdgeFunction<l_t> f) {

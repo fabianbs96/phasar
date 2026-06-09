@@ -28,6 +28,7 @@
 #include "parallel_hashmap/phmap.h"
 #include "parallel_hashmap/phmap_fwd_decl.h"
 
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -97,14 +98,7 @@ public:
       return;
     }
 
-    {
-#if false
-      // TODO: how to get less lock guarding here?
-      // The idea was to use callback functions as the return value instead of
-      // references. But how does that solve the problem? It exposes the same
-      // amount.
-      std::lock_guard Guard(NonEmptyReverseLookupMutex);
-      auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
+    NonEmptyReverseLookup.get(Target, TargetVal, [&](auto &SourceValToFunc) {
       if (auto Find = std::find_if(
               SourceValToFunc.begin(), SourceValToFunc.end(),
               [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
@@ -117,53 +111,9 @@ public:
       } else {
         SourceValToFunc.emplace_back(SourceVal, EdgeFunc);
       }
-#endif
+    });
 
-      // TODO: I have no idea if this impl is better than the previous one.
-      // NOTE: I don't think if_contains works here because we need to check the
-      // first part of a pair
-      // NODE: I don't even know if the findAndDo impl is thread safe, because
-      // there is a mutex locked check and then a mutex locked edit. But doesn't
-      // it need to be mutex locked the whole time, so no other thread messes
-      // with that in the meantime?
-      // But then how do we reduce the locking?
-      // TODO: Talk with Fabian about the following: I feel like there is no way
-      // around excessive locking.
-      NonEmptyReverseLookup.ifContainsDo(
-          Target, TargetVal,
-          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
-            // it is important that existing values in JumpFunctionsPll
-            // are overwritten
-            for (auto &Entry : Tab[Target][TargetVal]) {
-              if (SourceVal == Entry.first) {
-                Entry.second = EdgeFunc;
-              }
-            }
-          },
-          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
-            Tab[Target][TargetVal].emplace_back(SourceVal, EdgeFunc);
-          });
-    }
-    {
-      NonEmptyForwardLookup.ifContainsDo(
-          SourceVal, Target,
-          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
-            // it is important that existing values in JumpFunctionsPll
-            // are overwritten
-            for (auto &Entry : Tab[SourceVal][Target]) {
-              if (TargetVal == Entry.first) {
-                Entry.second = EdgeFunc;
-              }
-            }
-          },
-          [SourceVal, EdgeFunc, Target, TargetVal](auto &Tab) {
-            Tab[SourceVal][Target].emplace_back(TargetVal, EdgeFunc);
-          });
-    }
-#if false
-    {
-      std::lock_guard Guard(NonEmptyForwardLookupMutex);
-      auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
+    NonEmptyForwardLookup.get(SourceVal, Target, [&](auto &TargetValToFunc) {
       if (auto Find = std::find_if(
               TargetValToFunc.begin(), TargetValToFunc.end(),
               [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
@@ -176,15 +126,12 @@ public:
       } else {
         TargetValToFunc.emplace_back(TargetVal, EdgeFunc);
       }
-    }
-#endif
+    });
 
     // V Table::insert(R r, C c, V v) always overrides (see
     // comments above)
-    {
-      std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
-      NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
-    }
+    NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
+
     PHASAR_LOG_LEVEL(DEBUG, "End adding new jump function");
   }
 
@@ -216,6 +163,24 @@ public:
       return std::nullopt;
     }
     return {NonEmptyForwardLookup.get(SourceVal, Target)};
+  }
+
+  /**
+   * Returns, for a given source value and target statement all
+   * associated target values, and for each the associated edge function.
+   * The return value is a mapping from target value to function.
+   * TODO: add more context
+   */
+  void forwardLookup(d_t SourceVal, n_t Target,
+                     std::invocable<llvm::SmallVectorImpl<
+                         std::pair<d_t, EdgeFunction<l_t>>> &> auto Callback) {
+    std::lock_guard Guard(NonEmptyForwardLookupMutex);
+
+    if (!NonEmptyForwardLookup.contains(SourceVal, Target)) {
+      return;
+    }
+
+    NonEmptyForwardLookup.get(SourceVal, Target, std::move(Callback));
   }
 
   /**
