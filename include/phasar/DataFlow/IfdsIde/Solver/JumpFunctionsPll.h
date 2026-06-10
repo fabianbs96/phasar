@@ -130,7 +130,9 @@ public:
 
     // V Table::insert(R r, C c, V v) always overrides (see
     // comments above)
-    NonEmptyLookupByTargetNode[Target].insert(SourceVal, TargetVal, EdgeFunc);
+    auto &Inner =
+        NonEmptyLookupByTargetNode.try_emplace_p(Target).first->second;
+    Inner.insert(SourceVal, TargetVal, EdgeFunc);
 
     PHASAR_LOG_LEVEL(DEBUG, "End adding new jump function");
   }

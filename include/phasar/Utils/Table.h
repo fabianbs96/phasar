@@ -94,7 +94,7 @@ public:
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
     if constexpr (has_lazy_emplace<Container, R>) {
-      auto &Inner = Tab[std::move(Row)];
+      auto &Inner = Tab.try_emplace_p(std::move(Row)).first->second;
       Inner.lazy_emplace(Column, [&](auto &&Ctor) {
         Ctor(std::move(Column), std::move(Val));
       });
@@ -241,7 +241,7 @@ public:
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
     // TODO: below creates a data race. How to fix?
-    auto &Inner = Tab[std::move(RowKey)];
+    auto &Inner = Tab.try_emplace_p(std::move(RowKey)).first->second;
     Inner.lazy_emplace_l(
         ColumnKey, [&](auto &Pair) { Callback(Pair.second); },
         [&](auto &&Ctor) {
