@@ -234,13 +234,18 @@ public:
   [[nodiscard]] V &get(R RowKey, C ColumnKey) {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    return Tab[std::move(RowKey)][std::move(ColumnKey)];
+    if constexpr (has_try_emplace_p<Container, R>) {
+      return Tab.try_emplace_p(std::move(RowKey))
+          .second.try_emplace_p(std::move(ColumnKey));
+    } else {
+      return Tab[std::move(RowKey)][std::move(ColumnKey)];
+    }
   }
 
   void get(R RowKey, C ColumnKey, std::invocable<V &> auto Callback) {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    // TODO: below creates a data race. How to fix?
+    // TODO: add if constexpr!
     auto &Inner = Tab.try_emplace_p(std::move(RowKey)).first->second;
     Inner.lazy_emplace_l(
         ColumnKey, [&](auto &Pair) { Callback(Pair.second); },

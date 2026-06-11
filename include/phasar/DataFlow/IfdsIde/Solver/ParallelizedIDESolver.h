@@ -788,7 +788,10 @@ protected:
                        "   Target D: " << DToString(Edge.factAtTarget()));
     });
 
+    // JumpFn initialized to all-top, see line [2] in SRH96 paper
+    // RetVal is set to all-top
     EdgeFunction<l_t> RetVal = AllTop;
+
     JumpFn->forwardLookup(
         Edge.factAtSource(), Edge.getTarget(), [&](auto &FwdLookupRes) {
           if (auto Find = std::find_if(FwdLookupRes.begin(), FwdLookupRes.end(),
@@ -802,9 +805,8 @@ protected:
           }
 
           PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
-          // JumpFn initialized to all-top, see line [2] in SRH96 paper
-          // RetVal is set to all-top
         });
+
     return RetVal;
   }
 
@@ -1268,21 +1270,24 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
+    // TODO: check if we can pass by reference here
     auto JumpFnE = [=, this]() mutable {
-      const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
-      if (RevLookupResult) {
-        const auto &JumpFnContainer = RevLookupResult->get();
-        const auto Find = std::find_if(
-            JumpFnContainer.begin(), JumpFnContainer.end(),
-            [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
-        if (Find != JumpFnContainer.end()) {
-          return Find->second;
-        }
-      }
-
       // jump function is initialized to all-top if no entry
       // was found
-      return AllTop;
+      EdgeFunction<l_t> RetVal = AllTop;
+
+      JumpFn->reverseLookup(Target, TargetVal, [&](auto &RevLookupResult) {
+        if (const auto Find =
+                std::find_if(RevLookupResult.begin(), RevLookupResult.end(),
+                             [SourceVal](auto &KVpair) {
+                               return KVpair.first == SourceVal;
+                             });
+            Find != RevLookupResult.end()) {
+          RetVal = Find->second;
+        }
+      });
+
+      return RetVal;
     }();
 
     auto fPrime = IDEProblem.combine(JumpFnE, f);

@@ -340,6 +340,10 @@ concept has_lazy_emplace = requires(T &Container, K &Key) {
 };
 
 template <typename T, typename K>
+concept has_try_emplace_p =
+    requires(T &Container, K &Key) { Container.lazy_emplace(Key); };
+
+template <typename T, typename K>
 concept has_if_contains = requires(T &Container, K &Key) {
   Container.if_contains(
       Key, psr::DummyFn<typename std::remove_cvref_t<T>::value_type &>{});
