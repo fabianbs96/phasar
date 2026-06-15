@@ -119,20 +119,20 @@ public:
     // operator[] instead of try_emplace: NormalEdgeFlowData holds both the
     // flow function ptr and the edge function map for the same (Curr,Succ)
     // key, so getNormalEdgeFunction shares this entry via the same lookup.
-    auto &NormalFE = NormalFunctionCache[std::move(Key)];
-    if (!NormalFE.FlowFuncPtr) {
+    auto [NormalFE, Inserted] = NormalFunctionCache.try_emplace_p(Key);
+    if (Inserted) {
       INC_COUNTER("Normal-FF Construction", 1, Full);
       auto FF = Problem.getNormalFlowFunction(Curr, Succ);
-      NormalFE.FlowFuncPtr = AutoAddZero
-                                 ? std::make_unique<ZFF>(std::move(FF), ZV)
-                                 : std::move(FF);
+      NormalFE->second.FlowFuncPtr =
+          AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                      : std::move(FF);
       PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
     } else {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
       INC_COUNTER("Normal-FF Cache Hit", 1, Full);
     }
 
-    return getPointerFrom(NormalFE.FlowFuncPtr);
+    return getPointerFrom(NormalFunctionCache[std::move(Key)].FlowFuncPtr);
   }
 
   FlowFunctionPtrType getCallFlowFunction(n_t CallSite, f_t DestFun) {
@@ -147,7 +147,7 @@ public:
 
     // TODO: make thread safe
     // I feel like I can't get around a lock guard here.
-    auto [It, Inserted] = CallFlowFunctionCache.try_emplace(std::move(Key));
+    auto [It, Inserted] = CallFlowFunctionCache.try_emplace_p(std::move(Key));
     if (Inserted) {
       INC_COUNTER("Call-FF Construction", 1, Full);
       auto FF = Problem.getCallFlowFunction(CallSite, DestFun);
@@ -177,20 +177,20 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite)));
     auto Key = std::tie(CallSite, CalleeFun, ExitInst, RetSite);
 
-    auto [It, Inserted] = ReturnFlowFunctionCache.try_emplace(std::move(Key));
+    auto [Ptr, Inserted] = ReturnFlowFunctionCache.try_emplace_p(Key);
     if (Inserted) {
       INC_COUNTER("Return-FF Construction", 1, Full);
       auto FF =
           Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst, RetSite);
-      It->second = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
-                               : std::move(FF);
+      Ptr->second = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                                : std::move(FF);
 
       PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
     } else {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
       INC_COUNTER("Return-FF Cache Hit", 1, Full);
     }
-    return getPointerFrom(It->second);
+    return getPointerFrom(ReturnFlowFunctionCache[std::move(Key)]);
   }
 
   FlowFunctionPtrType getCallToRetFlowFunction(n_t CallSite, n_t RetSite,
@@ -256,6 +256,11 @@ public:
 
     EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(Curr, Succ);
     auto &NormalFE = NormalFunctionCache[std::move(OuterMapKey)];
+
+    // TODO: make EdgeFunctionMap thread safe and remove this lock. Making
+    // EdgeFunctionMap thread safe is a bit complicated, that's why this
+    // temporary lock exists.
+    std::lock_guard Guard(EdgeFunctionMapMutex);
     auto Ret = NormalFE.EdgeFunctionMap.getOrInsertLazy(
         createEdgeFunctionNodeKey(CurrNode, SuccNode),
         [&] {
@@ -574,7 +579,8 @@ private:
       std::is_base_of_v<llvm::Value, std::remove_pointer_t<d_t>>, uint64_t,
       std::pair<d_t, d_t>>;
   using InnerEdgeFunctionMapType =
-      EquivalenceClassMap<EdgeFuncNodeKey, EdgeFunctionType>;
+      EquivalenceClassMap<EdgeFuncNodeKey, EdgeFunctionType,
+                          phmap::parallel_node_hash_set_m<EdgeFuncNodeKey>>;
 
   using ZFF = ZeroedFlowFunction<d_t, Container>;
 
@@ -639,6 +645,8 @@ private:
   phmap::parallel_node_hash_map_m<std::tuple<n_t, d_t, n_t, d_t>,
                                   EdgeFunctionType>
       SummaryEdgeFunctionCache;
+
+  std::mutex EdgeFunctionMapMutex;
 };
 
 } // namespace psr

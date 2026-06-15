@@ -1227,6 +1227,9 @@ protected:
   container_type
   computeCallToReturnFlowFunction(const auto &CallToReturnFlowFunction,
                                   d_t /*d1*/, d_t d2) {
+    // TODO: can we move the mutex locks deeper? Can we use thread-safe data
+    // structures?
+    std::lock_guard Guard(CallToRetMutex);
     return CallToReturnFlowFunction->computeTargets(d2);
   }
 
@@ -1242,6 +1245,9 @@ protected:
   container_type computeReturnFlowFunction(const auto &RetFlowFunction,
                                            d_t /*d1*/, d_t d2, n_t /*CallSite*/,
                                            const Container & /*CallerSideDs*/) {
+    // TODO: can we move the mutex locks deeper? Can we use thread-safe data
+    // structures?
+    std::lock_guard Guard(RetFlowMutex);
     return RetFlowFunction->computeTargets(d2);
   }
 
@@ -1307,6 +1313,7 @@ protected:
 
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
+
       {
         std::lock_guard Guard(PathEdgeProcessingTaskMutex);
         pathEdgeProcessingTask(std::move(Edge));
@@ -1986,6 +1993,8 @@ private:
 
   BS::light_thread_pool TPool;
   std::mutex PathEdgeProcessingTaskMutex;
+  std::mutex RetFlowMutex;
+  std::mutex CallToRetMutex;
   hms SolveTime;
 };
 

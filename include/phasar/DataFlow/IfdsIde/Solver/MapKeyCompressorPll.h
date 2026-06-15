@@ -27,6 +27,7 @@ public:
   using CompressedType = uint32_t;
 
   [[nodiscard]] inline CompressedType getCompressedID(KeyType Key) {
+    std::lock_guard Guard(MapMutex);
     auto Search = Map.find(Key);
     if (Search == Map.end()) {
       return Map.insert(std::make_pair(Key, Map.size() + 1)).first->second;
@@ -36,6 +37,7 @@ public:
 
 private:
   phmap::parallel_flat_hash_map_m<KeyType, CompressedType> Map{};
+  std::mutex MapMutex;
 };
 
 } // namespace psr

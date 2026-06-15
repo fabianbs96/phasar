@@ -234,9 +234,7 @@ public:
    * there anyway.
    */
   bool removeFunction(d_t SourceVal, n_t Target, d_t TargetVal) {
-    {
-      std::lock_guard Guard(NonEmptyReverseLookupMutex);
-      auto &SourceValToFunc = NonEmptyReverseLookup.get(Target, TargetVal);
+    NonEmptyReverseLookup.get(Target, TargetVal, [&](auto &SourceValToFunc) {
       if (auto Find = std::find_if(
               SourceValToFunc.begin(), SourceValToFunc.end(),
               [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
@@ -245,19 +243,20 @@ public:
           Find != SourceValToFunc.end()) {
         SourceValToFunc.erase(Find);
       }
-    }
-    {
-      std::lock_guard ForwardGuard(NonEmptyForwardLookupMutex);
-      auto &TargetValToFunc = NonEmptyForwardLookup.get(SourceVal, Target);
-      if (auto Find = std::find_if(
-              TargetValToFunc.begin(), TargetValToFunc.end(),
-              [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
-                return TargetVal == Entry.first;
-              });
-          Find != TargetValToFunc.end()) {
-        TargetValToFunc.erase(Find);
-      }
-    }
+    });
+
+    auto &TargetValToFunc = NonEmptyForwardLookup.get(
+        SourceVal, Target, [&](auto &TargetValToFunc) {
+          if (auto Find = std::find_if(
+                  TargetValToFunc.begin(), TargetValToFunc.end(),
+                  [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+                    return TargetVal == Entry.first;
+                  });
+              Find != TargetValToFunc.end()) {
+            TargetValToFunc.erase(Find);
+          }
+        });
+
     std::lock_guard LookupGuard(NonEmptyLookupByTargetNodeMutex);
     return NonEmptyLookupByTargetNode.erase(Target);
   }
