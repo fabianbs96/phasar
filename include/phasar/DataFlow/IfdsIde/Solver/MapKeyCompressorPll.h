@@ -27,7 +27,7 @@ public:
   using CompressedType = uint32_t;
 
   [[nodiscard]] inline CompressedType getCompressedID(KeyType Key) {
-    std::lock_guard Guard(MapMutex);
+    // std::lock_guard Guard(MapMutex);
     auto Search = Map.find(Key);
     if (Search == Map.end()) {
       return Map.insert(std::make_pair(Key, Map.size() + 1)).first->second;

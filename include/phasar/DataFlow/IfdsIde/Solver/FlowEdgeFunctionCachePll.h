@@ -257,10 +257,6 @@ public:
     EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(Curr, Succ);
     auto &NormalFE = NormalFunctionCache[std::move(OuterMapKey)];
 
-    // TODO: make EdgeFunctionMap thread safe and remove this lock. Making
-    // EdgeFunctionMap thread safe is a bit complicated, that's why this
-    // temporary lock exists.
-    std::lock_guard Guard(EdgeFunctionMapMutex);
     auto Ret = NormalFE.EdgeFunctionMap.getOrInsertLazy(
         createEdgeFunctionNodeKey(CurrNode, SuccNode),
         [&] {
@@ -645,8 +641,6 @@ private:
   phmap::parallel_node_hash_map_m<std::tuple<n_t, d_t, n_t, d_t>,
                                   EdgeFunctionType>
       SummaryEdgeFunctionCache;
-
-  std::mutex EdgeFunctionMapMutex;
 };
 
 } // namespace psr
