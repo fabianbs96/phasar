@@ -17,6 +17,7 @@
 #include "phasar/Utils/EquivalenceClassMap.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/PAMMMacros.h"
+#include "phasar/Utils/PointerUtils.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "parallel_hashmap/phmap.h"
@@ -116,23 +117,25 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Succ Inst : " << NToString(Succ)));
     auto Key = createEdgeFunctionInstKey(Curr, Succ);
 
-    // operator[] instead of try_emplace: NormalEdgeFlowData holds both the
-    // flow function ptr and the edge function map for the same (Curr,Succ)
-    // key, so getNormalEdgeFunction shares this entry via the same lookup.
-    auto [NormalFE, Inserted] = NormalFunctionCache.try_emplace_p(Key);
-    if (Inserted) {
-      INC_COUNTER("Normal-FF Construction", 1, Full);
-      auto FF = Problem.getNormalFlowFunction(Curr, Succ);
-      NormalFE->second.FlowFuncPtr =
-          AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
-                      : std::move(FF);
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Normal-FF Cache Hit", 1, Full);
-    }
+    FlowFunctionPtrType Ret;
+    NormalFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Found) {
+          Ret = getPointerFrom(Found.second.FlowFuncPtr);
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+          INC_COUNTER("Normal-FF Cache Hit", 1, Full);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Normal-FF Construction", 1, Full);
+          auto FF = Problem.getNormalFlowFunction(Curr, Succ);
+          auto Ptr = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                                 : std::move(FF);
+          Ret = getPointerFrom(Ptr);
+          Ctor(std::move(Key), std::move(Ptr));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
 
-    return getPointerFrom(NormalFunctionCache[std::move(Key)].FlowFuncPtr);
+    return Ret;
   }
 
   FlowFunctionPtrType getCallFlowFunction(n_t CallSite, f_t DestFun) {
@@ -145,21 +148,25 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(F) Dest Fun : " << FToString(DestFun)));
     auto Key = std::tie(CallSite, DestFun);
 
-    // TODO: make thread safe
-    // I feel like I can't get around a lock guard here.
-    auto [It, Inserted] = CallFlowFunctionCache.try_emplace_p(std::move(Key));
-    if (Inserted) {
-      INC_COUNTER("Call-FF Construction", 1, Full);
-      auto FF = Problem.getCallFlowFunction(CallSite, DestFun);
-      It->second = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
-                               : std::move(FF);
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Call-FF Cache Hit", 1, Full);
-    }
+    FlowFunctionPtrType Ret;
+    CallFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Found) {
+          Ret = getPointerFrom(Found.second);
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+          INC_COUNTER("Call-FF Cache Hit", 1, Full);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Call-FF Construction", 1, Full);
+          auto FF = Problem.getCallFlowFunction(CallSite, DestFun);
+          auto Ptr = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                                 : std::move(FF);
+          Ret = getPointerFrom(Ptr);
+          Ctor(std::move(Key), std::move(Ptr));
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
 
-    return getPointerFrom(It->second);
+    return Ret;
   }
 
   FlowFunctionPtrType getRetFlowFunction(n_t CallSite, f_t CalleeFun,
@@ -177,24 +184,32 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite)));
     auto Key = std::tie(CallSite, CalleeFun, ExitInst, RetSite);
 
-    auto [Ptr, Inserted] = ReturnFlowFunctionCache.try_emplace_p(Key);
-    if (Inserted) {
-      INC_COUNTER("Return-FF Construction", 1, Full);
-      auto FF =
-          Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst, RetSite);
-      Ptr->second = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
-                                : std::move(FF);
+    FlowFunctionPtrType Ret;
+    ReturnFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Found) {
+          Ret = getPointerFrom(Found.second);
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+          INC_COUNTER("Return-FF Cache Hit", 1, Full);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("Return-FF Construction", 1, Full);
+          auto FF = Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
+                                               RetSite);
+          auto Ptr = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                                 : std::move(FF);
+          Ret = getPointerFrom(Ptr);
+          Ctor(std::move(Key), std::move(Ptr));
 
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Return-FF Cache Hit", 1, Full);
-    }
-    return getPointerFrom(ReturnFlowFunctionCache[std::move(Key)]);
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
+
+    return Ret;
   }
 
-  FlowFunctionPtrType getCallToRetFlowFunction(n_t CallSite, n_t RetSite,
-                                               llvm::ArrayRef<f_t> Callees) {
+  [[nodiscard]] NonNullPtr<FlowFunctionType>
+  getCallToRetFlowFunction(n_t CallSite, n_t RetSite,
+                           llvm::ArrayRef<f_t> Callees) {
     assertNotNull(CallSite);
     assertNotNull(RetSite);
     assertAllNotNull(Callees);
@@ -210,21 +225,30 @@ public:
         };);
     auto Key = std::tie(CallSite, RetSite);
 
-    auto [It, Inserted] =
-        CallToRetFlowFunctionCache.try_emplace(std::move(Key));
-    if (Inserted) {
-      INC_COUNTER("CallToRet-FF Construction", 1, Full);
-      auto FF = Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees);
-      It->second = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
-                               : std::move(FF);
+    // TODO: there is probably a better way to do the ret type here. However,
+    // NonNullPtr<FlowFunctionType> doesn't work, as it has no default
+    // constructor.
+    FlowFunctionPtrType Ret;
+    CallToRetFlowFunctionCache.lazy_emplace_l(
+        Key,
+        [&](auto &Found) {
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+          INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
+          Ret = getPointerFrom(Found.second);
+        },
+        [&](auto &&Ctor) {
+          INC_COUNTER("CallToRet-FF Construction", 1, Full);
+          auto FF =
+              Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees);
+          auto Ptr = AutoAddZero ? std::make_unique<ZFF>(std::move(FF), ZV)
+                                 : std::move(FF);
+          Ret = getPointerFrom(Ptr);
+          Ctor(std::move(Key), std::move(Ptr));
 
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
-    }
+          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+        });
 
-    return getPointerFrom(It->second);
+    return getPointerFrom(Ret.get());
   }
 
   FlowFunctionPtrType getSummaryFlowFunction(n_t CallSite, f_t DestFun) {
@@ -348,7 +372,7 @@ public:
           auto EF = Problem.getReturnEdgeFunction(
               CallSite, CalleeFunction, ExitInst, ExitNode, RetSite, RetNode);
           ReturnEF = EF;
-          PSR_FWD(Ctor)(Key, std::move(EF));
+          PSR_FWD(Ctor)(std::move(Key), std::move(EF));
           PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
           PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << EF);
         });
