@@ -279,21 +279,33 @@ public:
         PHASAR_LOG_LEVEL(DEBUG, "(D) Succ Node : " << DToString(SuccNode)));
 
     EdgeFuncInstKey OuterMapKey = createEdgeFunctionInstKey(Curr, Succ);
-    auto &NormalFE = NormalFunctionCache[std::move(OuterMapKey)];
+    // auto &NormalFE = NormalFunctionCache[std::move(OuterMapKey)];
+    auto [NormalFE, Inserted] =
+        NormalFunctionCache.try_emplace_p(std::move(OuterMapKey));
 
-    auto Ret = NormalFE.EdgeFunctionMap.getOrInsertLazy(
-        createEdgeFunctionNodeKey(CurrNode, SuccNode),
-        [&] {
-          INC_COUNTER("Normal-EF Construction", 1, Full);
-          auto EF =
-              Problem.getNormalEdgeFunction(Curr, CurrNode, Succ, SuccNode);
-          PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
-          return EF;
-        },
-        [&] {
-          INC_COUNTER("Normal-EF Cache Hit", 1, Full);
-          PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
-        });
+#if false
+  using InnerEdgeFunctionMapType =
+      EquivalenceClassMap<EdgeFuncNodeKey, EdgeFunctionType,
+                          phmap::parallel_node_hash_set_m<EdgeFuncNodeKey>>;
+#endif
+    EdgeFunctionType Ret;
+    {
+      std::lock_guard Guard(GetOrInsertLazyMutex);
+      Ret = NormalFE->second.EdgeFunctionMap.getOrInsertLazy(
+          createEdgeFunctionNodeKey(CurrNode, SuccNode),
+          [&] {
+            INC_COUNTER("Normal-EF Construction", 1, Full);
+            auto EF =
+                Problem.getNormalEdgeFunction(Curr, CurrNode, Succ, SuccNode);
+            PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+            return EF;
+          },
+          [&] {
+            INC_COUNTER("Normal-EF Cache Hit", 1, Full);
+            PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
+          });
+    }
+
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Ret);
     return Ret;
   }
@@ -640,6 +652,8 @@ private:
   // Auto add zero
   bool AutoAddZero;
   d_t ZV;
+
+  std::mutex GetOrInsertLazyMutex;
 
   // Caches for the flow/edge functions
   phmap::parallel_node_hash_map_m<EdgeFuncInstKey, NormalEdgeFlowData>

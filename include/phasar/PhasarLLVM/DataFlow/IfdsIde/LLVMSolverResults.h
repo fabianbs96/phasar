@@ -165,8 +165,9 @@ namespace psr::detail {
   return Ret;
 }
 
-template <typename Derived, typename N, typename D, typename L>
-auto SolverResultsBase<Derived, N, D, L>::resultsAtInLLVMSSA(
+template <typename Derived, typename N, typename D, typename L,
+          typename Container>
+auto SolverResultsBase<Derived, N, D, L, Container>::resultsAtInLLVMSSA(
     ByConstRef<n_t> Stmt, bool AllowOverapproximation, bool StripZero) const
     -> std::unordered_map<d_t, l_t>
   requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>
@@ -179,8 +180,9 @@ auto SolverResultsBase<Derived, N, D, L>::resultsAtInLLVMSSA(
   return Result;
 }
 
-template <typename Derived, typename N, typename D, typename L>
-auto SolverResultsBase<Derived, N, D, L>::resultAtInLLVMSSA(
+template <typename Derived, typename N, typename D, typename L,
+          typename Container>
+auto SolverResultsBase<Derived, N, D, L, Container>::resultAtInLLVMSSA(
     ByConstRef<n_t> Stmt, d_t Value, bool AllowOverapproximation) const -> l_t
   requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>
 {

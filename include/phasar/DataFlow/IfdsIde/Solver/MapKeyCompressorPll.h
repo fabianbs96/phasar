@@ -26,17 +26,27 @@ public:
   using KeyType = const llvm::Value *;
   using CompressedType = uint32_t;
 
-  [[nodiscard]] inline CompressedType getCompressedID(KeyType Key) {
-    // std::lock_guard Guard(MapMutex);
-    auto Search = Map.find(Key);
-    if (Search == Map.end()) {
-      return Map.insert(std::make_pair(Key, Map.size() + 1)).first->second;
-    }
-    return Search->second;
+  [[nodiscard]] CompressedType getCompressedID(KeyType Key) {
+    CompressedType Ret;
+
+    // TODO: for some reason, Map.size() creates a data race. It seems to be not
+    // thread safe, no idea why.
+    // TODO: remove mutex here and find a cleaner solution.
+    std::lock_guard Guard(MapMutex);
+    Map.lazy_emplace_l(
+        Key, [&](auto &Found) { Ret = Found.second; },
+        [&](auto &&Ctor) {
+          // return Map.insert(std::make_pair(Key, Map.size() +
+          // 1)).first->second;
+          Ret = Map.size() + 1;
+          Ctor(std::make_pair(Key, Ret));
+        });
+
+    return Ret;
   }
 
 private:
-  phmap::parallel_flat_hash_map_m<KeyType, CompressedType> Map{};
+  phmap::parallel_node_hash_map_m<KeyType, CompressedType> Map{};
   std::mutex MapMutex;
 };
 

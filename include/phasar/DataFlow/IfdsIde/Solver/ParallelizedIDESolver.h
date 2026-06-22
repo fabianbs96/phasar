@@ -56,7 +56,6 @@
 #include <concepts>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -65,6 +64,9 @@
 #include <vector>
 
 namespace psr {
+
+template <typename Key, typename Val>
+using PllMap = phmap::parallel_node_hash_map_m<Key, Val>;
 
 template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
@@ -93,9 +95,6 @@ public:
   using f_t = typename AnalysisDomainTy::f_t;
   using t_t = typename AnalysisDomainTy::t_t;
   using v_t = typename AnalysisDomainTy::v_t;
-
-  template <typename Key, typename Val>
-  using PllMap = phmap::parallel_node_hash_map_m<Key, Val>;
 
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
@@ -298,10 +297,10 @@ public:
   /// can be destroyed without that the analysis results are lost.
   /// Do not call any function (including getSolverResults()) on this
   /// ParallelizedIDESolver instance after that.
-  [[nodiscard]] OwningSolverResults<n_t, d_t, l_t>
+  [[nodiscard]] OwningSolverResults<n_t, d_t, l_t, Table<n_t, d_t, l_t, PllMap>>
   consumeSolverResults() noexcept(std::is_nothrow_move_constructible_v<d_t>) {
-    return OwningSolverResults<n_t, d_t, l_t>(std::move(this->ValTab),
-                                              std::move(ZeroValue));
+    return OwningSolverResults<n_t, d_t, l_t, Table<n_t, d_t, l_t, PllMap>>(
+        std::move(this->ValTab), std::move(ZeroValue));
   }
 
   [[nodiscard]] EdgeFunctionStats getEdgeFunctionStatistics() const {
@@ -1308,10 +1307,7 @@ protected:
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
 
-      {
-        std::lock_guard Guard(PathEdgeProcessingTaskMutex);
-        pathEdgeProcessingTask(std::move(Edge));
-      }
+      pathEdgeProcessingTask(std::move(Edge));
 
       IF_LOG_LEVEL_ENABLED(DEBUG, {
         if (!IDEProblem.isZeroValue(TargetVal)) {
@@ -1351,7 +1347,12 @@ protected:
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
-    IncomingTab.get(SP, d3)[n].insert(d2);
+    // TODO: use lambda get here maybe?
+    // IncomingTab.get(SP, d3)[n].insert(d2);
+    IncomingTab.get(SP, d3, [&](auto &Value) {
+      // TODO: the [] operator is not thread safe. Fix.
+      Value.at(n).insert(d2);
+    });
   }
 
   void printIncomingTab() {
@@ -1986,7 +1987,6 @@ private:
   std::map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   BS::light_thread_pool TPool;
-  std::mutex PathEdgeProcessingTaskMutex;
   hms SolveTime;
 };
 
@@ -2014,19 +2014,18 @@ using ParallelizedIDESolver_P =
                           typename Problem::container_type>;
 
 template <typename AnalysisDomainTy, typename Container>
-OwningSolverResults<typename AnalysisDomainTy::n_t,
-                    typename AnalysisDomainTy::d_t,
-                    typename AnalysisDomainTy::l_t>
-solveIDEProblemPll(
-    IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
-    const std::convertible_to<const typename AnalysisDomainTy::i_t &> auto
-        &ICF) {
+OwningSolverResults<
+    typename AnalysisDomainTy::n_t, typename AnalysisDomainTy::d_t,
+    typename AnalysisDomainTy::l_t,
+    Table<typename AnalysisDomainTy::n_t, typename AnalysisDomainTy::d_t,
+          typename AnalysisDomainTy::l_t, PllMap>>
+solveIDEProblemPll(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
+                   const ICFG auto &ICF) {
   ParallelizedIDESolver<AnalysisDomainTy, Container> Solver(&Problem, &ICF);
-
   SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
-  llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()
-               << "\n\n\n";
+  llvm::outs() << "\n\n\nParallelizedIDESolver solve() time: "
+               << SolveTimer.elapsed() << "\n\n\n";
 
   return Solver.consumeSolverResults();
 }

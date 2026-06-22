@@ -45,15 +45,13 @@ int main(int Argc, const char **Argv) {
   }
 
   if (HA.getProjectIRDB().getFunctionDefinition("main")) {
+    llvm::outs() << "Testing ParallelizedIDESolver:\n";
+
     auto Problem =
         createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
 
-    llvm::outs() << "Testing ParallelizedIDESolver:\n";
-    ParallelizedIDESolver Solver(Problem, &HA.getICFG());
-    Solver.solve();
-    llvm::outs() << "\n\n\nParallelizedIDESolver solve() time: "
-                 << Solver.getSolveTime() << "\n\n\n";
-
+    auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG());
+    IDEResults.dumpResults(HA.getICFG());
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }

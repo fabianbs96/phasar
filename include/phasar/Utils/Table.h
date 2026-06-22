@@ -27,7 +27,6 @@
 
 #include <cassert>
 #include <concepts>
-#include <mutex>
 #include <optional>
 #include <set>
 #include <tuple>

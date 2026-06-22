@@ -40,7 +40,8 @@ namespace psr {
 std::string getMetaDataID(const llvm::Value *V);
 
 namespace detail {
-template <typename Derived, typename N, typename D, typename L>
+template <typename Derived, typename N, typename D, typename L,
+          typename Container = Table<N, D, L>>
 class SolverResultsBase {
 public:
   using n_t = N;
@@ -148,7 +149,7 @@ public:
                                       bool AllowOverapproximation = false) const
     requires same_as_decay<std::remove_pointer_t<n_t>, llvm::Instruction>;
 
-  [[nodiscard]] std::vector<typename Table<n_t, d_t, l_t>::Cell>
+  [[nodiscard]] std::vector<typename Container::Cell>
   getAllResultEntries() const {
     return self().Results.cellVec();
   }
@@ -222,10 +223,13 @@ private:
 };
 } // namespace detail
 
-template <typename N, typename D, typename L>
+template <typename N, typename D, typename L,
+          typename Container = Table<N, D, L>>
 class SolverResults
-    : public detail::SolverResultsBase<SolverResults<N, D, L>, N, D, L> {
-  using base_t = detail::SolverResultsBase<SolverResults<N, D, L>, N, D, L>;
+    : public detail::SolverResultsBase<SolverResults<N, D, L, Container>, N, D,
+                                       L, Container> {
+  using base_t = detail::SolverResultsBase<SolverResults<N, D, L, Container>, N,
+                                           D, L, Container>;
   friend base_t;
 
 public:
@@ -233,20 +237,23 @@ public:
   using typename base_t::l_t;
   using typename base_t::n_t;
 
-  SolverResults(const Table<n_t, d_t, l_t> &ResTab, ByConstRef<d_t> ZV) noexcept
+  SolverResults(const Container &ResTab, ByConstRef<d_t> ZV) noexcept
       : Results(ResTab), ZV(ZV) {}
-  SolverResults(Table<n_t, d_t, l_t> &&ResTab, ByConstRef<d_t> ZV) = delete;
+  SolverResults(Container &&ResTab, ByConstRef<d_t> ZV) = delete;
 
 private:
-  const Table<n_t, d_t, l_t> &Results;
+  const Container &Results;
   ByConstRef<D> ZV;
 };
 
-template <typename N, typename D, typename L>
+template <typename N, typename D, typename L,
+          typename Container = Table<N, D, L>>
 class OwningSolverResults
-    : public detail::SolverResultsBase<OwningSolverResults<N, D, L>, N, D, L> {
+    : public detail::SolverResultsBase<OwningSolverResults<N, D, L, Container>,
+                                       N, D, L, Container> {
   using base_t =
-      detail::SolverResultsBase<OwningSolverResults<N, D, L>, N, D, L>;
+      detail::SolverResultsBase<OwningSolverResults<N, D, L, Container>, N, D,
+                                L, Container>;
   friend base_t;
 
 public:
@@ -254,7 +261,7 @@ public:
   using typename base_t::l_t;
   using typename base_t::n_t;
 
-  OwningSolverResults(Table<N, D, L> ResTab,
+  OwningSolverResults(Container ResTab,
                       D ZV) noexcept(std::is_nothrow_move_constructible_v<D>)
       : Results(std::move(ResTab)), ZV(std::move(ZV)) {}
 
@@ -270,7 +277,7 @@ public:
   operator SolverResults<N, D, L>() && = delete;
 
 private:
-  Table<N, D, L> Results;
+  Container Results;
   D ZV;
 };
 
