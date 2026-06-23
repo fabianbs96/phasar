@@ -1358,11 +1358,17 @@ protected:
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
+    // TODO: Maybe implement this in a smarter way in the future. My previous
+    // attempt below however broke the results.
+    std::lock_guard Guard(AddIncomingMutex);
+    IncomingTab.get(SP, d3)[n].insert(d2);
+#if false
     IncomingTab.get(SP, d3, [&](auto &Value) {
       // TODO: the [] operator is not thread safe. Fix.
       // TODO: is at() better?
       Value.at(n).insert(d2);
     });
+#endif
   }
 
   void printIncomingTab() {
@@ -2000,6 +2006,7 @@ private:
 
   BS::light_thread_pool TPool;
   hms SolveTime;
+  std::mutex AddIncomingMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>
