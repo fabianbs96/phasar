@@ -96,6 +96,8 @@ public:
   using t_t = typename AnalysisDomainTy::t_t;
   using v_t = typename AnalysisDomainTy::v_t;
 
+  using TableCell = typename Table<n_t, d_t, EdgeFunction<l_t>, PllMap>::Cell;
+
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
       const ICFGTy *ICF)
@@ -516,8 +518,6 @@ protected:
           // for each result node of the call-flow function
 
           for (d_t d3 : Res) {
-            using TableCell =
-                typename Table<n_t, d_t, EdgeFunction<l_t>, PllMap>::Cell;
             // create initial self-loop
             PHASAR_LOG_LEVEL(
                 DEBUG, "Create initial self-loop with D: " << DToString(d3));
@@ -752,7 +752,9 @@ protected:
 
   l_t val(n_t NHashN, d_t NHashD) {
     if (ValTab.contains(NHashN, NHashD)) {
-      return ValTab.get(NHashN, NHashD);
+      l_t Ret;
+      ValTab.get(NHashN, NHashD, [&Ret](auto &Value) { Ret = Value; });
+      return Ret;
     }
 
     // implicitly initialized to top; see line [1] of Fig. 7 in SRH96 paper
@@ -813,7 +815,8 @@ protected:
     // note: at this point we don't need to join with a potential previous f
     // because f is a jump function, which is already properly joined
     // within propagate(..)
-    EndsummaryTab.get(SP, d1).insert(eP, d2, std::move(f));
+    EndsummaryTab.get(SP, d1,
+                      [&](auto &Value) { Value.insert(eP, d2, std::move(f)); });
   }
 
   // should be made a callable at some point
@@ -895,8 +898,9 @@ protected:
     }
     auto &TgtMap =
         (isInterProc(Kind)) ? ComputedInterPathEdges : ComputedIntraPathEdges;
-    TgtMap.get(SourceNode, SinkStmt)[SourceVal].insert(DestVals.begin(),
-                                                       DestVals.end());
+    TgtMap.get(SourceNode, SinkStmt, [&](auto &Value) {
+      Value[SourceVal].insert(DestVals.begin(), DestVals.end());
+    });
   }
 
   void submitInitialValues() {
@@ -1339,18 +1343,24 @@ protected:
         FSummaryReuse[Key] += 1;
       }
     }
-    return EndsummaryTab.get(SP, d3).cellVec();
+
+    std::vector<TableCell> Ret;
+    EndsummaryTab.get(SP, d3, [&Ret](auto &Value) { Ret = Value.cellVec(); });
+    return Ret;
   }
 
   std::unordered_map<n_t, container_type> incoming(d_t d1, n_t SP) {
-    return IncomingTab.get(SP, d1);
+    std::unordered_map<n_t, container_type> Ret;
+
+    IncomingTab.get(SP, d1, [&](auto &Value) { Ret = Value; });
+
+    return Ret;
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
-    // TODO: use lambda get here maybe?
-    // IncomingTab.get(SP, d3)[n].insert(d2);
     IncomingTab.get(SP, d3, [&](auto &Value) {
       // TODO: the [] operator is not thread safe. Fix.
+      // TODO: is at() better?
       Value.at(n).insert(d2);
     });
   }
@@ -1544,11 +1554,13 @@ protected:
                 ProcessSummaryFacts.end()) {
 
               phmap::parallel_node_hash_set_m<d_t> SummaryDSet;
-              EndsummaryTab.get(Edge.second, D2)
-                  .foreachCell([&SummaryDSet](const auto &Row, const auto &Col,
-                                              const auto &Val) {
-                    SummaryDSet.insert(Col);
-                  });
+              EndsummaryTab.get(Edge.second, D2, [&](auto &Value) {
+                Value.foreachCell([&SummaryDSet](const auto & /*Row*/,
+                                                 const auto &Col,
+                                                 const auto & /*Val*/) {
+                  SummaryDSet.insert(Col);
+                });
+              });
 
               // Process summary just as an intra-procedural edge
               if (SummaryDSet.find(D2) != SummaryDSet.end()) {
