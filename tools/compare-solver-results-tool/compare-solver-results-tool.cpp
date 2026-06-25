@@ -19,9 +19,10 @@ int main(int Argc, const char **Argv) {
 
   if (Argc < 2 || !std::filesystem::exists(Argv[1]) ||
       std::filesystem::is_directory(Argv[1])) {
-    llvm::errs() << "myphasartool\n"
-                    "A small PhASAR-based example program\n\n"
-                    "Usage: myphasartool <LLVM IR file>\n";
+    llvm::errs() << "compare-solver-results-tool\n"
+                    "A small PhASAR-based program that runs two solvers and "
+                    "compares if the results are the same.\n\n"
+                    "Usage: compare-solver-results-tool <LLVM IR file>\n";
     return 1;
   }
 
@@ -38,6 +39,13 @@ int main(int Argc, const char **Argv) {
     auto M = createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
     // Alternative way of solving an IFDS/IDEProblem:
     auto IDEResults = solveIDEProblem(M, HA.getICFG());
+    auto ParallelIDEResults = solveIDEProblemPll(M, HA.getICFG());
+
+    if (checkSREquality(IDEResults, ParallelIDEResults)) {
+      llvm::outs() << "\nSuccess! Results are equal!\n";
+    } else {
+      llvm::outs() << "\nFailure! Results are not equal!\n";
+    }
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }

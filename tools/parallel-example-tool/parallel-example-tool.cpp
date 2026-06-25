@@ -51,7 +51,6 @@ int main(int Argc, const char **Argv) {
         createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
 
     auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG());
-    IDEResults.dumpResults(HA.getICFG());
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }

@@ -2,6 +2,7 @@
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_GENERICSOLVERRESULTS_H
 
 #include "phasar/Domain/BinaryDomain.h"
+#include "phasar/PhasarLLVM/Utils.h" // For llvmIRToString()
 #include "phasar/Utils/ByRef.h"
 
 #include "llvm/ADT/STLFunctionalExtras.h"
@@ -196,7 +197,7 @@ bool checkSREquality(const SR1 &LHS, const SR2 &RHS) {
                  << RHS.size() << '\n';
   }
 
-  auto ToString = [](const auto &Fact) {
+  auto ToString = [&](const auto &Fact) {
     if constexpr (std::is_pointer_v<std::decay_t<decltype(Fact)>> &&
                   std::is_base_of_v<llvm::Value,
                                     std::decay_t<std::remove_pointer_t<

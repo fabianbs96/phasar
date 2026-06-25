@@ -391,18 +391,12 @@ public:
   [[nodiscard]] ByConstRef<ContainerTy<C, V>>
   row(ByConstRef<R> RowKey) const noexcept {
     // Returns a view of all mappings that have the given row key.
-    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
-      ByConstRef<Container> RetVal;
-      Tab.if_contains(RowKey,
-                      [&](const auto &Entry) { RetVal = Entry.second; });
-      return RetVal;
-    } else {
-      auto It = Tab.find(RowKey);
-      if (It == Tab.end()) {
-        return getDefaultValue<std::unordered_map<C, V>>();
-      }
-      return It->second;
+    // TODO: Is find() thread-safe? I could swear it is...
+    auto It = Tab.find(RowKey);
+    if (It == Tab.end()) {
+      return getDefaultValue<ContainerTy<C, V>>();
     }
+    return It->second;
   }
 
   [[nodiscard]] const Container &rowMap() const & noexcept {
