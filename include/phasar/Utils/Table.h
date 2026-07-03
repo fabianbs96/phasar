@@ -23,10 +23,7 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-#include "parallel_hashmap/phmap_fwd_decl.h"
-
 #include <cassert>
-#include <concepts>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -92,7 +89,7 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
-    if constexpr (has_lazy_emplace<Container, R>) {
+    if constexpr (has_lazy_emplace<const Container, R>) {
       auto &Inner = Tab.try_emplace_p(std::move(Row)).first->second;
       Inner.lazy_emplace(Column, [&](auto &&Ctor) {
         Ctor(std::move(Column), std::move(Val));
@@ -247,7 +244,6 @@ public:
         // temporary. Is that correct?
       }
     }
-
     return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
@@ -296,6 +292,7 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       std::optional<V> RetVal = std::nullopt;
 
+      // TODO: ask Fabian if this logic is sound
       Tab.if_contains(RowKey, [&](auto &Entry) {
         Entry.second.if_contains(
             ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
@@ -323,6 +320,7 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       ByConstRef<V> RetVal = getDefaultValue<V>();
 
+      // TODO: ask Fabian if this logic is sound
       Tab.if_contains(RowKey, [&](auto &Entry) {
         Entry.second.if_contains(
             ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
@@ -382,20 +380,17 @@ public:
 
   [[nodiscard]] ContainerTy<C, V> &row(R RowKey) {
     // Returns a view of all mappings that have the given row key.
-    // TODO: can this be made thread safe, given that it returns a reference?
-    // TODO: do we even need this to be made thread safe? Or can we just not use
-    // it and use other functions if we need thread safety?
-    return Tab[RowKey];
+    return Tab.at(RowKey);
   }
 
   [[nodiscard]] ByConstRef<ContainerTy<C, V>>
   row(ByConstRef<R> RowKey) const noexcept {
     // Returns a view of all mappings that have the given row key.
-    // TODO: Is find() thread-safe? I could swear it is...
     auto It = Tab.find(RowKey);
     if (It == Tab.end()) {
       return getDefaultValue<ContainerTy<C, V>>();
     }
+    // Is this thread safe?
     return It->second;
   }
 
