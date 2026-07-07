@@ -39,6 +39,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -52,8 +53,8 @@ using l_t = IDELinearConstantAnalysisDomain::l_t;
 using d_t = IDELinearConstantAnalysisDomain::d_t;
 
 // For debug purpose only
-static unsigned CurrGenConstantId = 0; // NOLINT
-static unsigned CurrBinaryId = 0;      // NOLINT
+static std::atomic_uint32_t CurrGenConstantId = 0; // NOLINT
+static std::atomic_uint32_t CurrBinaryId = 0;      // NOLINT
 
 struct LCAEdgeFunctionComposer : EdgeFunctionComposer<l_t> {
 

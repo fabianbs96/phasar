@@ -32,7 +32,6 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <ostream>
 #include <unordered_map>
 #include <utility>
@@ -46,8 +45,16 @@ public:
   using d_t = typename AnalysisDomainTy::d_t;
   using n_t = typename AnalysisDomainTy::n_t;
 
+  // N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
+  // pool defaulting to hardware_concurrency() threads, 16 shards causes heavy
+  // per-shard mutex contention; more shards trades a small constant memory
+  // overhead per map for far fewer collisions.
   template <typename Key, typename Val>
-  using PllMap = phmap::parallel_node_hash_map_m<Key, Val>;
+  using PllMap =
+      phmap::parallel_node_hash_map_m<Key, Val, phmap::Hash<Key>,
+                                       phmap::EqualTo<Key>,
+                                       phmap::Allocator<std::pair<const Key, Val>>,
+                                       7>;
 
 protected:
   // mapping from target node and value to a list of all source values and
@@ -216,28 +223,11 @@ public:
    * Returns, for a given target statement and value all associated
    * source values, and for each the associated edge function.
    * The return value is a mapping from source value to function.
-   */
-  std::optional<std::reference_wrapper<
-      llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>>>>
-  reverseLookup(n_t Target, d_t TargetVal) {
-    std::lock_guard Guard(NonEmptyReverseLookupMutex);
-    if (!NonEmptyReverseLookup.contains(Target, TargetVal)) {
-      return std::nullopt;
-    }
-    return {NonEmptyReverseLookup.get(Target, TargetVal)};
-  }
-
-  /**
-   * Returns, for a given target statement and value all associated
-   * source values, and for each the associated edge function.
-   * The return value is a mapping from source value to function.
    * TODO: add more context
    */
   void reverseLookup(n_t Target, d_t TargetVal,
                      std::invocable<llvm::SmallVectorImpl<
                          std::pair<d_t, EdgeFunction<l_t>>> &> auto Callback) {
-    std::lock_guard Guard(NonEmptyReverseLookupMutex);
-
     if (!NonEmptyReverseLookup.contains(Target, TargetVal)) {
       return;
     }
@@ -249,28 +239,11 @@ public:
    * Returns, for a given source value and target statement all
    * associated target values, and for each the associated edge function.
    * The return value is a mapping from target value to function.
-   */
-  std::optional<std::reference_wrapper<
-      llvm::SmallVectorImpl<std::pair<d_t, EdgeFunction<l_t>>>>>
-  forwardLookup(d_t SourceVal, n_t Target) {
-    std::lock_guard Guard(NonEmptyForwardLookupMutex);
-    if (!NonEmptyForwardLookup.contains(SourceVal, Target)) {
-      return std::nullopt;
-    }
-    return {NonEmptyForwardLookup.get(SourceVal, Target)};
-  }
-
-  /**
-   * Returns, for a given source value and target statement all
-   * associated target values, and for each the associated edge function.
-   * The return value is a mapping from target value to function.
    * TODO: add more context
    */
   void forwardLookup(d_t SourceVal, n_t Target,
                      std::invocable<llvm::SmallVectorImpl<
                          std::pair<d_t, EdgeFunction<l_t>>> &> auto Callback) {
-    std::lock_guard Guard(NonEmptyForwardLookupMutex);
-
     if (!NonEmptyForwardLookup.contains(SourceVal, Target)) {
       return;
     }
@@ -284,8 +257,11 @@ public:
    * The return value is a set of records of the form
    * (sourceVal,targetVal,edgeFunction).
    */
+  // No locking needed: operator[] on the underlying parallel_node_hash_map_m
+  // is already thread-safe per-key (find-or-insert happens under that key's
+  // shard lock), and Target entries are only ever added, never erased, while
+  // solving.
   Table<d_t, d_t, EdgeFunction<l_t>, PllMap> &lookupByTarget(n_t Target) {
-    std::lock_guard Guard(NonEmptyLookupByTargetNodeMutex);
     return NonEmptyLookupByTargetNode[Target];
   }
 
