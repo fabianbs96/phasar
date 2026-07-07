@@ -1273,41 +1273,29 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
-    // TODO: check if we can pass by reference here
-    auto JumpFnE = [=, this]() mutable {
-      // jump function is initialized to all-top if no entry
-      // was found
-      EdgeFunction<l_t> RetVal = AllTop;
-
-      JumpFn->reverseLookup(Target, TargetVal, [&](auto &RevLookupResult) {
-        if (const auto Find =
-                std::find_if(RevLookupResult.begin(), RevLookupResult.end(),
-                             [SourceVal](auto &KVpair) {
-                               return KVpair.first == SourceVal;
-                             });
-            Find != RevLookupResult.end()) {
-          RetVal = Find->second;
-        }
-      });
-
-      return RetVal;
-    }();
-
-    auto fPrime = IDEProblem.combine(JumpFnE, f);
-    bool NewFunction = fPrime != JumpFnE;
+    // Atomically read the jump function currently stored for (SourceVal,
+    // Target, TargetVal), combine it with f, and store the result if it
+    // changed. This whole read-combine-write sequence happens under a
+    // single per-(Target, TargetVal) lock inside JumpFunctionsPll, so
+    // concurrent propagate() calls for the same triple cannot lose an
+    // update to one another; propagate() calls for different (Target,
+    // TargetVal) keys still proceed fully in parallel (no solver-wide
+    // lock).
+    auto [fPrime, NewFunction] = JumpFn->combineAndAddFunction(
+        SourceVal, Target, TargetVal, f, AllTop,
+        [this](const EdgeFunction<l_t> &Old, const EdgeFunction<l_t> &New) {
+          return IDEProblem.combine(Old, New);
+        });
 
     IF_LOG_LEVEL_ENABLED(DEBUG, {
       PHASAR_LOG_LEVEL(DEBUG,
-                       "Join: " << JumpFnE << " & " << f
-                                << (JumpFnE == f ? " (EF's are equal)" : " "));
+                       "Join: " << f << (NewFunction ? "" : " (no change)"));
       PHASAR_LOG_LEVEL(DEBUG, "    = "
                                   << fPrime
                                   << (NewFunction ? " (new jump func)" : " "));
       PHASAR_LOG_LEVEL(DEBUG, ' ');
     });
     if (NewFunction) {
-      JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
-
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
 
@@ -1358,17 +1346,12 @@ protected:
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
-    // TODO: Maybe implement this in a smarter way in the future. My previous
-    // attempt below however broke the results.
-    std::lock_guard Guard(AddIncomingMutex);
-    IncomingTab.get(SP, d3)[n].insert(d2);
-#if false
-    IncomingTab.get(SP, d3, [&](auto &Value) {
-      // TODO: the [] operator is not thread safe. Fix.
-      // TODO: is at() better?
-      Value.at(n).insert(d2);
-    });
-#endif
+    // Must go through the callback-based get(), which runs under the
+    // table's per-(SP, d3) bucket lock for its whole duration. incoming()
+    // reads through the very same callback-based get(), so both share this
+    // lock and cannot race. Using operator[] (not at()) is safe here since
+    // it only ever runs while that lock is held.
+    IncomingTab.get(SP, d3, [&](auto &Value) { Value[n].insert(d2); });
   }
 
   void printIncomingTab() {
@@ -2006,7 +1989,6 @@ private:
 
   BS::light_thread_pool TPool;
   hms SolveTime;
-  std::mutex AddIncomingMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>

@@ -138,6 +138,81 @@ public:
   }
 
   /**
+   * Atomically looks up the jump function currently stored for
+   * (SourceVal, Target, TargetVal) (defaulting to TopFunction if none
+   * exists yet), combines it with EdgeFunc via Combine(Old, New), and -- if
+   * the result differs from the previous value -- stores it.
+   *
+   * The read-combine-conditionally-write sequence, including keeping the
+   * forward-lookup and by-target-node indices in sync, happens while
+   * holding the (Target, TargetVal) bucket lock of the underlying table.
+   * This makes the whole operation atomic with respect to other concurrent
+   * calls for the same (SourceVal, Target, TargetVal) triple -- avoiding
+   * lost updates when several threads propagate into the same jump
+   * function concurrently -- without requiring any solver-wide lock:
+   * concurrent updates for different (Target, TargetVal) keys can still
+   * proceed fully in parallel.
+   *
+   * @return the combined edge function together with a flag indicating
+   * whether it differs from the previously stored one.
+   */
+  template <typename CombineFn>
+  std::pair<EdgeFunction<l_t>, bool>
+  combineAndAddFunction(d_t SourceVal, n_t Target, d_t TargetVal,
+                       EdgeFunction<l_t> EdgeFunc, EdgeFunction<l_t> TopFunction,
+                       CombineFn Combine) {
+    EdgeFunction<l_t> FPrime = TopFunction;
+    bool IsNew = false;
+
+    NonEmptyReverseLookup.get(Target, TargetVal, [&](auto &SourceValToFunc) {
+      auto Find = std::find_if(
+          SourceValToFunc.begin(), SourceValToFunc.end(),
+          [SourceVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+            return SourceVal == Entry.first;
+          });
+      EdgeFunction<l_t> Old =
+          Find != SourceValToFunc.end() ? Find->second : TopFunction;
+
+      FPrime = Combine(Old, EdgeFunc);
+      IsNew = FPrime != Old;
+
+      // we do not store the default function (all-top)
+      if (!IsNew || llvm::isa<AllTop<l_t>>(FPrime)) {
+        return;
+      }
+
+      if (Find != SourceValToFunc.end()) {
+        // it is important that existing values in JumpFunctionsPll
+        // are overwritten
+        Find->second = FPrime;
+      } else {
+        SourceValToFunc.emplace_back(SourceVal, FPrime);
+      }
+
+      NonEmptyForwardLookup.get(SourceVal, Target, [&](auto &TargetValToFunc) {
+        auto FwdFind = std::find_if(
+            TargetValToFunc.begin(), TargetValToFunc.end(),
+            [TargetVal](const std::pair<d_t, EdgeFunction<l_t>> &Entry) {
+              return TargetVal == Entry.first;
+            });
+        if (FwdFind != TargetValToFunc.end()) {
+          FwdFind->second = FPrime;
+        } else {
+          TargetValToFunc.emplace_back(TargetVal, FPrime);
+        }
+      });
+
+      // V Table::insert(R r, C c, V v) always overrides (see comments
+      // above)
+      auto &Inner =
+          NonEmptyLookupByTargetNode.try_emplace_p(Target).first->second;
+      Inner.insert(SourceVal, TargetVal, FPrime);
+    });
+
+    return {FPrime, IsNew};
+  }
+
+  /**
    * Returns, for a given target statement and value all associated
    * source values, and for each the associated edge function.
    * The return value is a mapping from source value to function.
