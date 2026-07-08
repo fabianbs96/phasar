@@ -89,7 +89,7 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
-    if constexpr (has_lazy_emplace<const Container, R>) {
+    if constexpr (has_try_emplace_p<Container, R>) {
       auto &Inner = Tab.try_emplace_p(std::move(Row)).first->second;
       Inner.lazy_emplace(Column, [&](auto &&Ctor) {
         Ctor(std::move(Column), std::move(Val));
@@ -231,20 +231,14 @@ public:
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
     if constexpr (has_try_emplace_p<Container, R>) {
-      // TODO: Ask Fabian if this logic is sound
-      // TODO: Also ask if it makes sense to always run the return line at the
-      // bottom, of if a different impl should be used inside the constexpr if.
-      // The impl of the operator[] is just try_implace and has a lock. Can we
-      // just use that here?
       auto [Inner, Inserted] = Tab.try_emplace_p(RowKey);
-      if (Inserted) {
-        // using Container = ContainerTy<R, ContainerTy<C, V>>;
-        Inner->second.try_emplace(ColumnKey);
-        // TODO: cannot return anything related to Inner here, because it is
-        // temporary. Is that correct?
-      }
+      auto RetVal = Inner->second.try_emplace_p(ColumnKey);
+
+      return RetVal.first->second;
+    } else {
+
+      return Tab[std::move(RowKey)][std::move(ColumnKey)];
     }
-    return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
   void get(R RowKey, C ColumnKey, std::invocable<V &> auto Callback) {
@@ -292,7 +286,6 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       std::optional<V> RetVal = std::nullopt;
 
-      // TODO: ask Fabian if this logic is sound
       Tab.if_contains(RowKey, [&](auto &Entry) {
         Entry.second.if_contains(
             ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
@@ -317,16 +310,15 @@ public:
                                   ByConstRef<C> ColumnKey) const noexcept {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
-      ByConstRef<V> RetVal = getDefaultValue<V>();
+    if constexpr (has_if_contains<const Container, ByConstRef<R>>) {
+      const V *RetVal = nullptr;
 
-      // TODO: ask Fabian if this logic is sound
       Tab.if_contains(RowKey, [&](auto &Entry) {
         Entry.second.if_contains(
-            ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
+            ColumnKey, [&](auto &InnerEntry) { RetVal = &InnerEntry.second; });
       });
 
-      return RetVal;
+      return RetVal ? *RetVal : getDefaultValue<V>();
     } else {
       auto OuterIt = Tab.find(RowKey);
       if (OuterIt == Tab.end()) {
@@ -347,7 +339,6 @@ public:
     if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       V RetVal = V();
 
-      // TODO: ask Fabian if this logic is sound
       Tab.if_contains(RowKey, [&](auto &Entry) {
         Entry.second.erase_if(
             ColumnKey, [&](auto &InnerEntry) { RetVal = InnerEntry.second; });
