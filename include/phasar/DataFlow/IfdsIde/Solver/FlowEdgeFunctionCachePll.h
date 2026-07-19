@@ -24,7 +24,9 @@
 #include "parallel_hashmap/phmap_fwd_decl.h"
 
 #include <algorithm>
+#include <array>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -290,7 +292,14 @@ public:
 #endif
     EdgeFunctionType Ret;
     {
-      std::lock_guard Guard(GetOrInsertLazyMutex);
+      // EdgeFunctionMap (EquivalenceClassMap) is a plain, unsynchronized
+      // linear-scan container, so concurrent access to the *same* Curr/Succ
+      // entry must be serialized. Striping the lock by key (instead of one
+      // mutex for the whole cache) still guarantees that, while letting
+      // unrelated Curr/Succ keys proceed in parallel.
+      std::lock_guard Guard(
+          EdgeFunctionMapMutexes[std::hash<EdgeFuncInstKey>{}(OuterMapKey) %
+                                 EdgeFunctionMapMutexes.size()]);
       Ret = NormalFE->second.EdgeFunctionMap.getOrInsertLazy(
           createEdgeFunctionNodeKey(CurrNode, SuccNode),
           [&] {
@@ -653,7 +662,11 @@ private:
   bool AutoAddZero;
   d_t ZV;
 
-  std::mutex GetOrInsertLazyMutex;
+  // Striped locks guarding EdgeFunctionMap access in NormalEdgeFlowData (see
+  // getNormalEdgeFunction): one mutex for the whole cache would serialize all
+  // Curr/Succ keys against each other, not just concurrent accesses to the
+  // same key.
+  std::array<std::mutex, 64> EdgeFunctionMapMutexes;
 
   // Caches for the flow/edge functions
   phmap::parallel_node_hash_map_m<EdgeFuncInstKey, NormalEdgeFlowData>

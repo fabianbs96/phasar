@@ -89,11 +89,11 @@ public:
 
   void insert(R Row, C Column, V Val) {
     // Associates the specified value with the specified keys.
-    if constexpr (has_try_emplace_p<Container, R>) {
+    if constexpr (has_lazy_emplace<Container, R>) {
       auto &Inner = Tab.try_emplace_p(std::move(Row)).first->second;
-      Inner.lazy_emplace(Column, [&](auto &&Ctor) {
-        Ctor(std::move(Column), std::move(Val));
-      });
+      Inner.lazy_emplace_l(
+          Column, [&](auto &KV) { KV.second = std::move(Val); },
+          [&](auto &&Ctor) { Ctor(std::move(Column), std::move(Val)); });
     } else {
       Tab[std::move(Row)][std::move(Column)] = std::move(Val);
     }
@@ -231,14 +231,20 @@ public:
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
     if constexpr (has_try_emplace_p<Container, R>) {
-      auto [Inner, Inserted] = Tab.try_emplace_p(RowKey);
-      auto RetVal = Inner->second.try_emplace_p(ColumnKey);
+      // TODO: Ask Fabian if this logic is sound
+      // TODO: Also ask if it makes sense to always run the return line at the
+      // bottom, of if a different impl should be used inside the constexpr if.
+      // The impl of the operator[] is just try_implace and has a lock. Can we
+      // just use that here?
+      auto [Inner, _] = Tab.try_emplace_p(RowKey);
 
-      return RetVal.first->second;
-    } else {
-
-      return Tab[std::move(RowKey)][std::move(ColumnKey)];
+      // using Container = ContainerTy<R, ContainerTy<C, V>>;
+      auto [It, Inserted] = Inner->second.try_emplace_p(ColumnKey);
+      // TODO: cannot return anything related to Inner here, because it is
+      // temporary. Is that correct?
+      return It->second;
     }
+    return Tab[std::move(RowKey)][std::move(ColumnKey)];
   }
 
   void get(R RowKey, C ColumnKey, std::invocable<V &> auto Callback) {

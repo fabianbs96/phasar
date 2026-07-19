@@ -65,8 +65,16 @@
 
 namespace psr {
 
+// N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
+// pool defaulting to hardware_concurrency() threads, 16 shards causes heavy
+// per-shard mutex contention; more shards trades a small constant memory
+// overhead per map for far fewer collisions.
 template <typename Key, typename Val>
-using PllMap = phmap::parallel_node_hash_map_m<Key, Val>;
+using PllMap =
+    phmap::parallel_node_hash_map_m<Key, Val, phmap::Hash<Key>,
+                                     phmap::EqualTo<Key>,
+                                     phmap::Allocator<std::pair<const Key, Val>>,
+                                     7>;
 
 template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
@@ -574,12 +582,11 @@ protected:
                                    "Queried Return Edge Function: " << f5);
                   if (SolverConfig.emitESG()) {
                     for (auto SP : ICF->getStartPointsOf(SCalledProcN)) {
-                      IntermediateEdgeFunctions[std::make_tuple(n, d2, SP, d3)]
-                          .push_back(f4);
+                      addIntermediateEdgeFunction(
+                          std::make_tuple(n, d2, SP, d3), f4);
                     }
-                    IntermediateEdgeFunctions[std::make_tuple(eP, d4, RetSiteN,
-                                                              d5)]
-                        .push_back(f5);
+                    addIntermediateEdgeFunction(
+                        std::make_tuple(eP, d4, RetSiteN, d5), f5);
                   }
                   INC_COUNTER("EF Queries", 2, Full);
                   // compose call * calleeSummary * return edge functions
@@ -629,8 +636,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG,
                          "Queried Call-to-Return Edge Function: " << EdgeFnE);
         if (SolverConfig.emitESG()) {
-          IntermediateEdgeFunctions[std::make_tuple(n, d2, ReturnSiteN, d3)]
-              .push_back(EdgeFnE);
+          addIntermediateEdgeFunction(
+              std::make_tuple(n, d2, ReturnSiteN, d3), EdgeFnE);
         }
         INC_COUNTER("EF Queries", 1, Full);
         auto fPrime = IDEProblem.extend(f, EdgeFnE);
@@ -678,8 +685,7 @@ protected:
             (NextUser) ? psr::unwrapNullable(PSR_FWD(NextUser)) : nPrime;
 
         if (SolverConfig.emitESG()) {
-          IntermediateEdgeFunctions[std::make_tuple(n, d2, DestN, d3)]
-              .push_back(g);
+          addIntermediateEdgeFunction(std::make_tuple(n, d2, DestN, d3), g);
         }
         PHASAR_LOG_LEVEL(DEBUG,
                          "Compose: " << g << " * " << f << " = " << fPrime);
@@ -698,19 +704,20 @@ protected:
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
-      auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
-      if (!LookupResults) {
-        continue;
-      }
-      for (size_t I = 0; I < LookupResults->get().size(); ++I) {
-        auto Entry = LookupResults->get()[I];
-        d_t dPrime = Entry.first;
-        auto fPrime = Entry.second;
-        n_t SP = Stmt;
-        l_t Val = val(SP, Fact);
-        INC_COUNTER("Value Propagation", 1, Full);
-        propagateValue(CallSite, dPrime, fPrime.computeTarget(Val));
-      }
+      // Iterate under JumpFn's per-key lock (via the callback overload)
+      // instead of taking a reference and iterating unlocked: the latter
+      // would race against concurrent addFunction/combineAndAddFunction
+      // calls mutating the same underlying SmallVector.
+      JumpFn->forwardLookup(Fact, CallSite, [&](auto &LookupResults) {
+        for (auto &Entry : LookupResults) {
+          d_t dPrime = Entry.first;
+          auto fPrime = Entry.second;
+          n_t SP = Stmt;
+          l_t Val = val(SP, Fact);
+          INC_COUNTER("Value Propagation", 1, Full);
+          propagateValue(CallSite, dPrime, fPrime.computeTarget(Val));
+        }
+      });
     }
   }
 
@@ -727,8 +734,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Queried Call Edge Function: " << EdgeFn);
         if (SolverConfig.emitESG()) {
           for (const auto SP : ICF->getStartPointsOf(Callee)) {
-            IntermediateEdgeFunctions[std::make_tuple(Stmt, Fact, SP, dPrime)]
-                .push_back(EdgeFn);
+            addIntermediateEdgeFunction(
+                std::make_tuple(Stmt, Fact, SP, dPrime), EdgeFn);
           }
         }
         INC_COUNTER("EF Queries", 1, Full);
@@ -903,6 +910,25 @@ protected:
     });
   }
 
+  /// Appends EdgeFn to IntermediateEdgeFunctions[Key] atomically. Plain
+  /// `IntermediateEdgeFunctions[Key].push_back(EdgeFn)` is not safe here:
+  /// operator[] only holds the shard lock while finding/creating the map
+  /// entry, then returns an unprotected std::vector& -- concurrent tasks
+  /// targeting the same Key (e.g. two path edges with different source
+  /// facts but the same target statement/fact) can push_back at the same
+  /// time. lazy_emplace_l holds the shard lock for the whole callback, so
+  /// the append is atomic with respect to other calls for the same Key.
+  void addIntermediateEdgeFunction(std::tuple<n_t, d_t, n_t, d_t> Key,
+                                   EdgeFunction<l_t> EdgeFn) {
+    IntermediateEdgeFunctions.lazy_emplace_l(
+        Key,
+        [&](auto &KV) { KV.second.push_back(EdgeFn); },
+        [&](auto &&Ctor) {
+          Ctor(std::move(Key), std::vector<EdgeFunction<l_t>>{
+                                    std::move(EdgeFn)});
+        });
+  }
+
   void submitInitialValues() {
     auto AllSeeds = Seeds.getSeeds();
     for (n_t UnbalancedRetSite : UnbalancedRetSites) {
@@ -1058,11 +1084,11 @@ protected:
             PHASAR_LOG_LEVEL(DEBUG, "Queried Return Edge Function: " << f5);
             if (SolverConfig.emitESG()) {
               for (auto SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
-                IntermediateEdgeFunctions[std::make_tuple(c, d4, SP, d1)]
-                    .push_back(f4);
+                addIntermediateEdgeFunction(
+                    std::make_tuple(c, d4, SP, d1), f4);
               }
-              IntermediateEdgeFunctions[std::make_tuple(n, d2, RetSiteC, d5)]
-                  .push_back(f5);
+              addIntermediateEdgeFunction(
+                  std::make_tuple(n, d2, RetSiteC, d5), f5);
             }
             INC_COUNTER("EF Queries", 2, Full);
             // compose call function * function * return function
@@ -1075,10 +1101,13 @@ protected:
 
             // for each jump function coming into the call, propagate to
             // return site using the composed function
-            auto RevLookupResult = JumpFn->reverseLookup(c, d4);
-            if (RevLookupResult) {
-              for (size_t I = 0; I < RevLookupResult->get().size(); ++I) {
-                auto ValAndFunc = RevLookupResult->get()[I];
+            // Iterate under JumpFn's per-key lock (via the callback overload)
+            // instead of taking a reference and iterating unlocked: the
+            // latter would race against concurrent
+            // addFunction/combineAndAddFunction calls mutating the same
+            // underlying SmallVector.
+            JumpFn->reverseLookup(c, d4, [&](auto &RevLookupResult) {
+              for (auto &ValAndFunc : RevLookupResult) {
                 EdgeFunction<l_t> f3 = ValAndFunc.second;
                 if (f3 != AllTop) {
                   d_t d3 = ValAndFunc.first;
@@ -1103,7 +1132,7 @@ protected:
                   });
                 }
               }
-            }
+            });
           }
         }
       }
@@ -1133,8 +1162,8 @@ protected:
                     Caller, ICF->getFunctionOf(n), n, d2, RetSiteC, d5);
             PHASAR_LOG_LEVEL(DEBUG, "Queried Return Edge Function: " << f5);
             if (SolverConfig.emitESG()) {
-              IntermediateEdgeFunctions[std::make_tuple(n, d2, RetSiteC, d5)]
-                  .push_back(f5);
+              addIntermediateEdgeFunction(
+                  std::make_tuple(n, d2, RetSiteC, d5), f5);
             }
             INC_COUNTER("EF Queries", 1, Full);
             PHASAR_LOG_LEVEL(DEBUG, "Compose: " << f5 << " * " << f);
@@ -1273,41 +1302,29 @@ protected:
     PHASAR_LOG_LEVEL(
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
-    // TODO: check if we can pass by reference here
-    auto JumpFnE = [=, this]() mutable {
-      // jump function is initialized to all-top if no entry
-      // was found
-      EdgeFunction<l_t> RetVal = AllTop;
-
-      JumpFn->reverseLookup(Target, TargetVal, [&](auto &RevLookupResult) {
-        if (const auto Find =
-                std::find_if(RevLookupResult.begin(), RevLookupResult.end(),
-                             [SourceVal](auto &KVpair) {
-                               return KVpair.first == SourceVal;
-                             });
-            Find != RevLookupResult.end()) {
-          RetVal = Find->second;
-        }
-      });
-
-      return RetVal;
-    }();
-
-    auto fPrime = IDEProblem.combine(JumpFnE, f);
-    bool NewFunction = fPrime != JumpFnE;
+    // Atomically read the jump function currently stored for (SourceVal,
+    // Target, TargetVal), combine it with f, and store the result if it
+    // changed. This whole read-combine-write sequence happens under a
+    // single per-(Target, TargetVal) lock inside JumpFunctionsPll, so
+    // concurrent propagate() calls for the same triple cannot lose an
+    // update to one another; propagate() calls for different (Target,
+    // TargetVal) keys still proceed fully in parallel (no solver-wide
+    // lock).
+    auto [fPrime, NewFunction] = JumpFn->combineAndAddFunction(
+        SourceVal, Target, TargetVal, f, AllTop,
+        [this](const EdgeFunction<l_t> &Old, const EdgeFunction<l_t> &New) {
+          return IDEProblem.combine(Old, New);
+        });
 
     IF_LOG_LEVEL_ENABLED(DEBUG, {
       PHASAR_LOG_LEVEL(DEBUG,
-                       "Join: " << JumpFnE << " & " << f
-                                << (JumpFnE == f ? " (EF's are equal)" : " "));
+                       "Join: " << f << (NewFunction ? "" : " (no change)"));
       PHASAR_LOG_LEVEL(DEBUG, "    = "
                                   << fPrime
                                   << (NewFunction ? " (new jump func)" : " "));
       PHASAR_LOG_LEVEL(DEBUG, ' ');
     });
     if (NewFunction) {
-      JumpFn->addFunction(SourceVal, Target, TargetVal, fPrime);
-
       PathEdge Edge(SourceVal, Target, TargetVal);
       PathEdgeCount++;
 
@@ -1335,13 +1352,14 @@ protected:
 
   auto endSummary(n_t SP, d_t d3) {
     if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Core) {
+      // endSummary() is called concurrently by tasks processing different
+      // path edges, so this counter update must go through the map's own
+      // per-key lock (lazy_emplace_l) instead of plain std::map
+      // find/emplace/operator[], which have no synchronization at all.
       auto Key = std::make_pair(SP, d3);
-      auto FindND = FSummaryReuse.find(Key);
-      if (FindND == FSummaryReuse.end()) {
-        FSummaryReuse.emplace(Key, 0);
-      } else {
-        FSummaryReuse[Key] += 1;
-      }
+      FSummaryReuse.lazy_emplace_l(
+          Key, [](auto &KV) { ++KV.second; },
+          [&](auto &&Ctor) { Ctor(Key, size_t{0}); });
     }
 
     std::vector<TableCell> Ret;
@@ -1358,17 +1376,12 @@ protected:
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
-    // TODO: Maybe implement this in a smarter way in the future. My previous
-    // attempt below however broke the results.
-    std::lock_guard Guard(AddIncomingMutex);
-    IncomingTab.get(SP, d3)[n].insert(d2);
-#if false
-    IncomingTab.get(SP, d3, [&](auto &Value) {
-      // TODO: the [] operator is not thread safe. Fix.
-      // TODO: is at() better?
-      Value.at(n).insert(d2);
-    });
-#endif
+    // Must go through the callback-based get(), which runs under the
+    // table's per-(SP, d3) bucket lock for its whole duration. incoming()
+    // reads through the very same callback-based get(), so both share this
+    // lock and cannot race. Using operator[] (not at()) is safe here since
+    // it only ever runs while that lock is held.
+    IncomingTab.get(SP, d3, [&](auto &Value) { Value[n].insert(d2); });
   }
 
   void printIncomingTab() {
@@ -2002,11 +2015,10 @@ private:
 
   Table<n_t, d_t, l_t, PllMap> ValTab;
 
-  std::map<std::pair<n_t, d_t>, size_t> FSummaryReuse;
+  PllMap<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
   BS::light_thread_pool TPool;
   hms SolveTime;
-  std::mutex AddIncomingMutex;
 };
 
 template <typename AnalysisDomainTy, typename Container>
