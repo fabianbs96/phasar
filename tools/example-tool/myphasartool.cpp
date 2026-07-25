@@ -7,10 +7,20 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "phasar/ControlFlow/CallGraphAnalysisType.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
+#include "phasar/PhasarLLVM/AnalysisPipeline.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
+#include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
+#include "phasar/Pointer/AliasAnalysisType.h"
+#include "phasar/Utils/Timer.h"
+
 #include "phasar.h"
 
 #include <filesystem>
 #include <string>
+#include <type_traits>
 
 using namespace psr;
 
@@ -25,37 +35,33 @@ int main(int Argc, const char **Argv) {
     return 1;
   }
 
-  std::vector EntryPoints = {"main"s};
+  {
+    SimpleTimer Tm;
+    HelperAnalyses HA(Argv[1], {"main"},
+                      {
+                          .PTATy = psr::AliasAnalysisType::UnionFind,
+                          .CGTy = psr::CallGraphAnalysisType::VTA,
+                      });
+    if (!HA.getProjectIRDB().isValid()) {
+      return 1;
+    }
 
-  HelperAnalyses HA(Argv[1], EntryPoints);
-  if (!HA.getProjectIRDB().isValid()) {
-    return 1;
+    LLVMTaintConfig TC(HA.getProjectIRDB());
+    auto TA = createAnalysisProblem<IFDSTaintAnalysis>(HA, &TC);
+    solveIFDSProblem(TA, HA.getICFG());
+
+    llvm::outs() << "Classical Taint Analysis elapsed: " << Tm.elapsed()
+                 << '\n';
   }
 
-  if (HA.getProjectIRDB().getFunctionDefinition("main")) {
-    // print type hierarchy
-    HA.getTypeHierarchy().print();
-    // print points-to information
-    HA.getAliasInfo().print();
-    // print inter-procedural control-flow graph
-    HA.getICFG().print();
-
-    // IFDS template parametrization test
-    llvm::outs() << "Testing IFDS:\n";
-    auto L = createAnalysisProblem<IFDSSolverTest>(HA, EntryPoints);
-    IFDSSolver S(L, &HA.getICFG());
-    auto IFDSResults = S.solve();
-    IFDSResults.dumpResults(HA.getICFG());
-
-    // IDE template parametrization test
-    llvm::outs() << "Testing IDE:\n";
-    auto M = createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
-    // Alternative way of solving an IFDS/IDEProblem:
-    auto IDEResults = solveIDEProblem(M, HA.getICFG());
-    IDEResults.dumpResults(HA.getICFG());
-
-  } else {
-    llvm::errs() << "error: file does not contain a 'main' function!\n";
+  {
+    SimpleTimer Tm;
+    auto Pipeline = defaultPipeline(Argv[1])
+                        .with(TaintConfigTag{})
+                        .with(DataflowAnalysisTag{},
+                              std::type_identity<IFDSTaintAnalysis>{});
+    llvm::outs() << "Pipeline Taint Analysis elapsed: " << Tm.elapsed() << '\n';
   }
+
   return 0;
 }

@@ -359,6 +359,14 @@ public:
   [[nodiscard]] AliasInfoRef<V, N> get() const & noexcept { return asRef(); }
   [[nodiscard]] AliasInfoRef<V, N> get() && = delete;
 
+  [[nodiscard]] static AliasInfoRef<V, N> asRefOrNull(AliasInfo *AI) noexcept {
+    if (!AI) {
+      return {};
+    }
+
+    return AI->asRef();
+  }
+
   using base_t::operator psr::AliasIteratorRef<V, N>;
   constexpr operator AliasIteratorRef<V, N>() && noexcept = delete;
 };
