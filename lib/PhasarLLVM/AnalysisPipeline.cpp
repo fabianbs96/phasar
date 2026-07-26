@@ -1,6 +1,9 @@
 #include "phasar/PhasarLLVM/AnalysisPipeline.h"
 
+#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/PrecomputedResolver.h"
+#include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMUnionFindAliasSet.h"
 
@@ -10,6 +13,30 @@
 #include <memory>
 
 using namespace psr;
+
+LLVMBasedICFG ICFGStage::buildImpl(LLVMProjectIRDB &IRDB,
+                                   const std::vector<std::string> &Entry,
+                                   LLVMVFTableProvider &VTP,
+                                   DIBasedTypeHierarchy &TH, LLVMAliasInfo *PT,
+                                   LLVMBasedICFG *BaseCG,
+                                   CallGraphAnalysisType CGTy) {
+  Resolver::BaseResolverProvider GetBaseRes = nullptr;
+  auto Precomputed =
+      [BaseCG](const LLVMProjectIRDB *IRDB, const LLVMVFTableProvider *VTP,
+               const DIBasedTypeHierarchy * /*TH*/, LLVMAliasInfoRef /*PT*/) {
+        const auto &CG = BaseCG->getCallGraph();
+        return std::make_unique<PrecomputedResolver>(IRDB, VTP, &CG);
+      };
+  if (BaseCG) {
+    GetBaseRes = Precomputed;
+  }
+
+  auto Res = Resolver::create(CGTy, &IRDB, &VTP, &TH,
+                              LLVMAliasInfo::asRefOrNull(PT), GetBaseRes);
+  return LLVMBasedICFG(
+      buildLLVMBasedCallGraphWithExternCallbackModels(IRDB, *Res, Entry),
+      &IRDB);
+}
 
 LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
                                         const LLVMBasedICFG *BaseCG,

@@ -12,11 +12,8 @@
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/DataFlow/AnalysisPipeline.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
-#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/PrecomputedResolver.h"
-#include "phasar/PhasarLLVM/ControlFlow/Resolver/Resolver.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
@@ -88,7 +85,28 @@ struct ICFGStage {
   using tag_t = ICFGTag;
   using result_t = LLVMBasedICFG;
 
-  static auto build(auto &PrevPipeline, CallGraphAnalysisType CGTy);
+  static LLVMBasedICFG buildImpl(LLVMProjectIRDB &IRDB,
+                                 const std::vector<std::string> &Entry,
+                                 LLVMVFTableProvider &VTP,
+                                 DIBasedTypeHierarchy &TH, LLVMAliasInfo *PT,
+                                 LLVMBasedICFG *BaseCG,
+                                 CallGraphAnalysisType CGTy);
+
+  static auto build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, EntrypointsTag, "missing EntrypointsStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, VFTableProviderTag,
+                      "missing VFTableProviderStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, TypeHierarchyTag,
+                      "missing TypeHierarchyStage");
+    auto &IRDB = PrevPipeline.getResult(IRDBTag{});
+    auto &Entry = PrevPipeline.getResult(EntrypointsTag{});
+    auto &VTP = PrevPipeline.getResult(VFTableProviderTag{});
+    auto &TH = PrevPipeline.getResult(TypeHierarchyTag{});
+    LLVMAliasInfo *PT = PrevPipeline.getResultOrNull(AliasInfoTag{});
+    LLVMBasedICFG *BaseCG = PrevPipeline.getResultOrNull(ICFGTag{});
+    return buildImpl(IRDB, Entry, VTP, TH, PT, BaseCG, CGTy);
+  }
 };
 
 struct AliasInfoStage {
@@ -117,47 +135,6 @@ struct AliasInfoStage {
     return buildImpl(IRDB, &BaseCG, AliasAnalysisType::UnionFind, UFAATy);
   }
 };
-
-inline auto ICFGStage::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
-  PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
-  PSR_REQUIRE_STAGE(PrevPipeline, EntrypointsTag, "missing EntrypointsStage");
-  PSR_REQUIRE_STAGE(PrevPipeline, VFTableProviderTag,
-                    "missing VFTableProviderStage");
-  PSR_REQUIRE_STAGE(PrevPipeline, TypeHierarchyTag,
-                    "missing TypeHierarchyStage");
-  auto &IRDB = PrevPipeline.getResult(IRDBTag{});
-  auto &Entry = PrevPipeline.getResult(EntrypointsTag{});
-  auto &VTP = PrevPipeline.getResult(VFTableProviderTag{});
-  auto &TH = PrevPipeline.getResult(TypeHierarchyTag{});
-  auto PT = PrevPipeline.getResultOrNull(AliasInfoTag{});
-  auto BaseCG = PrevPipeline.getResultOrNull(ICFGTag{});
-
-  auto BaseRes = [BaseCG]() {
-    // Note: double-wrapping in callback to avoid stack-use-after-scope,
-    //       since Resolver::BaseResolverProvider is a function_ref.
-    //       We cannot just use a ternary below, because BaseCG may be nullptr_t
-    if constexpr (std::is_null_pointer_v<decltype(BaseCG)>) {
-      (void)BaseCG;
-      return []() -> Resolver::BaseResolverProvider { return nullptr; };
-    } else {
-      return [BaseCG] {
-        return [BaseCG](const LLVMProjectIRDB *IRDB,
-                        const LLVMVFTableProvider *VTP,
-                        const DIBasedTypeHierarchy * /*TH*/,
-                        LLVMAliasInfoRef /*PT*/) {
-          auto &CG = BaseCG->getCallGraph();
-          return std::make_unique<PrecomputedResolver>(IRDB, VTP, &CG);
-        };
-      };
-    }
-  }();
-
-  auto Res = Resolver::create(CGTy, &IRDB, &VTP, &TH,
-                              LLVMAliasInfo::asRefOrNull(PT), BaseRes());
-  return LLVMBasedICFG(
-      buildLLVMBasedCallGraphWithExternCallbackModels(IRDB, *Res, Entry),
-      &IRDB);
-}
 
 struct TaintConfigStage {
   using tag_t = TaintConfigTag;
