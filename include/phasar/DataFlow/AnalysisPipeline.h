@@ -21,6 +21,7 @@
 
 #include <concepts>
 #include <memory>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -38,10 +39,8 @@ struct DataflowAnalysisTag {};
 struct FunctionCompressorTag {};
 struct CGSCCsTag {};
 
-// Checks that PrevPipeline already produced the result tagged TagT and, if
-// not, fails with the given Message instead of letting the raw getResult()
-// overload-resolution failure surface (which would print the fully nested
-// PipelineStage<...> type).
+// Fails with Message if PrevPipeline has no result tagged TagT yet, instead
+// of a raw getResult() overload-resolution error.
 #define PSR_REQUIRE_STAGE(PrevPipeline, TagT, Message)                         \
   /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                             \
   static_assert(requires { (PrevPipeline).getResult(TagT{}); }, Message)
@@ -49,36 +48,67 @@ struct CGSCCsTag {};
 template <typename ProblemT, typename I>
 auto solveDataFlowAnalysisProblem(auto &Pipeline, ProblemT &Problem, I &ICF);
 
-class PipelineRoot {
-public:
-  [[nodiscard]] PipelineRoot getResult(PipelineRoot /*unused*/) { return {}; };
-};
+template <typename Impl> class SharedPipeline;
 
-template <typename Base> class SharedPipelineStage;
+namespace detail {
 
-template <typename StageT, typename Base> class PipelineStage : public Base {
-public:
-  using result_t = typename StageT::result_t;
-  using tag_t = typename StageT::tag_t;
+// Marker for "no shared prefix": all stage results are owned locally.
+struct EmptyPrefix {};
 
-  template <typename ArgsT>
-    requires std::is_constructible_v<result_t, ArgsT>
-  explicit PipelineStage(StageT /*unused*/, ArgsT Args, Base &&B)
-      : Base(std::move(B)), Result(std::make_unique<result_t>(PSR_FWD(Args))) {}
-
-  explicit PipelineStage(StageT /*unused*/, std::unique_ptr<result_t> Result,
-                         Base &&B)
-      : Base(std::move(B)), Result(std::move(Result)) {}
-
-  using Base::getResult;
-
-  [[nodiscard]] result_t &
-  getResult(typename StageT::tag_t /*unused*/) & noexcept {
-    return *Result;
+// Index of the stage in StageTs... tagged Tag, or -1 if none. The LAST match
+// wins (e.g. defaultPipeline() tags two ICFGStage runs, RTA then VTA, with
+// the same ICFGTag; the later one must shadow the earlier one).
+// A free function, not a PipelineImpl member, since a trailing requires-
+// clause can't reference a member of the current instantiation unqualified.
+template <typename Tag, typename... StageTs>
+constexpr int indexOfTag() noexcept {
+  constexpr bool Matches[] = {std::same_as<typename StageTs::tag_t, Tag>...,
+                              false};
+  int Result = -1;
+  for (size_t Idx = 0; Idx < sizeof...(StageTs); ++Idx) {
+    if (Matches[Idx]) {
+      Result = static_cast<int>(Idx);
+    }
   }
-  [[nodiscard]] result_t
-  getResult(typename StageT::tag_t /*unused*/) && noexcept {
-    return std::move(*Result);
+  return Result;
+}
+
+// Flat pipeline storage: all stage results live in one std::tuple, and the
+// type only grows by appending to StageTs..., so an N-stage pipeline has
+// type PipelineImpl<Prefix, S1, ..., SN> (one level) instead of an N-deep
+// chain of nested PipelineStage<SN, PipelineStage<SN-1, ...>>.
+//
+// Prefix is EmptyPrefix (own everything) or a SharedPipeline<...> (stages
+// before the branch point live there and are only looked up through Prefix).
+template <typename Prefix, typename... StageTs> class PipelineImpl {
+public:
+  using ResultsTuple =
+      std::tuple<std::unique_ptr<typename StageTs::result_t>...>;
+
+  PipelineImpl() = default;
+  explicit PipelineImpl(Prefix Prev, ResultsTuple Results)
+      : Prev(std::move(Prev)), Results(std::move(Results)) {}
+
+  template <typename Tag>
+    requires(indexOfTag<Tag, StageTs...>() >= 0 ||
+             requires(Prefix &P) { P.getResult(Tag{}); })
+  [[nodiscard]] auto &getResult(Tag /*unused*/) & noexcept {
+    if constexpr (indexOfTag<Tag, StageTs...>() >= 0) {
+      return *std::get<indexOfTag<Tag, StageTs...>()>(Results);
+    } else {
+      return Prev.getResult(Tag{});
+    }
+  }
+
+  template <typename Tag>
+    requires(indexOfTag<Tag, StageTs...>() >= 0 ||
+             requires(Prefix &P) { P.getResult(Tag{}); })
+  [[nodiscard]] auto getResult(Tag /*unused*/) && noexcept {
+    if constexpr (indexOfTag<Tag, StageTs...>() >= 0) {
+      return std::move(*std::get<indexOfTag<Tag, StageTs...>()>(Results));
+    } else {
+      return Prev.getResult(Tag{});
+    }
   }
 
   template <typename OtherTag>
@@ -95,11 +125,26 @@ public:
     using NextT = typename NextStageT::result_t;
     auto Res =
         std::make_unique<NextT>(NextStageT::build(*this, PSR_FWD(NextArgs)...));
-    return PipelineStage<NextStageT, PipelineStage>{
-        NextStageT{}, std::move(Res), std::move(*this)};
+    return PipelineImpl<Prefix, StageTs..., NextStageT>(
+        std::move(Prev),
+        std::tuple_cat(std::move(Results), std::make_tuple(std::move(Res))));
   }
 
-  [[nodiscard]] auto shared() &&;
+  // Like with(), but builds the result directly from Args instead of via
+  // NextStageT::build(); used to seed a pipeline's first stage.
+  template <typename NextStageT, typename ArgsT>
+    requires std::is_constructible_v<typename NextStageT::result_t, ArgsT>
+  [[nodiscard]] auto withValue(NextStageT /*unused*/, ArgsT Args) && {
+    using NextT = typename NextStageT::result_t;
+    auto Res = std::make_unique<NextT>(PSR_FWD(Args));
+    return PipelineImpl<Prefix, StageTs..., NextStageT>(
+        std::move(Prev),
+        std::tuple_cat(std::move(Results), std::make_tuple(std::move(Res))));
+  }
+
+  [[nodiscard]] auto shared() && {
+    return SharedPipeline<PipelineImpl>(std::move(Results));
+  }
 
   auto solve() && {
     auto &Problem = this->getResult(DataflowAnalysisTag{});
@@ -108,24 +153,35 @@ public:
   }
 
 private:
-  std::unique_ptr<result_t> Result;
+  [[no_unique_address]] Prefix Prev;
+  ResultsTuple Results;
 };
 
-template <typename Base> class SharedPipelineStage {
-  struct SharedPipelineRoot
-      : public llvm::ThreadSafeRefCountedBase<SharedPipelineRoot>,
-        public Base {
-    SharedPipelineRoot(Base &&B) : Base(std::move(B)) {}
+} // namespace detail
+
+// Owns all of its stage results directly. Move-only: each .with() call
+// consumes the pipeline and returns a new, longer one.
+template <typename... StageTs>
+using Pipeline = detail::PipelineImpl<detail::EmptyPrefix, StageTs...>;
+
+// Reference-counted, copyable handle to a pipeline prefix, created via
+// Pipeline::shared(). .with() can be called repeatedly on it to branch off
+// several continuations that share the same already-computed prefix.
+template <typename Impl> class SharedPipeline {
+  struct Root : public llvm::ThreadSafeRefCountedBase<Root> {
+    Impl P;
+    explicit Root(Impl P) : P(std::move(P)) {}
   };
 
 public:
-  SharedPipelineStage(Base &&B)
-      : Rc(llvm::makeIntrusiveRefCnt<SharedPipelineRoot>(std::move(B))) {}
+  explicit SharedPipeline(typename Impl::ResultsTuple Results)
+      : Rc(llvm::makeIntrusiveRefCnt<Root>(
+            Impl(detail::EmptyPrefix{}, std::move(Results)))) {}
 
   template <typename Tag>
-  [[nodiscard]] auto getResult(Tag /*unused*/) noexcept
-      -> decltype(std::declval<Base &>().getResult(Tag{})) {
-    return Rc->getResult(Tag{});
+    requires requires(Impl &P) { P.getResult(Tag{}); }
+  [[nodiscard]] decltype(auto) getResult(Tag /*unused*/) noexcept {
+    return Rc->P.getResult(Tag{});
   }
 
   template <typename OtherTag>
@@ -141,28 +197,22 @@ public:
   [[nodiscard]] auto with(NextStageT /*unused*/, auto &&...NextArgs) {
     using NextT = typename NextStageT::result_t;
     auto Res =
-        std::make_unique<NextT>(NextStageT::build(*Rc, PSR_FWD(NextArgs)...));
-    auto Cpy = *this;
-    return PipelineStage<NextStageT, SharedPipelineStage>{
-        NextStageT{}, std::move(Res), std::move(Cpy)};
+        std::make_unique<NextT>(NextStageT::build(Rc->P, PSR_FWD(NextArgs)...));
+    return detail::PipelineImpl<SharedPipeline, NextStageT>(
+        *this, std::make_tuple(std::move(Res)));
   }
 
   [[nodiscard]] auto shared() { return *this; }
 
   auto solve() {
-    auto &Problem = this->getResult(DataflowAnalysisTag{});
-    auto &ICF = this->getResult(ICFGTag{});
-    return solveDataFlowAnalysisProblem(*Rc, Problem, ICF);
+    auto &Problem = Rc->P.getResult(DataflowAnalysisTag{});
+    auto &ICF = Rc->P.getResult(ICFGTag{});
+    return solveDataFlowAnalysisProblem(Rc->P, Problem, ICF);
   }
 
 private:
-  llvm::IntrusiveRefCntPtr<SharedPipelineRoot> Rc{};
+  llvm::IntrusiveRefCntPtr<Root> Rc{};
 };
-
-template <typename Tag, typename Base>
-inline auto PipelineStage<Tag, Base>::shared() && {
-  return SharedPipelineStage{std::move(*this)};
-}
 
 template <typename ProblemT, typename I>
 auto solveDataFlowAnalysisProblem(auto &Pipeline, ProblemT &Problem, I &ICF) {

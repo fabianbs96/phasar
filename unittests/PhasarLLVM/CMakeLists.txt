@@ -1,3 +1,4 @@
+add_subdirectory(AnalysisPipeline)
 add_subdirectory(ControlFlow)
 add_subdirectory(DataFlow)
 add_subdirectory(Utils)

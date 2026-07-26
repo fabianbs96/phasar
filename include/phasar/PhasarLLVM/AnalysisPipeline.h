@@ -269,13 +269,13 @@ template <typename ProblemTy> struct DataflowAnalysisStage {
 // --- pipeline constructors:
 
 [[nodiscard]] inline auto pipeline(const llvm::Twine &IRFile) {
-  return PipelineStage<IRDBStage, PipelineRoot>{
-      IRDBStage{}, PSR_LAZY(LLVMProjectIRDB::loadOrExit(IRFile)), {}};
+  return Pipeline<>{}.withValue(IRDBStage{},
+                                PSR_LAZY(LLVMProjectIRDB::loadOrExit(IRFile)));
 }
 
 [[nodiscard]] inline auto pipeline(NonNullPtr<llvm::Module> Mod) {
-  return PipelineStage<IRDBStage, PipelineRoot>{
-      IRDBStage{}, PSR_LAZY(LLVMProjectIRDB(Mod.get())), {}};
+  return Pipeline<>{}.withValue(IRDBStage{},
+                                PSR_LAZY(LLVMProjectIRDB(Mod.get())));
 }
 
 [[nodiscard]] inline auto defaultPipelineStart(const llvm::Twine &IRFile) {
