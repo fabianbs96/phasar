@@ -172,11 +172,8 @@ public:
 
   virtual ~InterMonoSolver() = default;
 
-  std::unordered_map<
-      n_t, std::unordered_map<CallStringCTX<n_t, K>, mono_container_t>>
-  getAnalysis() {
-    return Analysis;
-  }
+  [[nodiscard]] auto &getAnalysis() & { return Analysis; }
+  [[nodiscard]] auto getAnalysis() && { return std::move(Analysis); }
 
   void processNormal(std::pair<n_t, n_t> Edge) {
     llvm::outs() << "Handle normal flow\n";

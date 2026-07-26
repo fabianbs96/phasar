@@ -1,4 +1,5 @@
 #pragma once
+
 /******************************************************************************
  * Copyright (c) 2026 Fabian Schiebel.
  * All rights reserved. This program and the accompanying materials are made
@@ -34,40 +35,54 @@
 
 namespace psr {
 
-struct IRDBTag {};
+struct IRDBStage {
+  using tag_t = IRDBTag;
+};
 
-struct EntrypointsTag {
+struct EntrypointsStage {
+  using tag_t = EntrypointsTag;
+
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return getDefaultEntryPoints(IRDB);
   }
 };
-struct EntryFunctionsTag {
+struct EntryFunctionsStage {
+  using tag_t = EntryFunctionsTag;
+
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     auto &EntryPoints = PrevPipeline.getResult(EntrypointsTag{});
     return getEntryFunctions(IRDB, EntryPoints);
   }
 };
-struct TypeHierarchyTag {
+struct TypeHierarchyStage {
+  using tag_t = TypeHierarchyTag;
+
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return DIBasedTypeHierarchy(IRDB);
   }
 };
 
-struct VFTableProviderTag {
+struct VFTableProviderStage {
+  using tag_t = VFTableProviderTag;
+
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return LLVMVFTableProvider(IRDB);
   }
 };
 
-struct ICFGTag {
+struct ICFGStage {
+  using tag_t = ICFGTag;
+
   static auto build(auto &PrevPipeline, CallGraphAnalysisType CGTy);
 };
 
-struct AliasInfoTag {
+struct AliasInfoStage {
+  using tag_t = AliasInfoTag;
+
   static LLVMAliasInfo buildImpl(LLVMProjectIRDB &IRDB,
                                  const LLVMBasedICFG *BaseCG,
                                  AliasAnalysisType AATy,
@@ -88,7 +103,7 @@ struct AliasInfoTag {
   }
 };
 
-inline auto ICFGTag::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
+inline auto ICFGStage::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
   auto &IRDB = PrevPipeline.getResult(IRDBTag{});
   auto &Entry = PrevPipeline.getResult(EntrypointsTag{});
   auto &VTP = PrevPipeline.getResult(VFTableProviderTag{});
@@ -123,7 +138,9 @@ inline auto ICFGTag::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
       &IRDB);
 }
 
-struct TaintConfigTag {
+struct TaintConfigStage {
+  using tag_t = TaintConfigTag;
+
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return LLVMTaintConfig(IRDB);
@@ -135,7 +152,9 @@ struct TaintConfigTag {
   // TODO: callbacks
 };
 
-struct DataflowAnalysisTag {
+struct DataflowAnalysisStage {
+  using tag_t = DataflowAnalysisTag;
+
   template <typename ProblemTy, typename... ArgTys>
   static auto build(auto &PrevPipeline,
                     std::type_identity<ProblemTy> /*unused*/,
@@ -223,27 +242,27 @@ struct DataflowAnalysisTag {
 // --- pipeline constructors:
 
 [[nodiscard]] inline auto pipeline(const llvm::Twine &IRFile) {
-  return PipelineStage<LLVMProjectIRDB, IRDBTag, PipelineRoot>{
-      IRDBTag{}, PSR_LAZY(LLVMProjectIRDB::loadOrExit(IRFile)), {}};
+  return PipelineStage<LLVMProjectIRDB, IRDBStage, PipelineRoot>{
+      IRDBStage{}, PSR_LAZY(LLVMProjectIRDB::loadOrExit(IRFile)), {}};
 }
 
 [[nodiscard]] inline auto pipeline(NonNullPtr<llvm::Module> Mod) {
-  return PipelineStage<LLVMProjectIRDB, IRDBTag, PipelineRoot>{
-      IRDBTag{}, PSR_LAZY(LLVMProjectIRDB(Mod.get())), {}};
+  return PipelineStage<LLVMProjectIRDB, IRDBStage, PipelineRoot>{
+      IRDBStage{}, PSR_LAZY(LLVMProjectIRDB(Mod.get())), {}};
 }
 
 [[nodiscard]] inline auto defaultPipelineStart(const llvm::Twine &IRFile) {
   return pipeline(IRFile)
-      .with(EntrypointsTag{})
-      .with(TypeHierarchyTag{})
-      .with(VFTableProviderTag{});
+      .with(EntrypointsStage{})
+      .with(TypeHierarchyStage{})
+      .with(VFTableProviderStage{});
 }
 
 [[nodiscard]] inline auto defaultPipeline(const llvm::Twine &IRFile) {
   return defaultPipelineStart(IRFile)
-      .with(ICFGTag{}, CallGraphAnalysisType::RTA)
-      .with(AliasInfoTag{}, UnionFindAliasAnalysisType::CtxIndSens)
-      .with(ICFGTag{}, CallGraphAnalysisType::VTA);
+      .with(ICFGStage{}, CallGraphAnalysisType::RTA)
+      .with(AliasInfoStage{}, UnionFindAliasAnalysisType::CtxIndSens)
+      .with(ICFGStage{}, CallGraphAnalysisType::VTA);
 }
 
 } // namespace psr

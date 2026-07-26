@@ -57,9 +57,13 @@ int main(int Argc, const char **Argv) {
   {
     SimpleTimer Tm;
     auto Pipeline = defaultPipeline(Argv[1])
-                        .with(TaintConfigTag{})
-                        .with(DataflowAnalysisTag{},
-                              std::type_identity<IFDSTaintAnalysis>{});
+                        .with(TaintConfigStage{})
+                        .with(DataflowAnalysisStage{},
+                              std::type_identity<IFDSTaintAnalysis>{})
+                        .shared();
+
+    Pipeline.solve();
+
     llvm::outs() << "Pipeline Taint Analysis elapsed: " << Tm.elapsed() << '\n';
   }
 

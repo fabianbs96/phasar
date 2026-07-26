@@ -11,10 +11,10 @@
 
 using namespace psr;
 
-LLVMAliasInfo AliasInfoTag::buildImpl(LLVMProjectIRDB &IRDB,
-                                      const LLVMBasedICFG *BaseCG,
-                                      AliasAnalysisType AATy,
-                                      UnionFindAliasAnalysisType UFAATy) {
+LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
+                                        const LLVMBasedICFG *BaseCG,
+                                        AliasAnalysisType AATy,
+                                        UnionFindAliasAnalysisType UFAATy) {
   switch (AATy) {
   case AliasAnalysisType::Basic:
   case AliasAnalysisType::CFLSteens:

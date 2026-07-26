@@ -230,6 +230,7 @@ private:
           ICF->getCallGraph(),
           psr::getEntryFunctions(*ICF, Problem->getEntryPoints())));
     } else {
+      // TODO: static_assert?
       throw std::logic_error("The analysis problem " +
                              llvm::getTypeName<ProblemT>().str() +
                              " does not provide getEntryPoints(). So, you "
