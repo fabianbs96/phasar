@@ -37,10 +37,12 @@ namespace psr {
 
 struct IRDBStage {
   using tag_t = IRDBTag;
+  using result_t = LLVMProjectIRDB;
 };
 
 struct EntrypointsStage {
   using tag_t = EntrypointsTag;
+  using result_t = std::vector<std::string>;
 
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
@@ -49,6 +51,7 @@ struct EntrypointsStage {
 };
 struct EntryFunctionsStage {
   using tag_t = EntryFunctionsTag;
+  using result_t = std::vector<const llvm::Function *>;
 
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
@@ -58,6 +61,7 @@ struct EntryFunctionsStage {
 };
 struct TypeHierarchyStage {
   using tag_t = TypeHierarchyTag;
+  using result_t = DIBasedTypeHierarchy;
 
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
@@ -67,6 +71,7 @@ struct TypeHierarchyStage {
 
 struct VFTableProviderStage {
   using tag_t = VFTableProviderTag;
+  using result_t = LLVMVFTableProvider;
 
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
@@ -76,12 +81,14 @@ struct VFTableProviderStage {
 
 struct ICFGStage {
   using tag_t = ICFGTag;
+  using result_t = LLVMBasedICFG;
 
   static auto build(auto &PrevPipeline, CallGraphAnalysisType CGTy);
 };
 
 struct AliasInfoStage {
   using tag_t = AliasInfoTag;
+  using result_t = LLVMAliasInfo;
 
   static LLVMAliasInfo buildImpl(LLVMProjectIRDB &IRDB,
                                  const LLVMBasedICFG *BaseCG,
@@ -140,6 +147,7 @@ inline auto ICFGStage::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
 
 struct TaintConfigStage {
   using tag_t = TaintConfigTag;
+  using result_t = LLVMTaintConfig;
 
   static auto build(auto &PrevPipeline) {
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
@@ -152,13 +160,14 @@ struct TaintConfigStage {
   // TODO: callbacks
 };
 
-struct DataflowAnalysisStage {
+template <typename ProblemTy> struct DataflowAnalysisStage {
   using tag_t = DataflowAnalysisTag;
+  using result_t = ProblemTy;
 
-  template <typename ProblemTy, typename... ArgTys>
-  static auto build(auto &PrevPipeline,
-                    std::type_identity<ProblemTy> /*unused*/,
-                    ArgTys &&...Args) {
+  [[no_unique_address]] std::type_identity<ProblemTy> ProblemType;
+
+  template <typename... ArgTys>
+  static auto build(auto &PrevPipeline, ArgTys &&...Args) {
     // mirror createAnalysisProblem():
 
     if constexpr (std::is_constructible_v<ProblemTy, const LLVMProjectIRDB *,
@@ -242,12 +251,12 @@ struct DataflowAnalysisStage {
 // --- pipeline constructors:
 
 [[nodiscard]] inline auto pipeline(const llvm::Twine &IRFile) {
-  return PipelineStage<LLVMProjectIRDB, IRDBStage, PipelineRoot>{
+  return PipelineStage<IRDBStage, PipelineRoot>{
       IRDBStage{}, PSR_LAZY(LLVMProjectIRDB::loadOrExit(IRFile)), {}};
 }
 
 [[nodiscard]] inline auto pipeline(NonNullPtr<llvm::Module> Mod) {
-  return PipelineStage<LLVMProjectIRDB, IRDBStage, PipelineRoot>{
+  return PipelineStage<IRDBStage, PipelineRoot>{
       IRDBStage{}, PSR_LAZY(LLVMProjectIRDB(Mod.get())), {}};
 }
 

@@ -58,8 +58,8 @@ int main(int Argc, const char **Argv) {
     SimpleTimer Tm;
     auto Pipeline = defaultPipeline(Argv[1])
                         .with(TaintConfigStage{})
-                        .with(DataflowAnalysisStage{},
-                              std::type_identity<IFDSTaintAnalysis>{})
+                        .with(DataflowAnalysisStage{
+                            std::type_identity<IFDSTaintAnalysis>{}})
                         .shared();
 
     Pipeline.solve();

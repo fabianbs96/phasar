@@ -9,17 +9,13 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
-#include "phasar/DB/ProjectIRDB.h"
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
 #include "phasar/DataFlow/Mono/InterMonoProblem.h"
 #include "phasar/DataFlow/Mono/Solver/InterMonoSolver.h"
 #include "phasar/DataFlow/MonoIfds/MonoIFDSProblem.h"
 #include "phasar/DataFlow/MonoIfds/MonoIFDSSolver.h"
-#include "phasar/Utils/EmptyBaseOptimizationUtils.h"
-#include "phasar/Utils/Lazy.h"
 #include "phasar/Utils/Macros.h"
-#include "phasar/Utils/NonNullPtr.h"
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 
@@ -52,23 +48,28 @@ public:
 
 template <typename Base> class SharedPipelineStage;
 
-template <typename T, typename StageT, typename Base>
-class PipelineStage : public Base {
+template <typename StageT, typename Base> class PipelineStage : public Base {
 public:
-  template <typename ArgsT>
-    requires std::is_constructible_v<T, ArgsT>
-  explicit PipelineStage(StageT /*unused*/, ArgsT Args, Base &&B)
-      : Base(std::move(B)), Result(std::make_unique<T>(PSR_FWD(Args))) {}
+  using result_t = typename StageT::result_t;
+  using tag_t = typename StageT::tag_t;
 
-  explicit PipelineStage(StageT /*unused*/, std::unique_ptr<T> Result, Base &&B)
+  template <typename ArgsT>
+    requires std::is_constructible_v<result_t, ArgsT>
+  explicit PipelineStage(StageT /*unused*/, ArgsT Args, Base &&B)
+      : Base(std::move(B)), Result(std::make_unique<result_t>(PSR_FWD(Args))) {}
+
+  explicit PipelineStage(StageT /*unused*/, std::unique_ptr<result_t> Result,
+                         Base &&B)
       : Base(std::move(B)), Result(std::move(Result)) {}
 
   using Base::getResult;
 
-  [[nodiscard]] T &getResult(typename StageT::tag_t /*unused*/) & noexcept {
+  [[nodiscard]] result_t &
+  getResult(typename StageT::tag_t /*unused*/) & noexcept {
     return *Result;
   }
-  [[nodiscard]] T getResult(typename StageT::tag_t /*unused*/) && noexcept {
+  [[nodiscard]] result_t
+  getResult(typename StageT::tag_t /*unused*/) && noexcept {
     return std::move(*Result);
   }
 
@@ -83,28 +84,23 @@ public:
 
   template <typename NextStageT>
   [[nodiscard]] auto with(NextStageT /*unused*/, auto &&...NextArgs) && {
-    using NextT = decltype(NextStageT::build(*this, PSR_FWD(NextArgs)...));
+    using NextT = typename NextStageT::result_t;
     auto Res =
         std::make_unique<NextT>(NextStageT::build(*this, PSR_FWD(NextArgs)...));
-    return PipelineStage<NextT, NextStageT, PipelineStage>{
+    return PipelineStage<NextStageT, PipelineStage>{
         NextStageT{}, std::move(Res), std::move(*this)};
   }
 
   [[nodiscard]] auto shared() &&;
 
-  auto solve() &&
-    requires requires {
-      this->getResult(DataflowAnalysisTag{});
-      this->getResult(ICFGTag{});
-    }
-  {
+  auto solve() && {
     auto &Problem = this->getResult(DataflowAnalysisTag{});
     auto &ICF = this->getResult(ICFGTag{});
     return solveDataFlowAnalysisProblem(*this, Problem, ICF);
   }
 
 private:
-  std::unique_ptr<T> Result;
+  std::unique_ptr<result_t> Result;
 };
 
 template <typename Base> class SharedPipelineStage {
@@ -135,33 +131,28 @@ public:
 
   template <typename NextStageT>
   [[nodiscard]] auto with(NextStageT /*unused*/, auto &&...NextArgs) {
-    using NextT = decltype(NextStageT::build(*this, PSR_FWD(NextArgs)...));
+    using NextT = typename NextStageT::result_t;
     auto Res =
-        std::make_unique<NextT>(NextStageT::build(*this, PSR_FWD(NextArgs)...));
+        std::make_unique<NextT>(NextStageT::build(*Rc, PSR_FWD(NextArgs)...));
     auto Cpy = *this;
-    return PipelineStage<NextT, NextStageT, SharedPipelineStage>{
+    return PipelineStage<NextStageT, SharedPipelineStage>{
         NextStageT{}, std::move(Res), std::move(Cpy)};
   }
 
   [[nodiscard]] auto shared() { return *this; }
 
-  auto solve()
-    requires requires {
-      this->getResult(DataflowAnalysisTag{});
-      this->getResult(ICFGTag{});
-    }
-  {
+  auto solve() {
     auto &Problem = this->getResult(DataflowAnalysisTag{});
     auto &ICF = this->getResult(ICFGTag{});
-    return solveDataFlowAnalysisProblem(*this, Problem, ICF);
+    return solveDataFlowAnalysisProblem(*Rc, Problem, ICF);
   }
 
 private:
   llvm::IntrusiveRefCntPtr<SharedPipelineRoot> Rc{};
 };
 
-template <typename T, typename Tag, typename Base>
-inline auto PipelineStage<T, Tag, Base>::shared() && {
+template <typename Tag, typename Base>
+inline auto PipelineStage<Tag, Base>::shared() && {
   return SharedPipelineStage{std::move(*this)};
 }
 
