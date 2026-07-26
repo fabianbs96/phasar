@@ -38,6 +38,14 @@ struct DataflowAnalysisTag {};
 struct FunctionCompressorTag {};
 struct CGSCCsTag {};
 
+// Checks that PrevPipeline already produced the result tagged TagT and, if
+// not, fails with the given Message instead of letting the raw getResult()
+// overload-resolution failure surface (which would print the fully nested
+// PipelineStage<...> type).
+#define PSR_REQUIRE_STAGE(PrevPipeline, TagT, Message)                         \
+  /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                             \
+  static_assert(requires { (PrevPipeline).getResult(TagT{}); }, Message)
+
 template <typename ProblemT, typename I>
 auto solveDataFlowAnalysisProblem(auto &Pipeline, ProblemT &Problem, I &ICF);
 

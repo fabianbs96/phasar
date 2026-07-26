@@ -23,10 +23,13 @@ LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
   case AliasAnalysisType::PointsTo:
     llvm::WithColor::error()
         << "AliasAnalysisType::PointsTo not implemented yet\n";
+    llvm::report_fatal_error("AliasAnalysisType::PointsTo not implemented");
   case AliasAnalysisType::UnionFind:
     if (!BaseCG) {
       llvm::WithColor::error()
           << "UnionFind alias analysis requires a base-call-graph!\n";
+      llvm::report_fatal_error(
+          "UnionFind alias analysis requires a base-call-graph");
     }
     return std::make_unique<LLVMUnionFindAliasSet>(
         &IRDB, BaseCG->getCallGraph(),

@@ -45,6 +45,7 @@ struct EntrypointsStage {
   using result_t = std::vector<std::string>;
 
   static auto build(auto &PrevPipeline) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return getDefaultEntryPoints(IRDB);
   }
@@ -54,6 +55,8 @@ struct EntryFunctionsStage {
   using result_t = std::vector<const llvm::Function *>;
 
   static auto build(auto &PrevPipeline) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, EntrypointsTag, "missing EntrypointsStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     auto &EntryPoints = PrevPipeline.getResult(EntrypointsTag{});
     return getEntryFunctions(IRDB, EntryPoints);
@@ -64,6 +67,7 @@ struct TypeHierarchyStage {
   using result_t = DIBasedTypeHierarchy;
 
   static auto build(auto &PrevPipeline) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return DIBasedTypeHierarchy(IRDB);
   }
@@ -74,6 +78,7 @@ struct VFTableProviderStage {
   using result_t = LLVMVFTableProvider;
 
   static auto build(auto &PrevPipeline) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return LLVMVFTableProvider(IRDB);
   }
@@ -98,12 +103,15 @@ struct AliasInfoStage {
   static auto build(auto &PrevPipeline, AliasAnalysisType AATy,
                     UnionFindAliasAnalysisType UFAATy =
                         UnionFindAliasAnalysisType::CtxIndSens) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     auto *BaseCG = PrevPipeline.getResultOrNull(ICFGTag{});
     return buildImpl(IRDB, BaseCG, AATy, UFAATy);
   }
 
   static auto build(auto &PrevPipeline, UnionFindAliasAnalysisType UFAATy) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, ICFGTag, "missing ICFGStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     auto &BaseCG = PrevPipeline.getResult(ICFGTag{});
     return buildImpl(IRDB, &BaseCG, AliasAnalysisType::UnionFind, UFAATy);
@@ -111,6 +119,12 @@ struct AliasInfoStage {
 };
 
 inline auto ICFGStage::build(auto &PrevPipeline, CallGraphAnalysisType CGTy) {
+  PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
+  PSR_REQUIRE_STAGE(PrevPipeline, EntrypointsTag, "missing EntrypointsStage");
+  PSR_REQUIRE_STAGE(PrevPipeline, VFTableProviderTag,
+                    "missing VFTableProviderStage");
+  PSR_REQUIRE_STAGE(PrevPipeline, TypeHierarchyTag,
+                    "missing TypeHierarchyStage");
   auto &IRDB = PrevPipeline.getResult(IRDBTag{});
   auto &Entry = PrevPipeline.getResult(EntrypointsTag{});
   auto &VTP = PrevPipeline.getResult(VFTableProviderTag{});
@@ -150,10 +164,12 @@ struct TaintConfigStage {
   using result_t = LLVMTaintConfig;
 
   static auto build(auto &PrevPipeline) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return LLVMTaintConfig(IRDB);
   }
   static auto build(auto &PrevPipeline, const TaintConfigData &TC) {
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
     auto &IRDB = PrevPipeline.getResult(IRDBTag{});
     return LLVMTaintConfig(IRDB, TC);
   }
@@ -169,6 +185,8 @@ template <typename ProblemTy> struct DataflowAnalysisStage {
   template <typename... ArgTys>
   static auto build(auto &PrevPipeline, ArgTys &&...Args) {
     // mirror createAnalysisProblem():
+    PSR_REQUIRE_STAGE(PrevPipeline, IRDBTag, "missing IRDBStage");
+    PSR_REQUIRE_STAGE(PrevPipeline, EntrypointsTag, "missing EntrypointsStage");
 
     if constexpr (std::is_constructible_v<ProblemTy, const LLVMProjectIRDB *,
                                           std::vector<std::string>,
