@@ -45,6 +45,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "BS_thread_pool.hpp"
@@ -70,11 +71,9 @@ namespace psr {
 // per-shard mutex contention; more shards trades a small constant memory
 // overhead per map for far fewer collisions.
 template <typename Key, typename Val>
-using PllMap =
-    phmap::parallel_node_hash_map_m<Key, Val, phmap::Hash<Key>,
-                                     phmap::EqualTo<Key>,
-                                     phmap::Allocator<std::pair<const Key, Val>>,
-                                     7>;
+using PllMap = phmap::parallel_node_hash_map_m<
+    Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
+    phmap::Allocator<std::pair<const Key, Val>>, 7>;
 
 template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
@@ -108,9 +107,9 @@ public:
 
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
-      const ICFGTy *ICF)
+      const ICFGTy *ICF, size_t NumOfThreads = 0)
       : IDEProblem(Problem), ZeroValue(Problem.getZeroValue()),
-        ICF(&assertNotNull(ICF)),
+        ICF(&assertNotNull(ICF)), NumOfThreads(NumOfThreads),
         SolverConfig(Problem.getIFDSIDESolverConfig()),
         CachedFlowEdgeFunctions(Problem), AllTop(Problem.allTopFunction()),
         JumpFn(
@@ -119,8 +118,8 @@ public:
 
   ParallelizedIDESolver(
       IDETabulationProblem<AnalysisDomainTy, Container> *Problem,
-      const i_t *ICF)
-      : ParallelizedIDESolver(assertNotNull(Problem), ICF) {}
+      const i_t *ICF, size_t NumOfThreads = 0)
+      : ParallelizedIDESolver(assertNotNull(Problem), ICF, NumOfThreads) {}
 
   ParallelizedIDESolver(const ParallelizedIDESolver &) = delete;
   ParallelizedIDESolver &operator=(const ParallelizedIDESolver &) = delete;
@@ -636,8 +635,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG,
                          "Queried Call-to-Return Edge Function: " << EdgeFnE);
         if (SolverConfig.emitESG()) {
-          addIntermediateEdgeFunction(
-              std::make_tuple(n, d2, ReturnSiteN, d3), EdgeFnE);
+          addIntermediateEdgeFunction(std::make_tuple(n, d2, ReturnSiteN, d3),
+                                      EdgeFnE);
         }
         INC_COUNTER("EF Queries", 1, Full);
         auto fPrime = IDEProblem.extend(f, EdgeFnE);
@@ -734,8 +733,8 @@ protected:
         PHASAR_LOG_LEVEL(DEBUG, "Queried Call Edge Function: " << EdgeFn);
         if (SolverConfig.emitESG()) {
           for (const auto SP : ICF->getStartPointsOf(Callee)) {
-            addIntermediateEdgeFunction(
-                std::make_tuple(Stmt, Fact, SP, dPrime), EdgeFn);
+            addIntermediateEdgeFunction(std::make_tuple(Stmt, Fact, SP, dPrime),
+                                        EdgeFn);
           }
         }
         INC_COUNTER("EF Queries", 1, Full);
@@ -921,11 +920,10 @@ protected:
   void addIntermediateEdgeFunction(std::tuple<n_t, d_t, n_t, d_t> Key,
                                    EdgeFunction<l_t> EdgeFn) {
     IntermediateEdgeFunctions.lazy_emplace_l(
-        Key,
-        [&](auto &KV) { KV.second.push_back(EdgeFn); },
+        Key, [&](auto &KV) { KV.second.push_back(EdgeFn); },
         [&](auto &&Ctor) {
-          Ctor(std::move(Key), std::vector<EdgeFunction<l_t>>{
-                                    std::move(EdgeFn)});
+          Ctor(std::move(Key),
+               std::vector<EdgeFunction<l_t>>{std::move(EdgeFn)});
         });
   }
 
@@ -1084,11 +1082,10 @@ protected:
             PHASAR_LOG_LEVEL(DEBUG, "Queried Return Edge Function: " << f5);
             if (SolverConfig.emitESG()) {
               for (auto SP : ICF->getStartPointsOf(ICF->getFunctionOf(n))) {
-                addIntermediateEdgeFunction(
-                    std::make_tuple(c, d4, SP, d1), f4);
+                addIntermediateEdgeFunction(std::make_tuple(c, d4, SP, d1), f4);
               }
-              addIntermediateEdgeFunction(
-                  std::make_tuple(n, d2, RetSiteC, d5), f5);
+              addIntermediateEdgeFunction(std::make_tuple(n, d2, RetSiteC, d5),
+                                          f5);
             }
             INC_COUNTER("EF Queries", 2, Full);
             // compose call function * function * return function
@@ -1162,8 +1159,8 @@ protected:
                     Caller, ICF->getFunctionOf(n), n, d2, RetSiteC, d5);
             PHASAR_LOG_LEVEL(DEBUG, "Queried Return Edge Function: " << f5);
             if (SolverConfig.emitESG()) {
-              addIntermediateEdgeFunction(
-                  std::make_tuple(n, d2, RetSiteC, d5), f5);
+              addIntermediateEdgeFunction(std::make_tuple(n, d2, RetSiteC, d5),
+                                          f5);
             }
             INC_COUNTER("EF Queries", 1, Full);
             PHASAR_LOG_LEVEL(DEBUG, "Compose: " << f5 << " * " << f);
@@ -2017,7 +2014,8 @@ private:
 
   PllMap<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
-  BS::light_thread_pool TPool;
+  const size_t NumOfThreads;
+  BS::light_thread_pool TPool = BS::light_thread_pool(NumOfThreads);
   hms SolveTime;
 };
 
@@ -2051,8 +2049,9 @@ OwningSolverResults<
     Table<typename AnalysisDomainTy::n_t, typename AnalysisDomainTy::d_t,
           typename AnalysisDomainTy::l_t, PllMap>>
 solveIDEProblemPll(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
-                   const ICFG auto &ICF) {
-  ParallelizedIDESolver<AnalysisDomainTy, Container> Solver(&Problem, &ICF);
+                   const ICFG auto &ICF, size_t NumOfThreads = 0) {
+  ParallelizedIDESolver<AnalysisDomainTy, Container> Solver(&Problem, &ICF,
+                                                            NumOfThreads);
   SimpleTimer SolveTimer = SimpleTimer();
   Solver.solve();
   llvm::outs() << "\n\n\nParallelizedIDESolver solve() time: "

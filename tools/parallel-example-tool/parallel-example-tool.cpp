@@ -16,14 +16,32 @@
 
 using namespace psr;
 
+static bool isInt(const char *CCStr) {
+  if (!CCStr) {
+    return true;
+  }
+
+  std::string Str(CCStr);
+
+  for (const auto CurrChar : Str) {
+    if (!isdigit(CurrChar)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 int main(int Argc, const char **Argv) {
   using namespace std::string_literals;
 
   if (Argc < 2 || !std::filesystem::exists(Argv[1]) ||
-      std::filesystem::is_directory(Argv[1])) {
-    llvm::errs() << "myphasartool\n"
-                    "A small PhASAR-based example program\n\n"
-                    "Usage: myphasartool <LLVM IR file>\n";
+      std::filesystem::is_directory(Argv[1]) ||
+      (Argc == 3 && !isInt(Argv[2]))) {
+    llvm::errs()
+        << "parallel-example-tool\n"
+           "A small PhASAR-based parallel IDE solver implementation.\n\n"
+           "Usage: myphasartool <LLVM IR file> <Number of threads>\n";
     return 1;
   }
 
@@ -50,7 +68,12 @@ int main(int Argc, const char **Argv) {
     auto Problem =
         createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
 
-    auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG());
+    if (Argc == 3) {
+      auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG(),
+                                           std::stoi(std::string(Argv[2])));
+    } else {
+      auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG());
+    }
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";
   }
