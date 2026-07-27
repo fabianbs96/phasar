@@ -142,6 +142,9 @@ if (PHASAR_ENABLE_SANITIZERS)
   string(APPEND CMAKE_CXX_FLAGS " ${ASAN_FLAG}")
 endif()
 
+# Number of threads
+set(NUM_OF_THREADS 0 CACHE STRING "Number of threads to use for the thread pool or multi-threaded operations.")
+
 # Thread Sanitizer
 if (PHASAR_ENABLE_THREAD_SANITIZER)
   # NOT compatible with address sanitizer

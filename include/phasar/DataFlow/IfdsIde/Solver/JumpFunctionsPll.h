@@ -50,11 +50,9 @@ public:
   // per-shard mutex contention; more shards trades a small constant memory
   // overhead per map for far fewer collisions.
   template <typename Key, typename Val>
-  using PllMap =
-      phmap::parallel_node_hash_map_m<Key, Val, phmap::Hash<Key>,
-                                       phmap::EqualTo<Key>,
-                                       phmap::Allocator<std::pair<const Key, Val>>,
-                                       7>;
+  using PllMap = phmap::parallel_node_hash_map_m<
+      Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
+      phmap::Allocator<std::pair<const Key, Val>>, 7>;
 
 protected:
   // mapping from target node and value to a list of all source values and
@@ -166,8 +164,8 @@ public:
   template <typename CombineFn>
   std::pair<EdgeFunction<l_t>, bool>
   combineAndAddFunction(d_t SourceVal, n_t Target, d_t TargetVal,
-                       EdgeFunction<l_t> EdgeFunc, EdgeFunction<l_t> TopFunction,
-                       CombineFn Combine) {
+                        EdgeFunction<l_t> EdgeFunc,
+                        EdgeFunction<l_t> TopFunction, CombineFn Combine) {
     EdgeFunction<l_t> FPrime = TopFunction;
     bool IsNew = false;
 

@@ -340,6 +340,11 @@ concept has_lazy_emplace = requires(T &Container, K &Key) {
 };
 
 template <typename T, typename K>
+concept has_lazy_emplace_l = requires(T &Container, K &Key) {
+  Container.lazy_emplace_l(Key, [](auto &&Ctor) {}, [](auto &&Ctor) {});
+};
+
+template <typename T, typename K>
 concept has_try_emplace_p =
     requires(T &Container, K &Key) { Container.try_emplace_p(Key); };
 
