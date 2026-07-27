@@ -38,12 +38,15 @@ struct TaintConfigTag {};
 struct DataflowAnalysisTag {};
 struct FunctionCompressorTag {};
 struct CGSCCsTag {};
+struct CGSCCCallersTag {};
+struct UsedGlobalsTag {};
 
-// Fails with Message if PrevPipeline has no result tagged TagT yet, instead
-// of a raw getResult() overload-resolution error.
-#define PSR_REQUIRE_STAGE(PrevPipeline, TagT, Message)                         \
-  /* NOLINTNEXTLINE(bugprone-macro-parentheses) */                             \
-  static_assert(requires { (PrevPipeline).getResult(TagT{}); }, Message)
+template <typename T, typename TagT>
+concept StageRequireSingle =
+    requires(T &PrevPipeline, TagT Tag) { PrevPipeline.getResult(Tag); };
+
+template <typename T, typename... TagsT>
+concept StageRequire = (StageRequireSingle<T, TagsT> && ...);
 
 template <typename ProblemT, typename I>
 auto solveDataFlowAnalysisProblem(auto &Pipeline, ProblemT &Problem, I &ICF);
@@ -58,8 +61,6 @@ struct EmptyPrefix {};
 // Index of the stage in StageTs... tagged Tag, or -1 if none. The LAST match
 // wins (e.g. defaultPipeline() tags two ICFGStage runs, RTA then VTA, with
 // the same ICFGTag; the later one must shadow the earlier one).
-// A free function, not a PipelineImpl member, since a trailing requires-
-// clause can't reference a member of the current instantiation unqualified.
 template <typename Tag, typename... StageTs>
 constexpr int indexOfTag() noexcept {
   constexpr bool Matches[] = {std::same_as<typename StageTs::tag_t, Tag>...,
@@ -91,7 +92,7 @@ public:
 
   template <typename Tag>
     requires(indexOfTag<Tag, StageTs...>() >= 0 ||
-             requires(Prefix &P) { P.getResult(Tag{}); })
+             StageRequireSingle<Prefix, Tag>)
   [[nodiscard]] auto &getResult(Tag /*unused*/) & noexcept {
     if constexpr (indexOfTag<Tag, StageTs...>() >= 0) {
       return *std::get<indexOfTag<Tag, StageTs...>()>(Results);
@@ -179,7 +180,7 @@ public:
             Impl(detail::EmptyPrefix{}, std::move(Results)))) {}
 
   template <typename Tag>
-    requires requires(Impl &P) { P.getResult(Tag{}); }
+    requires StageRequireSingle<Impl, Tag>
   [[nodiscard]] decltype(auto) getResult(Tag /*unused*/) noexcept {
     return Rc->P.getResult(Tag{});
   }

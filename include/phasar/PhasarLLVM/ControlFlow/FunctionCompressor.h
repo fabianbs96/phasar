@@ -10,11 +10,16 @@
  *****************************************************************************/
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
-#include "phasar/Utils/Compressor.h"
 #include "phasar/Utils/FunctionId.h"
 
 namespace psr {
-Compressor<const llvm::Function *, FunctionId>
+
+class LLVMProjectIRDB;
+
+[[nodiscard]] FunctionCompressor<const llvm::Function *>
 compressFunctions(const LLVMBasedCallGraph &CG,
                   llvm::ArrayRef<const llvm::Function *> EntryPoints);
+
+[[nodiscard]] FunctionCompressor<const llvm::Function *>
+compressFunctions(const LLVMProjectIRDB &IRDB);
 } // namespace psr

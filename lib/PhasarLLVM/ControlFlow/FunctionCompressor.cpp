@@ -1,14 +1,16 @@
 #include "phasar/PhasarLLVM/ControlFlow/FunctionCompressor.h"
 
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
 
 using namespace psr;
 
-Compressor<const llvm::Function *, FunctionId>
+FunctionCompressor<const llvm::Function *>
 psr::compressFunctions(const LLVMBasedCallGraph &CG,
                        llvm::ArrayRef<const llvm::Function *> EntryPoints) {
-  Compressor<const llvm::Function *, FunctionId> Functions;
+  FunctionCompressor<const llvm::Function *> Functions;
   Functions.reserve(CG.getNumVertexFunctions());
   llvm::SmallVector<const llvm::Function *> WL;
   WL.append(EntryPoints.begin(), EntryPoints.end());
@@ -32,5 +34,15 @@ psr::compressFunctions(const LLVMBasedCallGraph &CG,
     }
   }
 
+  return Functions;
+}
+
+[[nodiscard]] FunctionCompressor<const llvm::Function *>
+psr::compressFunctions(const LLVMProjectIRDB &IRDB) {
+  FunctionCompressor<const llvm::Function *> Functions;
+  Functions.reserve(IRDB.getNumFunctions());
+  for (const auto *Fun : IRDB.getAllFunctions()) {
+    Functions.insert(Fun);
+  }
   return Functions;
 }

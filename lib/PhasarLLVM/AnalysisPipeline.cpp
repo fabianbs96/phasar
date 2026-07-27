@@ -1,5 +1,7 @@
 #include "phasar/PhasarLLVM/AnalysisPipeline.h"
 
+#include "phasar/ControlFlow/CGSCCs.h"
+#include "phasar/PhasarLLVM/ControlFlow/FunctionCompressor.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraphBuilder.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/Resolver/PrecomputedResolver.h"
@@ -68,4 +70,17 @@ LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
 
   // TODO #ifdef PHASAR_USE_SVF
   llvm::report_fatal_error("unimplemented");
+}
+
+auto CGSCCsStage::buildImpl(
+    const LLVMBasedICFG &ICF,
+    const FunctionCompressor<const llvm::Function *> &Functions) -> result_t {
+  return computeCGSCCs(ICF, Functions);
+}
+
+auto CGSCCCallersStage::buildImpl(
+    const LLVMBasedICFG &ICF,
+    const FunctionCompressor<const llvm::Function *> &Functions,
+    const SCCHolder<FunctionId> &SCCs) -> result_t {
+  return computeCGSCCCallers(ICF, Functions, SCCs);
 }
