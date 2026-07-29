@@ -99,17 +99,6 @@ public:
     REG_COUNTER("Summary-EF Cache Hit", 0, Full);
   }
 
-  ~FlowEdgeFunctionCacheBase() = default;
-
-  FlowEdgeFunctionCacheBase(const FlowEdgeFunctionCacheBase &FEFC) = default;
-  FlowEdgeFunctionCacheBase &
-  operator=(const FlowEdgeFunctionCacheBase &FEFC) = default;
-
-  FlowEdgeFunctionCacheBase(FlowEdgeFunctionCacheBase &&FEFC) noexcept =
-      default;
-  FlowEdgeFunctionCacheBase &
-  operator=(FlowEdgeFunctionCacheBase &&FEFC) noexcept = default;
-
   [[nodiscard]] NonNullPtr<FlowFunctionType> getNormalFlowFunction(n_t Curr,
                                                                    n_t Succ) {
     assertNotNull(Curr);
@@ -446,8 +435,7 @@ protected:
 
   IDETabulationProblem<AnalysisDomainTy, Container> &Problem;
   // Auto add zero
-  // TODO: Should be initialized, but with false or true?
-  bool AutoAddZero = false;
+  bool AutoAddZero = true;
   d_t ZV;
 };
 

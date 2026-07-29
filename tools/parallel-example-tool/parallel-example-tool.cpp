@@ -69,10 +69,10 @@ int main(int Argc, const char **Argv) {
         createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
 
     if (Argc == 3) {
-      auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG(),
-                                           std::stoi(std::string(Argv[2])));
+      auto IDEResults = solveIDEProblem(Problem, HA.getICFG(),
+                                        std::stoi(std::string(Argv[2])));
     } else {
-      auto IDEResults = solveIDEProblemPll(Problem, HA.getICFG());
+      auto IDEResults = solveIDEProblem(Problem, HA.getICFG());
     }
   } else {
     llvm::errs() << "error: file does not contain a 'main' function!\n";

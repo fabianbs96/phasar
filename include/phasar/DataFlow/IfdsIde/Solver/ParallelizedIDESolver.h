@@ -306,10 +306,17 @@ public:
   /// can be destroyed without that the analysis results are lost.
   /// Do not call any function (including getSolverResults()) on this
   /// ParallelizedIDESolver instance after that.
-  [[nodiscard]] OwningSolverResults<n_t, d_t, l_t, Table<n_t, d_t, l_t, PllMap>>
+  [[nodiscard]] OwningSolverResults<n_t, d_t, l_t>
   consumeSolverResults() noexcept(std::is_nothrow_move_constructible_v<d_t>) {
-    return OwningSolverResults<n_t, d_t, l_t, Table<n_t, d_t, l_t, PllMap>>(
-        std::move(this->ValTab), std::move(ZeroValue));
+    Table<n_t, d_t, l_t> StdTable;
+
+    ValTab.foreachCell(
+        [&StdTable](const auto &Row, const auto &Col, const auto &Val) {
+          StdTable.insert(Row, Col, Val);
+        });
+
+    return OwningSolverResults<n_t, d_t, l_t>(std::move(StdTable),
+                                              std::move(ZeroValue));
   }
 
   [[nodiscard]] EdgeFunctionStats getEdgeFunctionStatistics() const {

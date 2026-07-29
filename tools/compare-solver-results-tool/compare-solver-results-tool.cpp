@@ -7,6 +7,8 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "llvm/Support/Threading.h"
+
 #include "phasar.h"
 
 #include <filesystem>
@@ -39,7 +41,10 @@ int main(int Argc, const char **Argv) {
     auto M = createAnalysisProblem<IDELinearConstantAnalysis>(HA, EntryPoints);
     // Alternative way of solving an IFDS/IDEProblem:
     auto IDEResults = solveIDEProblem(M, HA.getICFG());
-    auto ParallelIDEResults = solveIDEProblemPll(M, HA.getICFG());
+    // TODO: Set the number of threads as an argument for the tool or make a
+    // variable for it.
+    auto ParallelIDEResults =
+        solveIDEProblem(M, HA.getICFG(), std::thread::hardware_concurrency());
 
     if (checkSREquality(IDEResults, ParallelIDEResults)) {
       llvm::outs() << "\nSuccess! Results are equal!\n";

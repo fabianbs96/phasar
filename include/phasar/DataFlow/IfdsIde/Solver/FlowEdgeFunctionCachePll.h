@@ -63,20 +63,6 @@ public:
       FlowEdgeFunctionCachePll<AnalysisDomainTy, Container>, AnalysisDomainTy,
       Container>;
 
-// TODO: Ask Fabian if the below is still needed in the derived class here.
-// TODO: If yes, how to do it?
-#if false
-  ~FlowEdgeFunctionCachePll() = default;
-
-  FlowEdgeFunctionCachePll(const FlowEdgeFunctionCachePll &FEFC) = default;
-  FlowEdgeFunctionCachePll &
-  operator=(const FlowEdgeFunctionCachePll &FEFC) = default;
-
-  FlowEdgeFunctionCachePll(FlowEdgeFunctionCachePll &&FEFC) noexcept = default;
-  FlowEdgeFunctionCachePll &
-  operator=(FlowEdgeFunctionCachePll &&FEFC) noexcept = default;
-#endif
-
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
                           Base::n_t Succ) {

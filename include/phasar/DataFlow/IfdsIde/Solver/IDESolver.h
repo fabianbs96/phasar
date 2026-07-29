@@ -1915,20 +1915,6 @@ using IDESolver_P
         IDESolver<typename Problem::ProblemAnalysisDomain,
                   typename Problem::container_type>;
 
-template <typename AnalysisDomainTy, typename Container>
-OwningSolverResults<typename AnalysisDomainTy::n_t,
-                    typename AnalysisDomainTy::d_t,
-                    typename AnalysisDomainTy::l_t>
-solveIDEProblem(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
-                const ICFG auto &ICF) {
-  IDESolver Solver(&Problem, &ICF);
-  SimpleTimer SolveTimer = SimpleTimer();
-  Solver.solve();
-  llvm::outs() << "\n\n\nIDESolver solve() time: " << SolveTimer.elapsed()
-               << "\n\n\n";
-  return Solver.consumeSolverResults();
-}
-
 } // namespace psr
 
 #endif
