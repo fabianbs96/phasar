@@ -22,16 +22,6 @@
 
 namespace psr {
 
-// TODO: check if the return type for the parallelized ide solver fits here. In
-// the impl in ParallelizedIDESolver, the return type had the table specified.
-/*
-OwningSolverResults<
-    typename AnalysisDomainTy::n_t, typename AnalysisDomainTy::d_t,
-    typename AnalysisDomainTy::l_t,
-    Table<typename AnalysisDomainTy::n_t, typename AnalysisDomainTy::d_t,
-          typename AnalysisDomainTy::l_t, PllMap>>
-*/
-
 template <typename AnalysisDomainTy, typename Container>
 static OwningSolverResults<typename AnalysisDomainTy::n_t,
                            typename AnalysisDomainTy::d_t,

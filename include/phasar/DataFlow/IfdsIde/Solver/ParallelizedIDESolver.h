@@ -73,7 +73,7 @@ namespace psr {
 template <typename Key, typename Val>
 using PllMap = phmap::parallel_node_hash_map_m<
     Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
-    phmap::Allocator<std::pair<const Key, Val>>, 7>;
+    phmap::Allocator<std::pair<const Key, Val>>, ExponentForShards>;
 
 template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;

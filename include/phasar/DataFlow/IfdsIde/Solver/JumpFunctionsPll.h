@@ -20,6 +20,7 @@
 #include "phasar/DataFlow/IfdsIde/EdgeFunctionUtils.h"
 #include "phasar/DataFlow/IfdsIde/IfdsIdeDomain.h"
 #include "phasar/Utils/ByRef.h"
+#include "phasar/Utils/ExponentForShards.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Table.h"
 
@@ -52,7 +53,7 @@ public:
   template <typename Key, typename Val>
   using PllMap = phmap::parallel_node_hash_map_m<
       Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
-      phmap::Allocator<std::pair<const Key, Val>>, 7>;
+      phmap::Allocator<std::pair<const Key, Val>>, ExponentForShards>;
 
 protected:
   // mapping from target node and value to a list of all source values and
