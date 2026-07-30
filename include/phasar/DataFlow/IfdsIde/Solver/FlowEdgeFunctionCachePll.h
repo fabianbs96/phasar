@@ -16,6 +16,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCacheBase.h"
 #include "phasar/DataFlow/IfdsIde/Solver/MapKeyCompressor.h"
 #include "phasar/Utils/EquivalenceClassMap.h"
+#include "phasar/Utils/ExponentForShards.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/PointerUtils.h"
@@ -62,6 +63,15 @@ public:
   using Base = FlowEdgeFunctionCacheBase<
       FlowEdgeFunctionCachePll<AnalysisDomainTy, Container>, AnalysisDomainTy,
       Container>;
+
+  // N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
+  // pool defaulting to hardware_concurrency() threads, 16 shards causes heavy
+  // per-shard mutex contention; more shards trades a small constant memory
+  // overhead per map for far fewer collisions.
+  template <typename Key, typename Val>
+  using PllMap = phmap::parallel_node_hash_map_m<
+      Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
+      phmap::Allocator<std::pair<const Key, Val>>, ExponentForShards>;
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
@@ -504,43 +514,36 @@ private:
   // getNormalEdgeFunction): one mutex for the whole cache would serialize all
   // Curr/Succ keys against each other, not just concurrent accesses to the
   // same key.
-  std::array<std::mutex, 64> EdgeFunctionMapMutexes;
+  std::array<std::mutex, getNumOfShards(ExponentForShards)>
+      EdgeFunctionMapMutexes;
 
   // Caches for the flow/edge functions
-  phmap::parallel_node_hash_map_m<EdgeFuncInstKey, NormalEdgeFlowData>
-      NormalFunctionCache;
+  PllMap<EdgeFuncInstKey, NormalEdgeFlowData> NormalFunctionCache;
 
   // Caches for the flow functions
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::f_t>,
-      typename Base::FlowFunctionPtrType>
+  PllMap<std::tuple<typename Base::n_t, typename Base::f_t>,
+         typename Base::FlowFunctionPtrType>
       CallFlowFunctionCache;
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::f_t, typename Base::n_t,
-                 typename Base::n_t>,
-      typename Base::FlowFunctionPtrType>
+  PllMap<std::tuple<typename Base::n_t, typename Base::f_t, typename Base::n_t,
+                    typename Base::n_t>,
+         typename Base::FlowFunctionPtrType>
       ReturnFlowFunctionCache;
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::n_t>,
-      typename Base::FlowFunctionPtrType>
+  PllMap<std::tuple<typename Base::n_t, typename Base::n_t>,
+         typename Base::FlowFunctionPtrType>
       CallToRetFlowFunctionCache;
   // Caches for the edge functions
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::d_t, typename Base::f_t,
-                 typename Base::d_t>,
-      typename Base::EdgeFunctionType>
+  PllMap<std::tuple<typename Base::n_t, typename Base::d_t, typename Base::f_t,
+                    typename Base::d_t>,
+         typename Base::EdgeFunctionType>
       CallEdgeFunctionCache;
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::f_t, typename Base::n_t,
-                 typename Base::d_t, typename Base::n_t, typename Base::d_t>,
-      typename Base::EdgeFunctionType>
+  PllMap<std::tuple<typename Base::n_t, typename Base::f_t, typename Base::n_t,
+                    typename Base::d_t, typename Base::n_t, typename Base::d_t>,
+         typename Base::EdgeFunctionType>
       ReturnEdgeFunctionCache;
-  phmap::parallel_node_hash_map_m<EdgeFuncInstKey, InnerEdgeFunctionMapType>
-      CallToRetEdgeFunctionCache;
-  phmap::parallel_node_hash_map_m<
-      std::tuple<typename Base::n_t, typename Base::d_t, typename Base::n_t,
-                 typename Base::d_t>,
-      typename Base::EdgeFunctionType>
+  PllMap<EdgeFuncInstKey, InnerEdgeFunctionMapType> CallToRetEdgeFunctionCache;
+  PllMap<std::tuple<typename Base::n_t, typename Base::d_t, typename Base::n_t,
+                    typename Base::d_t>,
+         typename Base::EdgeFunctionType>
       SummaryEdgeFunctionCache;
 };
 
