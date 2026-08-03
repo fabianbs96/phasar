@@ -51,7 +51,8 @@ template <typename AnalysisDomainTy,
 class FlowEdgeFunctionCachePll
     : public FlowEdgeFunctionCacheBase<
           FlowEdgeFunctionCachePll<AnalysisDomainTy, Container>,
-          AnalysisDomainTy, Container> {
+          AnalysisDomainTy, Container,
+          phmap::parallel_flat_hash_map_m<const llvm::Value *, uint32_t>> {
 public:
   // Ctor allows access to the IDEProblem in order to get access to flow and
   // edge function factory functions.
@@ -59,10 +60,14 @@ public:
       IDETabulationProblem<AnalysisDomainTy, Container> &Problem)
       : FlowEdgeFunctionCacheBase<
             FlowEdgeFunctionCachePll<AnalysisDomainTy, Container>,
-            AnalysisDomainTy, Container>(Problem) {}
+            AnalysisDomainTy, Container,
+            typename FlowEdgeFunctionCachePll::FlowEdgeFunctionCacheBase::
+                CompressorContainerType>(Problem) {}
   using Base = FlowEdgeFunctionCacheBase<
       FlowEdgeFunctionCachePll<AnalysisDomainTy, Container>, AnalysisDomainTy,
-      Container>;
+      Container,
+      typename FlowEdgeFunctionCachePll::FlowEdgeFunctionCacheBase::
+          CompressorContainerType>;
 
   // N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
   // pool defaulting to hardware_concurrency() threads, 16 shards causes heavy

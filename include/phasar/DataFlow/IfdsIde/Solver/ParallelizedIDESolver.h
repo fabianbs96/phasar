@@ -1979,6 +1979,7 @@ private:
   d_t ZeroValue;
   const i_t *ICF;
   const void *SVFG{};
+  const size_t NumOfThreads;
   IFDSIDESolverConfig &SolverConfig;
   Nullable<n_t> (*NextUserOrNullCB)(const void *, ByConstRef<f_t>,
                                     ByConstRef<d_t>, ByConstRef<n_t>) = nullptr;
@@ -2021,7 +2022,6 @@ private:
 
   PllMap<std::pair<n_t, d_t>, size_t> FSummaryReuse;
 
-  const size_t NumOfThreads;
   BS::light_thread_pool TPool = BS::light_thread_pool(NumOfThreads);
   hms SolveTime;
 };

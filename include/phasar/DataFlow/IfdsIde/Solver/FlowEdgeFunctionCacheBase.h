@@ -44,7 +44,9 @@ namespace psr {
  * into the cache.
  */
 template <typename Derived, typename AnalysisDomainTy,
-          typename Container = std::set<typename AnalysisDomainTy::d_t>>
+          typename Container = std::set<typename AnalysisDomainTy::d_t>,
+          typename CompressorContainer =
+              llvm::DenseMap<const llvm::Value *, uint32_t>>
 class FlowEdgeFunctionCacheBase {
 protected:
   using IDEProblemType = IDETabulationProblem<AnalysisDomainTy, Container>;
@@ -60,6 +62,9 @@ protected:
   using EdgeFunctionType = EdgeFunction<l_t>;
 
 public:
+  // This line of code is here so we can access the parent type in a child type.
+  using CompressorContainerType = CompressorContainer;
+
   // Ctor allows access to the IDEProblem in order to get access to flow and
   // edge function factory functions.
   FlowEdgeFunctionCacheBase(
@@ -382,10 +387,10 @@ public:
 protected:
   using DTKeyCompressorType = std::conditional_t<
       std::is_base_of_v<llvm::Value, std::remove_pointer_t<d_t>>,
-      LLVMMapKeyCompressor<>, DefaultMapKeyCompressor<d_t>>;
+      LLVMMapKeyCompressor<CompressorContainer>, DefaultMapKeyCompressor<d_t>>;
   using NTKeyCompressorType = std::conditional_t<
       std::is_base_of_v<llvm::Value, std::remove_pointer_t<n_t>>,
-      LLVMMapKeyCompressor<>, DefaultMapKeyCompressor<n_t>>;
+      LLVMMapKeyCompressor<CompressorContainer>, DefaultMapKeyCompressor<n_t>>;
 
   using MapKeyCompressorType = std::conditional_t<
       std::is_same_v<NTKeyCompressorType, DTKeyCompressorType>,
