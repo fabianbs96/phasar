@@ -16,10 +16,10 @@
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCacheBase.h"
 #include "phasar/DataFlow/IfdsIde/Solver/MapKeyCompressor.h"
 #include "phasar/Utils/EquivalenceClassMap.h"
-#include "phasar/Utils/ExponentForShards.h"
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/PointerUtils.h"
+#include "phasar/Utils/ThreadUtils.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "parallel_hashmap/phmap.h"
@@ -68,15 +68,6 @@ public:
       Container,
       typename FlowEdgeFunctionCachePll::FlowEdgeFunctionCacheBase::
           CompressorContainerType>;
-
-  // N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
-  // pool defaulting to hardware_concurrency() threads, 16 shards causes heavy
-  // per-shard mutex contention; more shards trades a small constant memory
-  // overhead per map for far fewer collisions.
-  template <typename Key, typename Val>
-  using PllMap = phmap::parallel_node_hash_map_m<
-      Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
-      phmap::Allocator<std::pair<const Key, Val>>, ExponentForShards>;
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
@@ -519,8 +510,7 @@ private:
   // getNormalEdgeFunction): one mutex for the whole cache would serialize all
   // Curr/Succ keys against each other, not just concurrent accesses to the
   // same key.
-  std::array<std::mutex, getNumOfShards(ExponentForShards)>
-      EdgeFunctionMapMutexes;
+  std::array<std::mutex, NumOfShards> EdgeFunctionMapMutexes;
 
   // Caches for the flow/edge functions
   PllMap<EdgeFuncInstKey, NormalEdgeFlowData> NormalFunctionCache;
