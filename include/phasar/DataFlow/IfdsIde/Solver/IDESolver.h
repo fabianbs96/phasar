@@ -1269,7 +1269,7 @@ protected:
   void printIncomingTab() const {
     IF_LOG_LEVEL_ENABLED(DEBUG, {
       PHASAR_LOG_LEVEL(DEBUG, "Start of incomingtab entry");
-      for (const auto &Cell : IncomingTab.cellSet()) {
+      for (const auto &Cell : IncomingTab.cellVec()) {
         PHASAR_LOG_LEVEL(DEBUG, "sP: " << NToString(Cell.getRowKey()));
         PHASAR_LOG_LEVEL(DEBUG, "d3: " << DToString(Cell.getColumnKey()));
         for (const auto &Entry : Cell.getValue()) {

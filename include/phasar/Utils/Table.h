@@ -250,7 +250,6 @@ public:
   void get(R RowKey, C ColumnKey, std::invocable<V &> auto Callback) {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    std::unordered_map<int, int> Test;
     if constexpr (has_try_emplace_p<Container, R>) {
       auto &Inner = Tab.try_emplace_p(std::move(RowKey)).first->second;
       Inner.lazy_emplace_l(
@@ -261,14 +260,8 @@ public:
             Ctor(std::move(ColumnKey), std::move(TempV));
           });
     } else {
-      auto [Inner, Inserted] = Tab.try_emplace(std::move(RowKey)).first;
-
-      if (Inserted) {
-        Tab[RowKey][ColumnKey] = Callback(Inner[ColumnKey]);
-        return;
-      }
-
-      Tab[RowKey][ColumnKey] = Callback(V());
+      auto &Val = Tab[RowKey][ColumnKey];
+      Callback(Val);
     }
   }
 
