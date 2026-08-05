@@ -260,7 +260,7 @@ public:
             Ctor(std::move(ColumnKey), std::move(TempV));
           });
     } else {
-      auto &Val = Tab[RowKey][ColumnKey];
+      auto &Val = Tab[std::move(RowKey)][std::move(ColumnKey)];
       Callback(Val);
     }
   }
