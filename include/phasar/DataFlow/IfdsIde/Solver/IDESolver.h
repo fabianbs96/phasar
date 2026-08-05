@@ -1258,12 +1258,12 @@ protected:
     return EndsummaryTab.get(SP, d3).cellSet();
   }
 
-  std::map<n_t, container_type> incoming(d_t d1, n_t SP) {
+  std::unordered_map<n_t, container_type> incoming(d_t d1, n_t SP) {
     return IncomingTab.get(SP, d1);
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
-    IncomingTab.get(SP, d3)[n].insert(d2);
+    IncomingTab.get(SP, d3, [&](auto &Value) { Value[n].insert(d2); });
   }
 
   void printIncomingTab() const {
@@ -1885,7 +1885,7 @@ private:
 
   // edges going along calls
   // see CC 2010 paper by Naeem, Lhotak and Rodriguez
-  Table<n_t, d_t, std::map<n_t, Container>> IncomingTab;
+  Table<n_t, d_t, std::unordered_map<n_t, Container>> IncomingTab;
 
   // stores the return sites (inside callers) to which we have unbalanced
   // returns if SolverConfig.followReturnPastSeeds is enabled
