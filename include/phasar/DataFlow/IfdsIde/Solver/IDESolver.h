@@ -88,6 +88,8 @@ public:
   using t_t = typename AnalysisDomainTy::t_t;
   using v_t = typename AnalysisDomainTy::v_t;
 
+  using TableCell = typename Table<n_t, d_t, EdgeFunction<l_t>>::Cell;
+
   IDESolver(IDETabulationProblem<AnalysisDomainTy, Container> &Problem,
             const ICFGTy *ICF)
       : IDEProblem(Problem), ZeroValue(Problem.getZeroValue()),
@@ -691,8 +693,11 @@ protected:
 
   l_t val(n_t NHashN, d_t NHashD) {
     if (ValTab.contains(NHashN, NHashD)) {
-      return ValTab.get(NHashN, NHashD);
+      l_t Ret;
+      ValTab.get(NHashN, NHashD, [&Ret](auto &Value) { Ret = Value; });
+      return Ret;
     }
+
     // implicitly initialized to top; see line [1] of Fig. 7 in SRH96 paper
     return IDEProblem.topElement();
   }
@@ -747,7 +752,8 @@ protected:
     // note: at this point we don't need to join with a potential previous f
     // because f is a jump function, which is already properly joined
     // within propagate(..)
-    EndsummaryTab.get(SP, d1).insert(eP, d2, std::move(f));
+    EndsummaryTab.get(SP, d1,
+                      [&](auto &Value) { Value.insert(eP, d2, std::move(f)); });
   }
 
   // should be made a callable at some point
@@ -831,8 +837,9 @@ protected:
     }
     Table<n_t, n_t, std::map<d_t, container_type>> &TgtMap =
         (isInterProc(Kind)) ? ComputedInterPathEdges : ComputedIntraPathEdges;
-    TgtMap.get(SourceNode, SinkStmt)[SourceVal].insert(DestVals.begin(),
-                                                       DestVals.end());
+    TgtMap.get(SourceNode, SinkStmt, [&](auto &Value) {
+      Value[SourceVal].insert(DestVals.begin(), DestVals.end());
+    });
   }
 
   void submitInitialValues() {
@@ -1244,8 +1251,7 @@ protected:
     return IDEProblem.join(std::move(Curr), std::move(NewVal));
   }
 
-  std::set<typename Table<n_t, d_t, EdgeFunction<l_t>>::Cell>
-  endSummary(n_t SP, d_t d3) {
+  auto endSummary(n_t SP, d_t d3) {
     if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Core) {
       auto Key = std::make_pair(SP, d3);
       auto FindND = FSummaryReuse.find(Key);
@@ -1255,11 +1261,18 @@ protected:
         FSummaryReuse[Key] += 1;
       }
     }
-    return EndsummaryTab.get(SP, d3).cellSet();
+
+    std::vector<TableCell> Ret;
+    EndsummaryTab.get(SP, d3, [&Ret](auto &Value) { Ret = Value.cellVec(); });
+    return Ret;
   }
 
   std::unordered_map<n_t, container_type> incoming(d_t d1, n_t SP) {
-    return IncomingTab.get(SP, d1);
+    std::unordered_map<n_t, container_type> Ret;
+
+    IncomingTab.get(SP, d1, [&](auto &Value) { Ret = Value; });
+
+    return Ret;
   }
 
   void addIncoming(n_t SP, d_t d3, n_t n, d_t d2) {
@@ -1454,11 +1467,13 @@ protected:
                 ProcessSummaryFacts.end()) {
 
               std::set<d_t> SummaryDSet;
-              EndsummaryTab.get(Edge.second, D2)
-                  .foreachCell([&SummaryDSet](const auto &Row, const auto &Col,
-                                              const auto &Val) {
-                    SummaryDSet.insert(Col);
-                  });
+              EndsummaryTab.get(Edge.second, D2, [&](auto &Value) {
+                Value.foreachCell([&SummaryDSet](const auto & /*Row*/,
+                                                 const auto &Col,
+                                                 const auto & /*Val*/) {
+                  SummaryDSet.insert(Col);
+                });
+              });
 
               // Process summary just as an intra-procedural edge
               if (SummaryDSet.find(D2) != SummaryDSet.end()) {
