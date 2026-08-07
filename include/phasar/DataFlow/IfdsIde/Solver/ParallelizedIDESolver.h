@@ -28,7 +28,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/EdgeFunctionKind.h"
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCachePll.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverAPIMixin.h"
-#include "phasar/DataFlow/IfdsIde/Solver/JumpFunctionsPll.h"
+#include "phasar/DataFlow/IfdsIde/Solver/JumpFunctions.h"
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
 #include "phasar/Utils/Average.h"
@@ -65,15 +65,6 @@
 #include <vector>
 
 namespace psr {
-
-// N=7 (128 shards) instead of the default N=4 (16 shards): with the thread
-// pool defaulting to hardware_concurrency() threads, 16 shards causes heavy
-// per-shard mutex contention; more shards trades a small constant memory
-// overhead per map for far fewer collisions.
-template <typename Key, typename Val>
-using PllMap = phmap::parallel_node_hash_map_m<
-    Key, Val, phmap::Hash<Key>, phmap::EqualTo<Key>,
-    phmap::Allocator<std::pair<const Key, Val>>, ExponentForShards>;
 
 template <typename AnalysisDomainTy, typename Container, ICFG ICFGTy>
 class ParallelizedIDESolver;
@@ -112,8 +103,8 @@ public:
         ICF(&assertNotNull(ICF)), NumOfThreads(NumOfThreads),
         SolverConfig(Problem.getIFDSIDESolverConfig()),
         CachedFlowEdgeFunctions(Problem), AllTop(Problem.allTopFunction()),
-        JumpFn(
-            std::make_unique<JumpFunctionsPll<AnalysisDomainTy, Container>>()),
+        JumpFn(std::make_unique<
+               JumpFunctions<AnalysisDomainTy, Container, PllMap>>()),
         Seeds(Problem.initialSeeds()) {}
 
   ParallelizedIDESolver(
@@ -794,7 +785,7 @@ protected:
 
   EdgeFunction<l_t> jumpFunction(const PathEdge<n_t, d_t> Edge) {
     IF_LOG_LEVEL_ENABLED(DEBUG, {
-      PHASAR_LOG_LEVEL(DEBUG, "JumpFunctionsPll Forward-Lookup:");
+      PHASAR_LOG_LEVEL(DEBUG, "JumpFunctions Forward-Lookup:");
       PHASAR_LOG_LEVEL(DEBUG,
                        "   Source D: " << DToString(Edge.factAtSource()));
       PHASAR_LOG_LEVEL(DEBUG, "   Target N: " << NToString(Edge.getTarget()));
@@ -1309,7 +1300,7 @@ protected:
     // Atomically read the jump function currently stored for (SourceVal,
     // Target, TargetVal), combine it with f, and store the result if it
     // changed. This whole read-combine-write sequence happens under a
-    // single per-(Target, TargetVal) lock inside JumpFunctionsPll, so
+    // single per-(Target, TargetVal) lock inside JumpFunctions, so
     // concurrent propagate() calls for the same triple cannot lose an
     // update to one another; propagate() calls for different (Target,
     // TargetVal) keys still proceed fully in parallel (no solver-wide
@@ -1998,7 +1989,7 @@ private:
 
   EdgeFunction<l_t> AllTop;
 
-  std::shared_ptr<JumpFunctionsPll<AnalysisDomainTy, Container>> JumpFn;
+  std::shared_ptr<JumpFunctions<AnalysisDomainTy, Container, PllMap>> JumpFn;
 
   PllMap<std::tuple<n_t, d_t, n_t, d_t>, std::vector<EdgeFunction<l_t>>>
       IntermediateEdgeFunctions;

@@ -639,19 +639,16 @@ protected:
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
-      auto LookupResults = JumpFn->forwardLookup(Fact, CallSite);
-      if (!LookupResults) {
-        continue;
-      }
-      for (size_t I = 0; I < LookupResults->get().size(); ++I) {
-        auto Entry = LookupResults->get()[I];
-        d_t dPrime = Entry.first;
-        auto fPrime = Entry.second;
-        n_t SP = Stmt;
-        l_t Val = val(SP, Fact);
-        INC_COUNTER("Value Propagation", 1, Full);
-        propagateValue(CallSite, dPrime, fPrime.computeTarget(Val));
-      }
+      JumpFn->forwardLookup(Fact, CallSite, [&](auto &LookupResults) {
+        for (auto &Entry : LookupResults) {
+          d_t dPrime = Entry.first;
+          auto fPrime = Entry.second;
+          n_t SP = Stmt;
+          l_t Val = val(SP, Fact);
+          INC_COUNTER("Value Propagation", 1, Full);
+          propagateValue(CallSite, dPrime, fPrime.computeTarget(Val));
+        }
+      });
     }
   }
 
@@ -730,22 +727,26 @@ protected:
                        "   Target D: " << DToString(Edge.factAtTarget()));
     });
 
-    auto FwdLookupRes =
-        JumpFn->forwardLookup(Edge.factAtSource(), Edge.getTarget());
-    if (FwdLookupRes) {
-      auto &Ref = FwdLookupRes->get();
-      if (auto Find = std::find_if(Ref.begin(), Ref.end(),
-                                   [Edge](const auto &Pair) {
-                                     return Edge.factAtTarget() == Pair.first;
-                                   });
-          Find != Ref.end()) {
-        PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
-        return Find->second;
-      }
-    }
-    PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
     // JumpFn initialized to all-top, see line [2] in SRH96 paper
-    return AllTop;
+    // RetVal is set to all-top
+    EdgeFunction<l_t> RetVal = AllTop;
+
+    JumpFn->forwardLookup(
+        Edge.factAtSource(), Edge.getTarget(), [&](auto &FwdLookupRes) {
+          if (auto Find = std::find_if(FwdLookupRes.begin(), FwdLookupRes.end(),
+                                       [Edge](const auto &Pair) {
+                                         return Edge.factAtTarget() ==
+                                                Pair.first;
+                                       });
+              Find != FwdLookupRes.end()) {
+            PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << Find->second);
+            RetVal = Find->second;
+          }
+
+          PHASAR_LOG_LEVEL(DEBUG, "  => EdgeFn: " << AllTop);
+        });
+
+    return RetVal;
   }
 
   void addEndSummary(n_t SP, d_t d1, n_t eP, d_t d2, EdgeFunction<l_t> f) {
@@ -1008,17 +1009,16 @@ protected:
             PHASAR_LOG_LEVEL(DEBUG, "       = " << fPrime);
             // for each jump function coming into the call, propagate to
             // return site using the composed function
-            auto RevLookupResult = JumpFn->reverseLookup(c, d4);
-            if (RevLookupResult) {
-              for (size_t I = 0; I < RevLookupResult->get().size(); ++I) {
-                auto ValAndFunc = RevLookupResult->get()[I];
-                auto f3 = ValAndFunc.second;
+            JumpFn->reverseLookup(c, d4, [&](auto &RevLookupResult) {
+              for (auto &ValAndFunc : RevLookupResult) {
+                EdgeFunction<l_t> f3 = ValAndFunc.second;
                 if (f3 != AllTop) {
                   d_t d3 = ValAndFunc.first;
                   d_t d5_restoredCtx = restoreContextOnReturnedFact(c, d4, d5);
                   PHASAR_LOG_LEVEL(DEBUG, "Compose: " << fPrime << " * " << f3);
 
-                  auto DestN = [&] {
+                  const llvm::Instruction *DestN;
+                  DestN = [&] {
                     if (auto &&NextUser =
                             getNextUserOrNull(Fun, d5_restoredCtx, c)) {
                       return psr::unwrapNullable(PSR_FWD(NextUser));
@@ -1032,7 +1032,7 @@ protected:
                       IDEProblem.extend(f3, fPrime));
                 }
               }
-            }
+            });
           }
         }
       }
@@ -1199,19 +1199,18 @@ protected:
         DEBUG, "Edge function : " << f << " (result of previous compose)");
 
     auto JumpFnE = [&]() {
-      const auto RevLookupResult = JumpFn->reverseLookup(Target, TargetVal);
-      if (RevLookupResult) {
-        const auto &JumpFnContainer = RevLookupResult->get();
+      EdgeFunction<l_t> Ret = AllTop;
+      JumpFn->reverseLookup(Target, TargetVal, [&](auto &RevLookupResult) {
         const auto Find = std::find_if(
-            JumpFnContainer.begin(), JumpFnContainer.end(),
+            RevLookupResult.begin(), RevLookupResult.end(),
             [SourceVal](auto &KVpair) { return KVpair.first == SourceVal; });
-        if (Find != JumpFnContainer.end()) {
-          return Find->second;
+        if (Find != RevLookupResult.end()) {
+          Ret = Find->second;
         }
-      }
+      });
       // jump function is initialized to all-top if no entry
       // was found
-      return AllTop;
+      return Ret;
     }();
     auto fPrime = IDEProblem.combine(JumpFnE, f);
     bool NewFunction = fPrime != JumpFnE;
