@@ -63,6 +63,29 @@ public:
       FlowEdgeFunctionCache<AnalysisDomainTy, Container>, AnalysisDomainTy,
       Container>;
 
+private:
+  template <typename CacheContainer, typename CacheKey>
+  [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
+  cacheNonNormalFlowFunction(CacheContainer &CurrContainer,
+                             typename Base::FlowFunctionPtrType FlowFunc,
+                             const std::string &LogName, CacheKey Key) {
+    auto [It, Inserted] = CurrContainer.try_emplace(std::move(Key));
+
+    if (Inserted) {
+      INC_COUNTER(LogName + " Construction", 1, Full);
+      It->second = Base::AutoAddZero ? std::make_unique<typename Base::ZFF>(
+                                           std::move(FlowFunc), Base::ZV)
+                                     : std::move(FlowFunc);
+      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
+    } else {
+      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
+      INC_COUNTER(LogName + " Cache Hit", 1, Full);
+    }
+
+    return getPointerFrom(It->second);
+  }
+
+public:
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
                           Base::n_t Succ) {
@@ -89,22 +112,9 @@ public:
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheCallFlowFunction(std::tuple<typename Base::n_t, typename Base::f_t> Key,
                         Base::n_t CallSite, Base::f_t DestFun) {
-    auto [It, Inserted] = CallFlowFunctionCache.try_emplace(std::move(Key));
-
-    if (Inserted) {
-      INC_COUNTER("Call-FF Construction", 1, Full);
-      auto FF = Base::Problem.getCallFlowFunction(CallSite, DestFun);
-      It->second =
-          Base::AutoAddZero
-              ? std::make_unique<typename Base::ZFF>(std::move(FF), Base::ZV)
-              : std::move(FF);
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Call-FF Cache Hit", 1, Full);
-    }
-
-    return getPointerFrom(It->second);
+    return cacheNonNormalFlowFunction(
+        CallFlowFunctionCache,
+        Base::Problem.getCallFlowFunction(CallSite, DestFun), "Call-FF", Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -112,24 +122,11 @@ public:
                                   typename Base::n_t, typename Base::n_t> Key,
                        Base::n_t CallSite, Base::f_t CalleeFun,
                        Base::n_t ExitInst, Base::n_t RetSite) {
-    auto [It, Inserted] = ReturnFlowFunctionCache.try_emplace(std::move(Key));
-
-    if (Inserted) {
-      INC_COUNTER("Return-FF Construction", 1, Full);
-      auto FF = Base::Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
-                                                 RetSite);
-      It->second =
-          Base::AutoAddZero
-              ? std::make_unique<typename Base::ZFF>(std::move(FF), Base::ZV)
-              : std::move(FF);
-
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Return-FF Cache Hit", 1, Full);
-    }
-
-    return getPointerFrom(It->second);
+    return cacheNonNormalFlowFunction(
+        ReturnFlowFunctionCache,
+        Base::Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
+                                         RetSite),
+        "Return-FF", Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -137,25 +134,10 @@ public:
       std::tuple<typename Base::n_t, typename Base::n_t> Key,
       Base::n_t CallSite, Base::n_t RetSite,
       llvm::ArrayRef<typename Base::f_t> Callees) {
-    auto [It, Inserted] =
-        CallToRetFlowFunctionCache.try_emplace(std::move(Key));
-
-    if (Inserted) {
-      INC_COUNTER("CallToRet-FF Construction", 1, Full);
-      auto FF =
-          Base::Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees);
-      It->second =
-          Base::AutoAddZero
-              ? std::make_unique<typename Base::ZFF>(std::move(FF), Base::ZV)
-              : std::move(FF);
-
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-    } else {
-      PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
-    }
-
-    return getPointerFrom(It->second);
+    return cacheNonNormalFlowFunction(
+        CallToRetFlowFunctionCache,
+        Base::Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees),
+        "CallToRet-FF", Key);
   }
 
   [[nodiscard]] Base::EdgeFunctionType

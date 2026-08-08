@@ -69,24 +69,32 @@ public:
       typename FlowEdgeFunctionCachePll::FlowEdgeFunctionCacheBase::
           CompressorContainerType>;
 
+private:
+  template <typename CacheContainer, typename CacheKey>
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
-  cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
-                          Base::n_t Succ) {
+  cacheFlowFunction(CacheContainer &CurrContainer,
+                    typename Base::FlowFunctionPtrType FlowFunc,
+                    const std::string &LogName, CacheKey Key) {
     typename Base::FlowFunctionType *Ret;
 
-    NormalFunctionCache.lazy_emplace_l(
+    CurrContainer.lazy_emplace_l(
         Key,
         [&](auto &Found) {
-          Ret = getPointerFrom(Found.second.FlowFuncPtr);
+          if constexpr (std::is_same_v<
+                            CacheContainer,
+                            PllMap<EdgeFuncInstKey, NormalEdgeFlowData>>) {
+            Ret = getPointerFrom(Found.second.FlowFuncPtr);
+          } else {
+            Ret = getPointerFrom(Found.second);
+          }
           PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-          INC_COUNTER("Normal-FF Cache Hit", 1, Full);
+          INC_COUNTER(LogName + " Cache Hit", 1, Full);
         },
         [&](auto &&Ctor) {
-          INC_COUNTER("Normal-FF Construction", 1, Full);
-          auto FF = Base::Problem.getNormalFlowFunction(Curr, Succ);
+          INC_COUNTER(LogName + " Construction", 1, Full);
           auto Ptr = Base::AutoAddZero
-                         ? std::make_unique<ZFF>(std::move(FF), Base::ZV)
-                         : std::move(FF);
+                         ? std::make_unique<ZFF>(std::move(FlowFunc), Base::ZV)
+                         : std::move(FlowFunc);
           Ret = getPointerFrom(Ptr);
           Ctor(std::move(Key), std::move(Ptr));
           PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
@@ -95,30 +103,21 @@ public:
     return getPointerFrom(Ret);
   }
 
+public:
+  [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
+  cacheNormalFlowFunction(Base::EdgeFuncInstKey Key, Base::n_t Curr,
+                          Base::n_t Succ) {
+    return cacheFlowFunction(NormalFunctionCache,
+                             Base::Problem.getNormalFlowFunction(Curr, Succ),
+                             "Normal-FF", Key);
+  }
+
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheCallFlowFunction(std::tuple<typename Base::n_t, typename Base::f_t> Key,
                         Base::n_t CallSite, Base::f_t DestFun) {
-    typename Base::FlowFunctionType *Ret;
-
-    CallFlowFunctionCache.lazy_emplace_l(
-        Key,
-        [&](auto &Found) {
-          Ret = getPointerFrom(Found.second);
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-          INC_COUNTER("Call-FF Cache Hit", 1, Full);
-        },
-        [&](auto &&Ctor) {
-          INC_COUNTER("Call-FF Construction", 1, Full);
-          auto FF = Base::Problem.getCallFlowFunction(CallSite, DestFun);
-          auto Ptr = Base::AutoAddZero
-                         ? std::make_unique<ZFF>(std::move(FF), Base::ZV)
-                         : std::move(FF);
-          Ret = getPointerFrom(Ptr);
-          Ctor(std::move(Key), std::move(Ptr));
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-        });
-
-    return Ret;
+    return cacheFlowFunction(
+        CallFlowFunctionCache,
+        Base::Problem.getCallFlowFunction(CallSite, DestFun), "Call-FF", Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -126,29 +125,10 @@ public:
                                   typename Base::n_t, typename Base::n_t> Key,
                        Base::n_t CallSite, Base::f_t CalleeFun,
                        Base::n_t ExitInst, Base::n_t RetSite) {
-    typename Base::FlowFunctionType *Ret;
-
-    ReturnFlowFunctionCache.lazy_emplace_l(
-        Key,
-        [&](auto &Found) {
-          Ret = getPointerFrom(Found.second);
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-          INC_COUNTER("Return-FF Cache Hit", 1, Full);
-        },
-        [&](auto &&Ctor) {
-          INC_COUNTER("Return-FF Construction", 1, Full);
-          auto FF = Base::Problem.getRetFlowFunction(CallSite, CalleeFun,
-                                                     ExitInst, RetSite);
-          auto Ptr = Base::AutoAddZero
-                         ? std::make_unique<ZFF>(std::move(FF), Base::ZV)
-                         : std::move(FF);
-          Ret = getPointerFrom(Ptr);
-          Ctor(std::move(Key), std::move(Ptr));
-
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-        });
-
-    return Ret;
+    return cacheFlowFunction(ReturnFlowFunctionCache,
+                             Base::Problem.getRetFlowFunction(
+                                 CallSite, CalleeFun, ExitInst, RetSite),
+                             "Return-FF", Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -156,29 +136,10 @@ public:
       std::tuple<typename Base::n_t, typename Base::n_t> Key,
       Base::n_t CallSite, Base::n_t RetSite,
       llvm::ArrayRef<typename Base::f_t> Callees) {
-    typename Base::FlowFunctionPtrType Ret;
-
-    CallToRetFlowFunctionCache.lazy_emplace_l(
-        Key,
-        [&](auto &Found) {
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-          INC_COUNTER("CallToRet-FF Cache Hit", 1, Full);
-          Ret = getPointerFrom(Found.second);
-        },
-        [&](auto &&Ctor) {
-          INC_COUNTER("CallToRet-FF Construction", 1, Full);
-          auto FF = Base::Problem.getCallToRetFlowFunction(CallSite, RetSite,
-                                                           Callees);
-          auto Ptr = Base::AutoAddZero
-                         ? std::make_unique<ZFF>(std::move(FF), Base::ZV)
-                         : std::move(FF);
-          Ret = getPointerFrom(Ptr);
-          Ctor(std::move(Key), std::move(Ptr));
-
-          PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
-        });
-
-    return getPointerFrom(Ret.get());
+    return cacheFlowFunction(
+        CallToRetFlowFunctionCache,
+        Base::Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees),
+        "CallToRet-FF", Key);
   }
 
   [[nodiscard]] Base::EdgeFunctionType
