@@ -48,17 +48,19 @@ protected:
   // mapping from target node and value to a list of all source values and
   // associated functions where the list is implemented as a mapping from
   // the source value to the function we exclude empty default functions
-  Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  Table<n_t, d_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>,
+        MapContainerTy>
       NonEmptyReverseLookup;
   // mapping from source value and target node to a list of all target values
   // and associated functions where the list is implemented as a mapping from
   // the source value to the function we exclude empty default functions
-  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>>
+  Table<d_t, n_t, llvm::SmallVector<std::pair<d_t, EdgeFunction<l_t>>, 1>,
+        MapContainerTy>
       NonEmptyForwardLookup;
   // a mapping from target node to a list of triples consisting of source value,
   // target value and associated function; the triple is implemented by a table
   // we exclude empty default functions
-  MapContainerTy<n_t, Table<d_t, d_t, EdgeFunction<l_t>>>
+  MapContainerTy<n_t, Table<d_t, d_t, EdgeFunction<l_t>, MapContainerTy>>
       NonEmptyLookupByTargetNode;
 
   std::mutex NonEmptyReverseLookupMutex;
