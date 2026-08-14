@@ -246,7 +246,8 @@ public:
    * The return value is a set of records of the form
    * (sourceVal,targetVal,edgeFunction).
    */
-  Table<d_t, d_t, EdgeFunction<l_t>> &lookupByTarget(n_t Target) {
+  Table<d_t, d_t, EdgeFunction<l_t>, MapContainerTy> &
+  lookupByTarget(n_t Target) {
     return NonEmptyLookupByTargetNode[Target];
   }
 

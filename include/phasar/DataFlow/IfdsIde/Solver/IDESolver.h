@@ -31,6 +31,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/ESGEdgeKind.h"
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCache.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverAPIMixin.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IDESolverPerf.h"
 #include "phasar/DataFlow/IfdsIde/Solver/JumpFunctions.h"
 #include "phasar/DataFlow/IfdsIde/Solver/PathEdge.h"
 #include "phasar/DataFlow/IfdsIde/SolverResults.h"
@@ -42,7 +43,6 @@
 #include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/Nullable.h"
-#include "phasar/Utils/PAMMMacros.h"
 #include "phasar/Utils/Table.h"
 #include "phasar/Utils/Timer.h"
 #include "phasar/Utils/TypeTraits.h"
@@ -55,7 +55,6 @@
 #include "nlohmann/json.hpp"
 
 #include <concepts>
-#include <cstddef>
 #include <map>
 #include <memory>
 #include <set>
@@ -65,36 +64,6 @@
 #include <utility>
 
 namespace psr {
-
-namespace detail {
-struct IDESolverPerf {
-  PAMM_CATEGORY(IDESolver);
-
-  // NOLINTBEGIN
-  PAMM_COUNTER(Genfacts, Core);
-  PAMM_COUNTER(Killfacts, Core);
-  PAMM_COUNTER(Summaryreuse, Core);
-  PAMM_COUNTER(IntraPathEdges, Core);
-  PAMM_COUNTER(InterPathEdges, Core);
-  PAMM_COUNTER(FFQueries, Full);
-  PAMM_COUNTER(EFQueries, Full);
-  PAMM_COUNTER(ValuePropagation, Full);
-  PAMM_COUNTER(ValueComputation, Full);
-  PAMM_COUNTER(SpecialSummaryFF_Application, Full);
-  PAMM_COUNTER(SpecialSummaryEF_Queries, Full);
-  PAMM_COUNTER(JumpFnConstruction, Full);
-  PAMM_COUNTER(ProcessCall, Full);
-  PAMM_COUNTER(ProcessNormal, Full);
-  PAMM_COUNTER(ProcessExit, Full);
-
-  PAMM_HISTOGRAM(DataFlowFacts, Full);
-  PAMM_HISTOGRAM(PointsTo, Full);
-
-  PAMM_TIMER(DFAPhase1, Full);
-  PAMM_TIMER(DFAPhase2, Full);
-  // NOLINTEND
-};
-} // namespace detail
 
 /// Solves the given IDETabulationProblem as described in the 1996 paper by
 /// Sagiv, Horwitz and Reps. To solve the problem, call solve(). Results
@@ -668,12 +637,9 @@ protected:
     d_t Fact = NAndD.second;
     f_t Func = ICF->getFunctionOf(Stmt);
     for (const n_t CallSite : ICF->getCallsFromWithin(Func)) {
+
       JumpFn->forwardLookup(Fact, CallSite, [&](auto &LookupResults) {
-        if (!LookupResults) {
-          return;
-        }
-        for (size_t I = 0; I < LookupResults->get().size(); ++I) {
-          auto Entry = LookupResults->get()[I];
+        for (auto &Entry : LookupResults) {
           d_t dPrime = Entry.first;
           auto fPrime = Entry.second;
           n_t SP = Stmt;
@@ -760,6 +726,7 @@ protected:
     });
 
     // JumpFn initialized to all-top, see line [2] in SRH96 paper
+    // RetVal is set to all-top
     // RetVal is set to all-top
     EdgeFunction<l_t> RetVal = AllTop;
 
@@ -1493,13 +1460,12 @@ protected:
                 ProcessSummaryFacts.end()) {
 
               std::set<d_t> SummaryDSet;
-              EndsummaryTab.get(Edge.second, D2, [&](auto &Value) {
-                Value.foreachCell([&SummaryDSet](const auto & /*Row*/,
-                                                 const auto &Col,
-                                                 const auto & /*Val*/) {
-                  SummaryDSet.insert(Col);
-                });
-              });
+              EndsummaryTab.get(Edge.second, D2)
+                  .foreachCell([&SummaryDSet](const auto & /*Row*/,
+                                              const auto &Col,
+                                              const auto & /*Val*/) {
+                    SummaryDSet.insert(Col);
+                  });
 
               // Process summary just as an intra-procedural edge
               if (SummaryDSet.find(D2) != SummaryDSet.end()) {
@@ -1837,15 +1803,16 @@ private:
   }
 
   void finalizeInternal() {
-    DFAPhase1.stop();
+    STOP_TIMER("DFA Phase I", Full);
     PHASAR_LOG_LEVEL(INFO, "[info]: IDE Phase I completed");
 
     if (SolverConfig.computeValues()) {
-      PAMM_SCOPED_TIMER(DFAPhase2);
+      START_TIMER("DFA Phase II", Full);
       // Computing the final values for the edge functions
       PHASAR_LOG_LEVEL(
           INFO, "Compute the final values according to the edge functions");
       computeValues();
+      STOP_TIMER("DFA Phase II", Full);
     }
 
     PHASAR_LOG_LEVEL(INFO, "Problem solved");
