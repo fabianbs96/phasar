@@ -17,15 +17,26 @@
 #ifndef PHASAR_PHASARLLVM_UTILS_LLVMSHORTHANDS_H
 #define PHASAR_PHASARLLVM_UTILS_LLVMSHORTHANDS_H
 
+#include "phasar/Utils/BitSet.h"
 #include "phasar/Utils/Utilities.h"
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/GlobalObject.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Casting.h"
 
+#include <concepts>
+#include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace llvm {
@@ -42,6 +53,8 @@ class CallInst;
 class AllocaInst;
 class DIType;
 class DIDerivedType;
+class DICompositeType;
+class DataLayout;
 } // namespace llvm
 
 namespace psr {
@@ -301,6 +314,40 @@ definitelyContainsNoPointer(const llvm::Type *Ty) noexcept {
          definitelyContainsNoPointer(Val->getType());
 }
 
+/// Strips pointer-cast and alias wrappers from \p V, then invokes \p Handler
+/// for each concrete underlying value:
+///   - If \p V is not a ConstantExpr after stripping, Handler is called once
+///     with the stripped value.
+///   - If \p V is a ConstantExpr, the expression tree is walked and Handler
+///     is called for each GlobalObject leaf.
+template <std::invocable<const llvm::Value *> HandlerT>
+void forEachPointerOperand(const llvm::Value *V, HandlerT Handler) {
+  V = V->stripPointerCastsAndAliases();
+  const auto *CExpr = llvm::dyn_cast<llvm::ConstantExpr>(V);
+  if (!CExpr) [[likely]] {
+    std::invoke(Handler, V);
+    return;
+  }
+
+  llvm::SmallPtrSet<const llvm::Value *, 4> Seen = {V};
+  llvm::SmallVector<const llvm::User *> WL = {CExpr};
+  do {
+    const auto *Curr = WL.pop_back_val();
+    for (const auto *Op : Curr->operand_values()) {
+      if (definitelyContainsNoPointer(Op) || !Seen.insert(Op).second) {
+        continue;
+      }
+      if (const auto *GObj = llvm::dyn_cast<llvm::GlobalObject>(Op)) {
+        std::invoke(Handler, static_cast<const llvm::Value *>(GObj));
+        continue;
+      }
+      if (const auto *OpUser = llvm::dyn_cast<llvm::User>(Op)) {
+        WL.push_back(OpUser);
+      }
+    }
+  } while (!WL.empty());
+}
+
 /// Approximates, whether the given LLVM value may be address-taken, i.e.,
 /// whether its pointer value is used for other purposes than just
 /// store/load/gep.
@@ -308,6 +355,12 @@ definitelyContainsNoPointer(const llvm::Type *Ty) noexcept {
 /// This check is designed to be rather lightweight and may therefore not be
 /// precise in all cases.
 [[nodiscard]] bool isAddressTakenVariable(const llvm::Value *Var) noexcept;
+
+/// Like \c isAddressTakenVariable but runs the full use-traversal for
+/// function arguments regardless of their attributes.  Use this when the
+/// caller has already established that \p Arg is allocation-site-like (e.g.,
+/// for PAG field-sensitivity of pointer parameters).
+[[nodiscard]] bool isAddressTakenArg(const llvm::Argument *Arg) noexcept;
 
 /**
  * Tests for <https://llvm.org/docs/LangRef.html#llvm-var-annotation-intrinsic>
@@ -336,6 +389,36 @@ inline const llvm::Function *getFunction(const llvm::Instruction *Inst) {
 
   return Inst->getFunction();
 }
+
+const llvm::DIType *stripMemberAndTypedef(const llvm::DIType *Ty);
+
+inline bool isPointerTy(const llvm::DIType *Ty) {
+  if (const auto *DerivedTy =
+          llvm::dyn_cast<llvm::DIDerivedType>(stripMemberAndTypedef(Ty))) {
+    return DerivedTy->getTag() == llvm::dwarf::DW_TAG_pointer_type ||
+           DerivedTy->getTag() == llvm::dwarf::DW_TAG_reference_type;
+  }
+  return false;
+}
+
+struct PointerIndicesCache {
+  std::unordered_map<const llvm::DIType *,
+                     BitSet<uint32_t, llvm::SmallBitVector>>
+      Cache;
+};
+
+[[nodiscard]] BitSet<uint32_t, llvm::SmallBitVector>
+getPointerIndicesOfType(const llvm::DIType *Ty, const llvm::DataLayout &DL);
+
+[[nodiscard]] BitSet<uint32_t, llvm::SmallBitVector> &
+getPointerIndicesOfType(const llvm::DIType *Ty, const llvm::DataLayout &DL,
+                        PointerIndicesCache &PIC);
+
+[[nodiscard]] bool walkLoadChainTo(const llvm::Value *Start,
+                                   const llvm::Value *Target,
+                                   const llvm::DataLayout &DL,
+                                   uint32_t MaxDepth,
+                                   llvm::function_ref<void(int64_t)> OnDeref);
 
 /**
  * Retrieves String annotation value as per
@@ -366,6 +449,17 @@ getVaListTagOrNull(const llvm::Function &Fun);
 [[nodiscard]] bool isVaListAlloca(const llvm::AllocaInst &Alloc);
 
 [[nodiscard]] const llvm::DIType *stripPointerTypes(const llvm::DIType *DITy);
+
+/// Walk a constant initializer along a GEP index path and return the
+/// \c Function* at the leaf, or nullptr.
+///
+/// \p Indices mirrors GEP index semantics:
+///   - \c Indices[0] is the outer "pointer-array" index:
+///     \c ConstantArray -> selects the element; \c ConstantStruct ->
+///     must be 0 (pointer-arithmetic no-op, struct is not an array).
+///   - \c Indices[1+] navigate recursively through ConstantAggregate.
+[[nodiscard]] const llvm::Function *
+walkConstInitPath(const llvm::Constant *Init, llvm::ArrayRef<uint64_t> Indices);
 } // namespace psr
 
 #endif

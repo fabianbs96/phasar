@@ -160,7 +160,7 @@ public:
     if (auto It = ToInt.find(&Elem); It != ToInt.end()) {
       return {It->second, false};
     }
-    auto Ret = Id(FromInt.size());
+    auto Ret = IdT(FromInt.size());
     auto *Ins = &FromInt.emplace_back(std::move(Elem));
     ToInt[Ins] = Ret;
     return {Ret, true};
@@ -224,6 +224,9 @@ private:
       assert(Elem != nullptr);
       if constexpr (has_llvm_dense_map_info<T>) {
         return llvm::DenseMapInfo<T>::getHashValue(*Elem);
+      } else if constexpr (is_llvm_hashable_v<T>) {
+        using llvm::hash_value;
+        return hash_value(*Elem);
       } else {
         return std::hash<T>{}(*Elem);
       }

@@ -11,3 +11,6 @@
 [submodule "external/thread-pool"]
 	path = external/thread-pool
 	url = https://github.com/bshoshany/thread-pool.git
+[submodule "external/CRoaring"]
+	path = external/CRoaring
+	url = https://github.com/fabianbs96/CRoaring.git

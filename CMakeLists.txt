@@ -75,7 +75,9 @@ set(RELEASE_CONFIGURATIONS RELWITHDEBINFO RELEASE CACHE INTERNAL "" FORCE)
 
 string(APPEND CMAKE_CXX_FLAGS " -MP -fstack-protector-strong -ffunction-sections -fdata-sections -pipe")
 string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fno-omit-frame-pointer")
+string(APPEND CMAKE_C_FLAGS_DEBUG " -fno-omit-frame-pointer")
 string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -fno-omit-frame-pointer")
+string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO " -fno-omit-frame-pointer")
 string(APPEND CMAKE_CXX_FLAGS_RELEASE "")
 
 option(CMAKE_VISIBILITY_INLINES_HIDDEN "Hide inlined functions from the DSO table (default ON)" ON)
@@ -124,6 +126,7 @@ if (NOT "${PHASAR_TARGET_ARCH_INTERNAL}" STREQUAL "")
   if (MARCH_SUPPORTED)
     message(STATUS "Target architecture '${PHASAR_TARGET_ARCH_INTERNAL}' enabled")
     string(APPEND CMAKE_CXX_FLAGS_RELEASE " -march=${PHASAR_TARGET_ARCH_INTERNAL}")
+    string(APPEND CMAKE_C_FLAGS_RELEASE " -march=${PHASAR_TARGET_ARCH_INTERNAL}")
   else()
     message(WARNING "Target architecture '${PHASAR_TARGET_ARCH_INTERNAL}' not supported. Fallback to generic build")
   endif()
@@ -214,18 +217,16 @@ if (PHASAR_ENABLE_PIC)
 endif (PHASAR_ENABLE_PIC)
 
 # PAMM
-if (NOT PHASAR_ENABLE_PAMM)
-  set(PHASAR_ENABLE_PAMM "Off" CACHE STRING "Enable the performance measurement mechanism ('Off', 'Core' or 'Full', default is 'Off')" FORCE)
-  set_property(CACHE PHASAR_ENABLE_PAMM PROPERTY STRINGS "Off" "Core" "Full")
-endif()
-if(PHASAR_ENABLE_PAMM STREQUAL "Core" AND NOT PHASAR_BUILD_UNITTESTS)
+set(PHASAR_ENABLE_PAMM "Off" CACHE STRING "Enable the performance measurement mechanism ('Off', 'Core' or 'Full', default is 'Off')")
+set_property(CACHE PHASAR_ENABLE_PAMM PROPERTY STRINGS "Off" "Core" "Full")
+option(PHASAR_THREAD_SAFE_PAMM "Use a thread-safe version of PAMM, if PAMM is enabled" ON)
+
+if(PHASAR_ENABLE_PAMM STREQUAL "Core")
   set(PAMM_CORE ON)
   message(STATUS "PAMM metric severity level: Core")
-elseif(PHASAR_ENABLE_PAMM STREQUAL "Full" AND NOT PHASAR_BUILD_UNITTESTS)
+elseif(PHASAR_ENABLE_PAMM STREQUAL "Full")
   set(PAMM_FULL ON)
   message(STATUS "PAMM metric severity level: Full")
-elseif(PHASAR_BUILD_UNITTESTS AND (PHASAR_ENABLE_PAMM STREQUAL "Core" OR PHASAR_ENABLE_PAMM STREQUAL "Full"))
-  message(WARNING "PAMM metric severity level: Off (due to unittests)")
 else()
   message(STATUS "PAMM metric severity level: Off")
 endif()
@@ -242,16 +243,6 @@ endif()
 
 if (PHASAR_USE_CONAN)
 elseif (NOT PHASAR_IN_TREE)
-  # RPATH
-  set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-
-  if (NOT "${CMAKE_INSTALL_LIBDIR}" STREQUAL "lib")
-    message(STATUS "Detected CMAKE_INSTALL_LIBDIR that deviates from 'lib': ${CMAKE_INSTALL_LIBDIR}. Add ${CMAKE_INSTALL_PREFIX}/lib to the RPATH as json-schema-validator needs it")
-    list(APPEND CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
-  endif()
-
-  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
   # Export set
   set(PHASAR_DEPS_EXPORT_SET PhasarDepsExports)
 else()
@@ -361,6 +352,15 @@ set(PHASAR_LLVM_VERSION 20.1 CACHE STRING "The LLVM major-version that PhASAR sh
 
 include(add_llvm)
 add_llvm()
+
+# Roaring
+
+find_package(roaring QUIET CONFIG)
+if(NOT TARGET roaring::roaring)
+  set(ENABLE_ROARING_TESTS OFF)
+  add_subdirectory(external/CRoaring)
+  set(PHASAR_PROVIDE_CROARING ON)
+endif()
 
 # SVF
 option(PHASAR_USE_SVF "Use SVF for more options in alias analysis (default is OFF)" OFF)
@@ -560,6 +560,20 @@ install(
         "${CMAKE_CURRENT_BINARY_DIR}/phasarConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/phasar"
 )
+
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND NOT TARGET uninstall)
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    @ONLY
+  )
+
+  add_custom_target(uninstall
+    COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    COMMENT "Uninstalling PhASAR"
+    VERBATIM
+  )
+endif()
 
 # If the Phasar shared object libraries are not installed into a system folder
 # the so libs must be added manually to the linker search path and the linker

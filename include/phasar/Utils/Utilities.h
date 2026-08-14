@@ -17,8 +17,10 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <functional>
 #include <optional>
 #include <set>
+#include <source_location>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -135,7 +137,12 @@ void intersectWith(ContainerTy &Dest, const OtherContainerTy &Src) {
     if (Src.count(*It)) {
       ++It;
     } else {
-      It = Dest.erase(It);
+      if constexpr (std::is_void_v<decltype(Dest.erase(It))>) {
+        auto OldIt = It++;
+        Dest.erase(OldIt);
+      } else {
+        It = Dest.erase(It);
+      }
     }
   }
 }
@@ -284,17 +291,26 @@ struct identity {
   }
 };
 
-template <is_llvm_printable_v T>
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                              const std::optional<T> &Opt) {
-  if (Opt) {
-    OS << *Opt;
-  } else {
-    OS << "<none>";
+struct FirstFn {
+  [[nodiscard]] constexpr decltype(auto)
+  operator()(const auto &PairLike) const noexcept {
+    if constexpr (requires { PairLike.first; }) {
+      return PairLike.first;
+    } else {
+      return std::get<0>(PairLike);
+    }
   }
-
-  return OS;
-}
+};
+struct SecondFn {
+  [[nodiscard]] constexpr decltype(auto)
+  operator()(const auto &PairLike) const noexcept {
+    if constexpr (requires { PairLike.second; }) {
+      return PairLike.second;
+    } else {
+      return std::get<1>(PairLike);
+    }
+  }
+};
 
 template <typename T>
   requires(!std::is_pointer_v<T>)
@@ -324,6 +340,26 @@ template <typename T> void assertAllNotNull([[maybe_unused]] const T &Range) {
   for (const auto &Elem : Range) {
     assertNotNull(Elem);
   }
+}
+
+[[nodiscard]] std::string locToString(std::source_location Loc);
+
+template <typename CompareFn = std::less<>>
+constexpr void sortUnique(auto &Range, CompareFn Cmp = {}) {
+  auto It = llvm::adl_begin(Range);
+  auto End = llvm::adl_end(Range);
+  std::sort(It, End, std::move(Cmp));
+  Range.erase(std::unique(It, End), End);
+}
+
+/// \brief Similar to std::minmax, but returns by value
+template <typename T>
+[[nodiscard]] constexpr std::pair<T, T> minmaxVal(T First, T Second) noexcept {
+  if (std::less<T>{}(Second, First)) {
+    return {std::move(Second), std::move(First)};
+  }
+
+  return {std::move(First), std::move(Second)};
 }
 
 } // namespace psr

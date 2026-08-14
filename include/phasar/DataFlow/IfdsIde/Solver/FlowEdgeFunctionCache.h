@@ -51,6 +51,18 @@ class FlowEdgeFunctionCache
     : public FlowEdgeFunctionCacheBase<
           FlowEdgeFunctionCache<AnalysisDomainTy, Container>, AnalysisDomainTy,
           Container> {
+  using IDEProblemType = IDETabulationProblem<AnalysisDomainTy, Container>;
+  using FlowFunctionPtrType = typename IDEProblemType::FlowFunctionPtrType;
+
+  using n_t = typename AnalysisDomainTy::n_t;
+  using d_t = typename AnalysisDomainTy::d_t;
+  using f_t = typename AnalysisDomainTy::f_t;
+  using t_t = typename AnalysisDomainTy::t_t;
+  using l_t = typename AnalysisDomainTy::l_t;
+
+  using FlowFunctionType = FlowFunction<d_t, Container>;
+  using EdgeFunctionType = EdgeFunction<l_t>;
+
 public:
   // Ctor allows access to the IDEProblem in order to get access to flow and
   // edge function factory functions.
@@ -59,27 +71,40 @@ public:
       : FlowEdgeFunctionCacheBase<
             FlowEdgeFunctionCache<AnalysisDomainTy, Container>,
             AnalysisDomainTy, Container>(Problem) {}
+
   using Base = FlowEdgeFunctionCacheBase<
       FlowEdgeFunctionCache<AnalysisDomainTy, Container>, AnalysisDomainTy,
       Container>;
 
+  ~FlowEdgeFunctionCache() = default;
+
+  FlowEdgeFunctionCache(const FlowEdgeFunctionCache &FEFC) = default;
+  FlowEdgeFunctionCache &operator=(const FlowEdgeFunctionCache &FEFC) = default;
+
+  FlowEdgeFunctionCache(FlowEdgeFunctionCache &&FEFC) noexcept = default;
+  FlowEdgeFunctionCache &
+  operator=(FlowEdgeFunctionCache &&FEFC) noexcept = default;
+
 private:
-  template <typename CacheContainer, typename CacheKey>
+  template <typename CacheContainer, typename CacheKey,
+            typename PAMMConstructionType, typename PAMMHitType>
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
   cacheNonNormalFlowFunction(CacheContainer &CurrContainer,
-                             typename Base::FlowFunctionPtrType FlowFunc,
-                             const std::string &LogName, CacheKey Key) {
+                             std::invocable<> auto FlowFuncCallback,
+                             PAMMConstructionType &PAMMFFConstruction,
+                             PAMMHitType &PAMMFFCacheHit, CacheKey Key) {
     auto [It, Inserted] = CurrContainer.try_emplace(std::move(Key));
-
     if (Inserted) {
-      INC_COUNTER(LogName + " Construction", 1, Full);
-      It->second = Base::AutoAddZero ? std::make_unique<typename Base::ZFF>(
-                                           std::move(FlowFunc), Base::ZV)
-                                     : std::move(FlowFunc);
+      PAMMFFConstruction++;
+      auto FF = FlowFuncCallback();
+      It->second =
+          Base::AutoAddZero
+              ? std::make_unique<typename Base::ZFF>(std::move(FF), Base::ZV)
+              : std::move(FF);
       PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
     } else {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER(LogName + " Cache Hit", 1, Full);
+      PAMMFFCacheHit++;
     }
 
     return getPointerFrom(It->second);
@@ -94,7 +119,7 @@ public:
     // key, so getNormalEdgeFunction shares this entry via the same lookup.
     auto &NormalFE = NormalFunctionCache[std::move(Key)];
     if (!NormalFE.FlowFuncPtr) {
-      INC_COUNTER("Normal-FF Construction", 1, Full);
+      Base::NormalFF_Construction++;
       auto FF = Base::Problem.getNormalFlowFunction(Curr, Succ);
       NormalFE.FlowFuncPtr =
           Base::AutoAddZero
@@ -103,7 +128,7 @@ public:
       PHASAR_LOG_LEVEL(DEBUG, "Flow function constructed");
     } else {
       PHASAR_LOG_LEVEL(DEBUG, "Flow function fetched from cache");
-      INC_COUNTER("Normal-FF Cache Hit", 1, Full);
+      Base::NormalFF_CacheHit++;
     }
 
     return getPointerFrom(NormalFE.FlowFuncPtr);
@@ -114,7 +139,8 @@ public:
                         Base::n_t CallSite, Base::f_t DestFun) {
     return cacheNonNormalFlowFunction(
         CallFlowFunctionCache,
-        Base::Problem.getCallFlowFunction(CallSite, DestFun), "Call-FF", Key);
+        [&]() { return Base::Problem.getCallFlowFunction(CallSite, DestFun); },
+        Base::CallFF_Construction, Base::CallFF_CacheHit, Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -124,9 +150,11 @@ public:
                        Base::n_t ExitInst, Base::n_t RetSite) {
     return cacheNonNormalFlowFunction(
         ReturnFlowFunctionCache,
-        Base::Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
-                                         RetSite),
-        "Return-FF", Key);
+        [&]() {
+          return Base::Problem.getRetFlowFunction(CallSite, CalleeFun, ExitInst,
+                                                  RetSite);
+        },
+        Base::ReturnFF_Construction, Base::ReturnFF_CacheHit, Key);
   }
 
   [[nodiscard]] NonNullPtr<typename Base::FlowFunctionType>
@@ -136,27 +164,59 @@ public:
       llvm::ArrayRef<typename Base::f_t> Callees) {
     return cacheNonNormalFlowFunction(
         CallToRetFlowFunctionCache,
-        Base::Problem.getCallToRetFlowFunction(CallSite, RetSite, Callees),
-        "CallToRet-FF", Key);
+        [&]() {
+          return Base::Problem.getCallToRetFlowFunction(CallSite, RetSite,
+                                                        Callees);
+        },
+        Base::CallToRetFF_Construction, Base::CallToRetFF_CacheHit, Key);
   }
 
-  [[nodiscard]] Base::EdgeFunctionType
-  cacheNormalEdgeFunction(typename Base::EdgeFuncInstKey OuterMapKey,
-                          Base::n_t Curr, Base::d_t CurrNode, Base::n_t Succ,
-                          Base::d_t SuccNode) {
+  /// \note Unlike the other get*FlowFunction methods, this returns a nullable
+  /// FlowFunctionPtrType rather than NonNullPtr. A null return means no special
+  /// summary is available for this call site; the solver falls back to
+  /// propagating through the callee body.
+  [[nodiscard]] FlowFunctionPtrType getSummaryFlowFunction(n_t CallSite,
+                                                           f_t DestFun) {
+    assertNotNull(CallSite);
+    assertNotNull(DestFun);
+
+    Base::SummaryFF_Construction++;
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Summary flow function factory call");
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Call Stmt : " << NToString(CallSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(F) Dest Mthd : " << FToString(DestFun));
+        PHASAR_LOG_LEVEL(DEBUG, ' '));
+    auto FF = Base::Problem.getSummaryFlowFunction(CallSite, DestFun);
+    return FF;
+  }
+
+  [[nodiscard]] EdgeFunctionType getNormalEdgeFunction(n_t Curr, d_t CurrNode,
+                                                       n_t Succ, d_t SuccNode) {
+    assertNotNull(Curr);
+    assertNotNull(Succ);
+
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Normal edge function factory call");
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Curr Inst : " << NToString(Curr));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Curr Node : " << DToString(CurrNode));
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Succ Inst : " << NToString(Succ));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Succ Node : " << DToString(SuccNode)));
+
+    typename Base::EdgeFuncInstKey OuterMapKey =
+        this->createEdgeFunctionInstKey(Curr, Succ);
     auto &NormalFE = NormalFunctionCache[std::move(OuterMapKey)];
 
     auto Ret = NormalFE.EdgeFunctionMap.getOrInsertLazy(
         Base::createEdgeFunctionNodeKey(CurrNode, SuccNode),
         [&] {
-          INC_COUNTER("Normal-EF Construction", 1, Full);
+          Base::NormalEF_Construction++;
           auto EF = Base::Problem.getNormalEdgeFunction(Curr, CurrNode, Succ,
                                                         SuccNode);
           PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
           return EF;
         },
         [&] {
-          INC_COUNTER("Normal-EF Cache Hit", 1, Full);
+          Base::NormalEF_CacheHit++;
           PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
         });
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Ret);
@@ -164,21 +224,33 @@ public:
     return Ret;
   }
 
-  [[nodiscard]] Base::EdgeFunctionType
-  cacheCallEdgeFunction(std::tuple<typename Base::n_t, typename Base::d_t,
-                                   typename Base::f_t, typename Base::d_t> Key,
-                        Base::n_t CallSite, Base::d_t SrcNode,
-                        Base::f_t DestinationFunction, Base::d_t DestNode) {
+  [[nodiscard]] EdgeFunctionType getCallEdgeFunction(n_t CallSite, d_t SrcNode,
+                                                     f_t DestinationFunction,
+                                                     d_t DestNode) {
+
+    assertNotNull(CallSite);
+    assertNotNull(DestinationFunction);
+
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Call edge function factory call");
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Call Stmt : " << NToString(CallSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Src Node  : " << DToString(SrcNode));
+
+        PHASAR_LOG_LEVEL(DEBUG,
+                         "(F) Dest Fun : " << FToString(DestinationFunction));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Dest Node : " << DToString(DestNode)));
+    auto Key = std::tie(CallSite, SrcNode, DestinationFunction, DestNode);
+
     auto [It, Inserted] = CallEdgeFunctionCache.try_emplace(std::move(Key));
 
     if (Inserted) {
-      INC_COUNTER("Call-EF Construction", 1, Full);
+      Base::CallEF_Construction++;
       It->second = Base::Problem.getCallEdgeFunction(
           CallSite, SrcNode, DestinationFunction, DestNode);
 
       PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
     } else {
-      INC_COUNTER("Call-EF Cache Hit", 1, Full);
+      Base::CallEF_CacheHit++;
       PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
     }
 
@@ -187,19 +259,35 @@ public:
     return It->second;
   }
 
-  [[nodiscard]] Base::EdgeFunctionType cacheReturnEdgeFunction(
-      std::tuple<typename Base::n_t, typename Base::f_t, typename Base::n_t,
-                 typename Base::d_t, typename Base::n_t, typename Base::d_t>
-          Key,
-      Base::n_t CallSite, Base::f_t CalleeFunction, Base::n_t ExitInst,
-      Base::d_t ExitNode, Base::n_t RetSite, Base::d_t RetNode) {
+  [[nodiscard]] EdgeFunctionType
+  getReturnEdgeFunction(n_t CallSite, f_t CalleeFunction, n_t ExitInst,
+                        d_t ExitNode, n_t RetSite, d_t RetNode) {
+    assertNotNull(CallSite);
+    assertNotNull(CalleeFunction);
+    assertNotNull(ExitInst);
+    assertNotNull(RetSite);
+
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Return edge function factory call");
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Call Site : " << NToString(CallSite));
+        PHASAR_LOG_LEVEL(DEBUG,
+                         "(F) Callee    : " << FToString(CalleeFunction));
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Exit Stmt : " << NToString(ExitInst));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Exit Node : " << DToString(ExitNode));
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Ret Node  : " << DToString(RetNode)));
+    auto Key = std::tie(CallSite, CalleeFunction, ExitInst, ExitNode, RetSite,
+                        RetNode);
     auto [It, Inserted] = ReturnEdgeFunctionCache.try_emplace(std::move(Key));
 
     if (Inserted) {
-      INC_COUNTER("Return-EF Construction", 1, Full);
+      Base::ReturnEF_Construction++;
       It->second = Base::Problem.getReturnEdgeFunction(
           CallSite, CalleeFunction, ExitInst, ExitNode, RetSite, RetNode);
       PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
+    } else {
+      Base::ReturnEF_CacheHit++;
+      PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
     }
 
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << It->second);
@@ -207,122 +295,77 @@ public:
     return It->second;
   }
 
-  [[nodiscard]] Base::EdgeFunctionType
-  cacheCallToRetEdgeFunction(typename Base::EdgeFuncInstKey OuterMapKey,
-                             Base::n_t CallSite, Base::d_t CallNode,
-                             Base::n_t RetSite, Base::d_t RetSiteNode,
-                             llvm::ArrayRef<typename Base::f_t> Callees) {
+  [[nodiscard]] EdgeFunctionType
+  getCallToRetEdgeFunction(n_t CallSite, d_t CallNode, n_t RetSite,
+                           d_t RetSiteNode, llvm::ArrayRef<f_t> Callees) {
+    assertNotNull(CallSite);
+    assertNotNull(RetSite);
+    assertAllNotNull(Callees);
+
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Call-to-Return edge function factory call");
+
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Call Site : " << NToString(CallSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Call Node : " << DToString(CallNode));
+
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Ret Node  : " << DToString(RetSiteNode));
+        PHASAR_LOG_LEVEL(DEBUG, "(F) Callee's  : ");
+        for (auto Callee : Callees) {
+          PHASAR_LOG_LEVEL(DEBUG, "  " << FToString(Callee));
+        });
+
+    typename Base::EdgeFuncInstKey OuterMapKey =
+        this->createEdgeFunctionInstKey(CallSite, RetSite);
     auto &Outer = CallToRetEdgeFunctionCache[std::move(OuterMapKey)];
 
     auto Ret = Outer.getOrInsertLazy(
         std::move(Base::createEdgeFunctionNodeKey(CallNode, RetSiteNode)),
         [&] {
-          INC_COUNTER("CallToRet-EF Construction", 1, Full);
+          Base::CallToRetEF_Construction++;
           auto Ret = Base::Problem.getCallToRetEdgeFunction(
               CallSite, CallNode, RetSite, RetSiteNode, Callees);
           PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
           return Ret;
         },
         [&] {
-          INC_COUNTER("CallToRet-EF Cache Hit", 1, Full);
+          Base::CallToRetEF_CacheHit++;
           PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
         });
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << Ret);
     return Ret;
   }
 
-  [[nodiscard]] Base::EdgeFunctionType cacheSummaryEdgeFunction(
-      std::tuple<typename Base::n_t, typename Base::d_t, typename Base::n_t,
-                 typename Base::d_t> Key,
-      Base::n_t CallSite, Base::d_t CallNode, Base::n_t RetSite,
-      Base::d_t RetSiteNode) {
+  [[nodiscard]] EdgeFunctionType getSummaryEdgeFunction(n_t CallSite,
+                                                        d_t CallNode,
+                                                        n_t RetSite,
+                                                        d_t RetSiteNode) {
+    assertNotNull(CallSite);
+    assertNotNull(RetSite);
+
+    IF_LOG_ENABLED(
+        PHASAR_LOG_LEVEL(DEBUG, "Summary edge function factory call");
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Call Site : " << NToString(CallSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Call Node : " << DToString(CallNode));
+        PHASAR_LOG_LEVEL(DEBUG, "(N) Ret Site  : " << NToString(RetSite));
+        PHASAR_LOG_LEVEL(DEBUG, "(D) Ret Node  : " << DToString(RetSiteNode));
+        PHASAR_LOG_LEVEL(DEBUG, ' '));
+    auto Key = std::tie(CallSite, CallNode, RetSite, RetSiteNode);
     auto [It, Inserted] = SummaryEdgeFunctionCache.try_emplace(std::move(Key));
 
     if (Inserted) {
-      INC_COUNTER("Summary-EF Construction", 1, Full);
+      Base::SummaryEF_Construction++;
       It->second = Base::Problem.getSummaryEdgeFunction(CallSite, CallNode,
                                                         RetSite, RetSiteNode);
       PHASAR_LOG_LEVEL(DEBUG, "Edge function constructed");
     } else {
-      INC_COUNTER("Summary-EF Cache Hit", 1, Full);
+      Base::SummaryEF_CacheHit++;
       PHASAR_LOG_LEVEL(DEBUG, "Edge function fetched from cache");
     }
 
     PHASAR_LOG_LEVEL(DEBUG, "Provide Edge Function: " << It->second);
 
     return It->second;
-  }
-
-  void print() {
-    if constexpr (PAMM_CURR_SEV_LEVEL >= PAMM_SEVERITY_LEVEL::Full) {
-      PAMM_GET_INSTANCE;
-      PHASAR_LOG_LEVEL(INFO, "=== Flow-Edge-Function Cache Statistics ===");
-      PHASAR_LOG_LEVEL(INFO, "Normal-flow function cache hits: "
-                                 << GET_COUNTER("Normal-FF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Normal-flow function constructions: "
-                                 << GET_COUNTER("Normal-FF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Call-flow function cache hits: "
-                                 << GET_COUNTER("Call-FF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Call-flow function constructions: "
-                                 << GET_COUNTER("Call-FF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Return-flow function cache hits: "
-                                 << GET_COUNTER("Return-FF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Return-flow function constructions: "
-                                 << GET_COUNTER("Return-FF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Call-to-Return-flow function cache hits: "
-                                 << GET_COUNTER("CallToRet-FF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Call-to-Return-flow function constructions: "
-                                 << GET_COUNTER("CallToRet-FF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Summary-flow function cache hits: "
-                                 << GET_COUNTER("Summary-FF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Summary-flow function constructions: "
-                                 << GET_COUNTER("Summary-FF Construction"));
-      PHASAR_LOG_LEVEL(INFO,
-                       "Total flow function cache hits: " << GET_SUM_COUNT(
-                           {"Normal-FF Cache Hit", "Call-FF Cache Hit",
-                            "Return-FF Cache Hit", "CallToRet-FF Cache Hit"}));
-      //"Summary-FF Cache Hit"});
-      PHASAR_LOG_LEVEL(INFO, "Total flow function constructions: "
-          << GET_SUM_COUNT({"Normal-FF Construction", "Call-FF Construction",
-                            "Return-FF Construction",
-                            "CallToRet-FF Construction" /*,
-                "Summary-FF Construction"*/}));
-      PHASAR_LOG_LEVEL(INFO, ' ');
-      PHASAR_LOG_LEVEL(INFO, "Normal edge function cache hits: "
-                                 << GET_COUNTER("Normal-EF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Normal edge function constructions: "
-                                 << GET_COUNTER("Normal-EF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Call edge function cache hits: "
-                                 << GET_COUNTER("Call-EF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Call edge function constructions: "
-                                 << GET_COUNTER("Call-EF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Return edge function cache hits: "
-                                 << GET_COUNTER("Return-EF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Return edge function constructions: "
-                                 << GET_COUNTER("Return-EF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Call-to-Return edge function cache hits: "
-                                 << GET_COUNTER("CallToRet-EF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Call-to-Return edge function constructions: "
-                                 << GET_COUNTER("CallToRet-EF Construction"));
-      PHASAR_LOG_LEVEL(INFO, "Summary edge function cache hits: "
-                                 << GET_COUNTER("Summary-EF Cache Hit"));
-      PHASAR_LOG_LEVEL(INFO, "Summary edge function constructions: "
-                                 << GET_COUNTER("Summary-EF Construction"));
-      PHASAR_LOG_LEVEL(INFO,
-                       "Total edge function cache hits: " << GET_SUM_COUNT(
-                           {"Normal-EF Cache Hit", "Call-EF Cache Hit",
-                            "Return-EF Cache Hit", "CallToRet-EF Cache Hit",
-                            "Summary-EF Cache Hit"}));
-      PHASAR_LOG_LEVEL(
-          INFO, "Total edge function constructions: " << GET_SUM_COUNT(
-                    {"Normal-EF Construction", "Call-EF Construction",
-                     "Return-EF Construction", "CallToRet-EF Construction",
-                     "Summary-EF Construction"}));
-      PHASAR_LOG_LEVEL(INFO, "----------------------------------------------");
-    } else {
-      PHASAR_LOG_LEVEL(
-          INFO, "Cache statistics only recorded on PAMM severity level: Full.");
-    }
   }
 
   template <typename Handler>
