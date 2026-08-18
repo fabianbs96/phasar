@@ -1397,7 +1397,7 @@ protected:
     // d1 --> d2-Set
     // Case 1: d1 in d2-Set
     // Case 2: d1 not in d2-Set, i.e., d1 was killed. d2-Set could be empty.
-    for (const auto &Cell : ComputedIntraPathEdges.cellSet()) {
+    for (const auto &Cell : ComputedIntraPathEdges.cellVec()) {
       auto Edge = std::make_pair(Cell.getRowKey(), Cell.getColumnKey());
       PHASAR_LOG_LEVEL(DEBUG, "N1: " << NToString(Edge.first));
       PHASAR_LOG_LEVEL(DEBUG, "N2: " << NToString(Edge.second));
@@ -1803,16 +1803,15 @@ private:
   }
 
   void finalizeInternal() {
-    STOP_TIMER("DFA Phase I", Full);
+    DFAPhase1.stop();
     PHASAR_LOG_LEVEL(INFO, "[info]: IDE Phase I completed");
 
     if (SolverConfig.computeValues()) {
-      START_TIMER("DFA Phase II", Full);
+      PAMM_SCOPED_TIMER(DFAPhase2);
       // Computing the final values for the edge functions
       PHASAR_LOG_LEVEL(
           INFO, "Compute the final values according to the edge functions");
       computeValues();
-      STOP_TIMER("DFA Phase II", Full);
     }
 
     PHASAR_LOG_LEVEL(INFO, "Problem solved");

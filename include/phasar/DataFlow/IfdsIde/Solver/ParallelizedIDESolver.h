@@ -1903,17 +1903,15 @@ private:
   }
 
   void finalizeInternal() {
-
-    STOP_TIMER("DFA Phase I", Full);
+    DFAPhase1.stop();
     PHASAR_LOG_LEVEL(INFO, "[info]: IDE Phase I completed");
 
     if (SolverConfig.computeValues()) {
-      START_TIMER("DFA Phase II", Full);
+      PAMM_SCOPED_TIMER(DFAPhase2);
       // Computing the final values for the edge functions
       PHASAR_LOG_LEVEL(
           INFO, "Compute the final values according to the edge functions");
       computeValues();
-      STOP_TIMER("DFA Phase II", Full);
     }
 
     PHASAR_LOG_LEVEL(INFO, "Problem solved");
