@@ -320,7 +320,7 @@ public:
                                   ByConstRef<C> ColumnKey) const noexcept {
     // Returns the value corresponding to the given row and column keys, or
     // V() if no such mapping exists.
-    if constexpr (has_if_contains<const Container, ByConstRef<R>>) {
+    if constexpr (has_if_contains<Container, ByConstRef<R>>) {
       const V *RetVal = nullptr;
 
       Tab.if_contains(RowKey, [&](auto &Entry) {

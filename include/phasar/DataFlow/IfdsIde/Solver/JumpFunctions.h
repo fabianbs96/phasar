@@ -122,7 +122,7 @@ public:
       }
     });
 
-    if constexpr (has_try_emplace_p<const Container, n_t>) {
+    if constexpr (has_try_emplace_p<Container, n_t>) {
       // V Table::insert(R r, C c, V v) always overrides (see
       // comments above)
       auto &Inner =
