@@ -1,3 +1,5 @@
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint22_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: /xtaint/xtaint22.cpp:9:5:
 
 void print([[clang::annotate("psr.sink")]] int) {}
 

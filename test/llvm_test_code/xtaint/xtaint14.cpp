@@ -1,3 +1,7 @@
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint14_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: /xtaint/xtaint14.cpp:23:3:
+// CHECK: /xtaint/xtaint14.cpp:24:3:
+
 void sink([[clang::annotate("psr.sink")]] int) {}
 void sanitize([[clang::annotate("psr.sanitizer")]] int *) noexcept {}
 

@@ -1,3 +1,6 @@
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint21_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: A LLVM-based static analysis framework
+
 extern void srcsink(int &);
 extern void sink(int);
 

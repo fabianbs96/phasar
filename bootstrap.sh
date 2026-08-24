@@ -85,6 +85,10 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 # End - Parsing command-line-parameters
 
+# installing LLVM
+tmp_dir=$(mktemp -d "llvm-build.XXXXXXXX" --tmpdir)
+./utils/install-llvm.sh "${NUM_THREADS}" "${tmp_dir}" "${LLVM_INSTALL_DIR}" ${LLVM_RELEASE}
+rm -rf "${tmp_dir}"
 
 echo "installing phasar dependencies..."
 if [ -x "$(command -v pacman)" ]; then
@@ -93,10 +97,6 @@ else
     ./utils/InstallAptDependencies.sh
 fi
 
-# installing LLVM
-tmp_dir=$(mktemp -d "llvm-build.XXXXXXXX" --tmpdir)
-./utils/install-llvm.sh "${NUM_THREADS}" "${tmp_dir}" "${LLVM_INSTALL_DIR}" ${LLVM_RELEASE}
-rm -rf "${tmp_dir}"
 
 echo "dependencies successfully installed"
 

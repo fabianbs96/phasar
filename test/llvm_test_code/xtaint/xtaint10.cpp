@@ -1,3 +1,7 @@
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint10_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: /xtaint/xtaint10.cpp:23:3:
+// CHECK: /xtaint/xtaint10.cpp:24:3:
+
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
