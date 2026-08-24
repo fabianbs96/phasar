@@ -2130,54 +2130,93 @@ struct [[clang::internal_linkage]] AndersenOTFSolver::SolverData {
 
   // ---- Result construction --------------------------------------------
 
-  AndersenOTFResult buildResult() {
+  /// One external name of a PAG node.
+  struct ExtName {
+    ValueId Id;
+    bool IsObject; ///< The name denotes the abstract object, not the pointer.
+  };
+
+  using NodeToExtT = TypedVector<ValueId, llvm::SmallVector<ExtName, 1>>;
+  using RepToExtT = TypedVector<ValueId, llvm::SmallVector<ExtName>>;
+
+  // Map local node IDs → external VC IDs.
+  // Context clones of one PAGVariable share an external id, so the reported
+  // set of a formal is the union over its contexts, while call sites and
+  // locals -- distinct PAGVariables -- keep their per-context precision.
+  // A node normally gets one external id; it gets more when a caller-supplied
+  // ExternalVC already mapped two of its names to distinct ids, which
+  // addAlias cannot undo. Keeping both makes them share the set.
+  //
+  // Object and variable names are mapped in one pass and told apart by their
+  // tag: this mutates ExternalVC, and which name is inserted first decides how
+  // the node's remaining names merge onto it, so a pass per name kind would
+  // make the external ids depend on the order the passes run in.
+  NodeToExtT mapNodesToExternal() {
     const size_t NumLocal = LocalVC.size();
 
-    // Map variable local IDs → external VC IDs.
-    // Object nodes are internal only and do not appear in the external result.
-    // Context clones of one PAGVariable share an external id, so the reported
-    // alias set of a formal is the union over its contexts, while call sites
-    // and locals -- distinct PAGVariables -- keep their per-context precision.
-    // A node normally gets one external id; it gets more when a caller-supplied
-    // ExternalVC already mapped two of its names to distinct ids, which
-    // addAlias cannot undo. Keeping both makes them share the alias set.
-    TypedVector<ValueId, llvm::SmallVector<ValueId, 1>> LocalToExt(NumLocal);
+    NodeToExtT NodeToExt(NumLocal);
     for (auto VId : iota<ValueId>(NumLocal)) {
+      auto &Names = NodeToExt[VId];
+      const auto RecordName = [&Names](ValueId ExtId, bool IsObject) {
+        auto *It = llvm::find_if(
+            Names, [ExtId](ExtName Name) { return Name.Id == ExtId; });
+        if (It == Names.end()) {
+          Names.push_back({.Id = ExtId, .IsObject = IsObject});
+        } else if (!IsObject) {
+          // A pointer name wins: the id must stay usable as a pointer.
+          It->IsObject = false;
+        }
+      };
+
       std::optional<ValueId> FirstExtId;
       forEachVar(VId, [&](ContextualVar CVar) {
-        if (CVar.Var.isObject()) {
-          return;
-        }
+        const PAGVariable Base = CVar.Var.getBase();
         if (!FirstExtId) {
-          FirstExtId = ExternalVC.insert(CVar.Var.getBase()).first;
-          LocalToExt[VId].push_back(*FirstExtId);
-        } else if (!ExternalVC.addAlias(CVar.Var.getBase(), *FirstExtId)) {
-          const ValueId Existing = *ExternalVC.getOrNull(CVar.Var.getBase());
-          if (!llvm::is_contained(LocalToExt[VId], Existing)) {
-            LocalToExt[VId].push_back(Existing);
-          }
+          FirstExtId = ExternalVC.insert(Base).first;
+          RecordName(*FirstExtId, CVar.Var.isObject());
+        } else if (ExternalVC.addAlias(Base, *FirstExtId)) {
+          RecordName(*FirstExtId, CVar.Var.isObject());
+        } else {
+          RecordName(*ExternalVC.getOrNull(Base), CVar.Var.isObject());
         }
       });
     }
+    return NodeToExt;
+  }
 
-    // Build rep → bitset of external IDs for all vars in that SCC.
-    TypedVector<ValueId, llvm::SmallVector<ValueId>> RepToExtVIds(NumLocal);
-    for (auto VId : iota<ValueId>(NumLocal)) {
-      if (LocalToExt[VId].empty()) {
+  // Build rep → external names of all nodes in that SCC.
+  [[nodiscard]] RepToExtT
+  groupByRepresentative(const NodeToExtT &NodeToExt) const {
+    RepToExtT RepToExt(NodeToExt.size());
+    for (auto VId : iota<ValueId>(NodeToExt.size())) {
+      if (NodeToExt[VId].empty()) {
         continue;
       }
       const ValueId RepId = rep(VId);
       if (!Nodes.inbounds(RepId)) {
         continue;
       }
-      llvm::append_range(RepToExtVIds[RepId], LocalToExt[VId]);
+      llvm::append_range(RepToExt[RepId], NodeToExt[VId]);
     }
+    return RepToExt;
+  }
+
+  [[nodiscard]] static bool
+  hasPointerName(llvm::ArrayRef<ExtName> Names) noexcept {
+    return llvm::any_of(Names, [](ExtName Name) { return !Name.IsObject; });
+  }
+
+  // Two values may-alias iff their points-to sets intersect.  Object names are
+  // not part of the alias domain and are skipped throughout.
+  TypedVector<ValueId, RawAliasSet<ValueId>>
+  buildAliasSets(const RepToExtT &RepToExt) {
+    const size_t NumLocal = LocalVC.size();
 
     // Reverse map: abstract object → bitset of representatives pointing to it.
     // Only representatives with at least one external variable are inserted.
     TypedVector<ValueId, RawAliasSet<ValueId>> Obj2Reps(NumLocal);
     for (auto RepId : iota<ValueId>(NumLocal)) {
-      if (RepToExtVIds[RepId].empty()) {
+      if (!hasPointerName(RepToExt[RepId])) {
         continue;
       }
       if (!Nodes.inbounds(RepId)) {
@@ -2204,8 +2243,10 @@ struct [[clang::internal_linkage]] AndersenOTFSolver::SolverData {
           continue;
         }
         Reps.foreach ([&](ValueId AliasRepId) {
-          for (auto EId : RepToExtVIds[AliasRepId]) {
-            Buf.push_back(uint32_t(EId));
+          for (auto Name : RepToExt[AliasRepId]) {
+            if (!Name.IsObject) {
+              Buf.push_back(uint32_t(Name.Id));
+            }
           }
         });
         // Context clones share an external id, so Buf routinely has duplicates.
@@ -2215,11 +2256,10 @@ struct [[clang::internal_linkage]] AndersenOTFSolver::SolverData {
       }
     }
 
-    AndersenOTFResult Result{};
-    Result.AliasSets.resize(ExternalVC.size());
+    TypedVector<ValueId, RawAliasSet<ValueId>> AliasSets(ExternalVC.size());
 
-    for (const auto &[RepId, ExtVIds] : RepToExtVIds.enumerate()) {
-      if (ExtVIds.empty()) {
+    for (const auto &[RepId, Names] : RepToExt.enumerate()) {
+      if (!hasPointerName(Names)) {
         continue;
       }
       if (!Nodes.inbounds(RepId)) {
@@ -2238,18 +2278,88 @@ struct [[clang::internal_linkage]] AndersenOTFSolver::SolverData {
       });
 
       // Broadcast to every external ID mapped to this representative.
-      for (auto ExtVId : ExtVIds) {
-        Result.AliasSets[ExtVId] |= AliasExtVIds;
+      for (auto Name : Names) {
+        if (!Name.IsObject) {
+          AliasSets[Name.Id] |= AliasExtVIds;
+        }
       }
     }
 
+    return AliasSets;
+  }
+
+  // pts of the pointer *variables*: an object node names the abstract object
+  // itself, so its set is the contents of that object and does not belong to
+  // any pointer's points-to set.  Pointees are named by all their names --
+  // object nodes carry an object name, but a self-pointing function only a
+  // variable one.
+  TypedVector<ValueId, RawAliasSet<ValueId>>
+  buildPointsToSets(const NodeToExtT &NodeToExt, const RepToExtT &RepToExt) {
+    const size_t NumLocal = LocalVC.size();
+
+    TypedVector<ValueId, RawAliasSet<ValueId>> PointsToSets(ExternalVC.size());
+    llvm::SmallVector<uint32_t, 64> Buf;
+
+    for (const auto &[RepId, Names] : RepToExt.enumerate()) {
+      if (!hasPointerName(Names)) {
+        continue;
+      }
+      if (!Nodes.inbounds(RepId)) {
+        break; // iota is monotone; all subsequent IDs exceed Nodes.size()
+      }
+
+      Nodes[RepId].PtsSet.foreach ([&](ValueId Obj) {
+        if (size_t(Obj) >= NumLocal) {
+          // Iteration is in sorted order
+          return false;
+        }
+        for (auto Name : NodeToExt[Obj]) {
+          Buf.push_back(uint32_t(Name.Id));
+        }
+        return true;
+      });
+      if (Buf.empty()) {
+        continue;
+      }
+      // Context clones share an external id, so Buf routinely has duplicates.
+      sortUnique(Buf);
+
+      RawAliasSet<ValueId> PtsExtVIds;
+      PtsExtVIds.insertSorted(Buf);
+      Buf.clear();
+
+      for (auto Name : Names) {
+        if (!Name.IsObject) {
+          PointsToSets[Name.Id] |= PtsExtVIds;
+        }
+      }
+    }
+
+    return PointsToSets;
+  }
+
+  AndersenOTFResult buildResult() {
+    const auto RepToExt = groupByRepresentative(mapNodesToExternal());
+
+    AndersenOTFResult Result{};
+    Result.AliasSets = buildAliasSets(RepToExt);
+    Result.CG = CGBuilder.consumeCallGraph();
+    return Result;
+  }
+
+  AndersenOTFPointsToResult buildPointsToResult() {
+    const auto NodeToExt = mapNodesToExternal();
+    const auto RepToExt = groupByRepresentative(NodeToExt);
+
+    AndersenOTFPointsToResult Result{};
+    Result.PointsToSets = buildPointsToSets(NodeToExt, RepToExt);
     Result.CG = CGBuilder.consumeCallGraph();
     return Result;
   }
 
   // ---- Main loop ------------------------------------------------------
 
-  AndersenOTFResult run() {
+  void runFixpoint() {
     initGlobals();
 
     bool Changed{};
@@ -2271,8 +2381,16 @@ struct [[clang::internal_linkage]] AndersenOTFSolver::SolverData {
       Changed |= checkUnresolvedStructVCalls();
       Changed |= checkUnresolvedCallbacks();
     } while (!FunctionWorklist.empty() || Changed);
+  }
 
+  AndersenOTFResult run() {
+    runFixpoint();
     return buildResult();
+  }
+
+  AndersenOTFPointsToResult runPointsTo() {
+    runFixpoint();
+    return buildPointsToResult();
   }
 };
 
@@ -2287,6 +2405,11 @@ AndersenOTFSolver::AndersenOTFSolver(
 AndersenOTFResult AndersenOTFSolver::solve() {
   SolverData Impl{*IRDB, Entries, *VC, S, CSOpts};
   return Impl.run();
+}
+
+AndersenOTFPointsToResult AndersenOTFSolver::solvePointsTo() {
+  SolverData Impl{*IRDB, Entries, *VC, S, CSOpts};
+  return Impl.runPointsTo();
 }
 
 // ---- Factory functions --------------------------------------------------
@@ -2314,4 +2437,44 @@ psr::computeAndersenOTF(const LLVMProjectIRDB &IRDB,
   AndersenOTFSolver Solver(IRDB, EntryPoints, *VC, S, std::move(CSOpts));
   auto Res = Solver.solve();
   return LLVMRawAliasIterator{std::move(Res), std::move(VC)};
+}
+
+static_assert(
+    IsPointsToIterator<LLVMRawPointsToIterator<AndersenOTFPointsToResult>>);
+
+AndersenOTFPointsToResult psr::computeAndersenOTFPointsToRaw(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC, Soundness S,
+    ContextSensitivityOptions CSOpts) {
+  if (!VC) {
+    VC = std::make_unique<ValueCompressor<PAGVariable>>();
+  }
+  AndersenOTFSolver Solver(IRDB, EntryPoints, *VC, S, std::move(CSOpts));
+  return Solver.solvePointsTo();
+}
+
+LLVMRawPointsToIterator<AndersenOTFPointsToResult>
+psr::computeAndersenOTFPointsTo(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC, Soundness S,
+    ContextSensitivityOptions CSOpts) {
+  if (!VC) {
+    VC = std::make_unique<ValueCompressor<PAGVariable>>();
+  }
+  AndersenOTFSolver Solver(IRDB, EntryPoints, *VC, S, std::move(CSOpts));
+  auto Res = Solver.solvePointsTo();
+  return LLVMRawPointsToIterator<AndersenOTFPointsToResult>{
+      .PTRes = std::move(Res), .VC = std::move(VC)};
+}
+
+LLVMPointsToIterator psr::createAndersenOTFPointsToIterator(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC, Soundness S,
+    ContextSensitivityOptions CSOpts) {
+  return {std::make_unique<LLVMRawPointsToIterator<AndersenOTFPointsToResult>>(
+      computeAndersenOTFPointsTo(IRDB, EntryPoints, std::move(VC), S,
+                                 std::move(CSOpts)))};
 }

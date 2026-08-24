@@ -11,8 +11,10 @@
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointerAssignmentGraph.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMRawPointsToResults.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMUnionFindAA.h"
 #include "phasar/Pointer/RawAliasSet.h"
+#include "phasar/Pointer/RawPointsToResult.h"
 #include "phasar/Pointer/UnionFindAA.h"
 #include "phasar/Utils/Macros.h"
 #include "phasar/Utils/MaybeUniquePtr.h"
@@ -114,6 +116,39 @@ struct AndersenOTFResult {
 
 static_assert(RawAAResult<AndersenOTFResult>);
 
+/// Points-to result for the Andersen-style OTF points-to analysis.
+///
+/// Maps each pointer to the abstract objects it may point to.
+/// The reported set belongs to the pointer value itself, so an allocation site
+/// is contained in its own points-to set, and the contents of an object are not
+/// queryable.
+struct AndersenOTFPointsToResult {
+  TypedVector<ValueId, RawAliasSet<ValueId>> PointsToSets;
+  LLVMBasedCallGraph CG;
+
+  [[nodiscard]] static constexpr bool isCached() noexcept { return true; }
+  [[nodiscard]] constexpr size_t size() const noexcept {
+    return PointsToSets.size();
+  }
+
+  [[nodiscard]] RawAliasSet<ValueId>
+  getRawPointsToSet(ValueId Ptr) const noexcept {
+    if (!PointsToSets.inbounds(Ptr)) {
+      return {};
+    }
+    return PointsToSets[Ptr];
+  }
+
+  [[nodiscard]] bool mayPointsTo(ValueId Ptr, ValueId Obj) const noexcept {
+    if (!PointsToSets.inbounds(Ptr)) {
+      return false;
+    }
+    return PointsToSets[Ptr].contains(Obj);
+  }
+};
+
+static_assert(RawPointsToResult<AndersenOTFPointsToResult>);
+
 /// Andersen-style inclusion-based points-to analysis that co-refines the call
 /// graph and points-to sets in a single fixpoint.
 ///
@@ -134,6 +169,9 @@ public:
 
   /// Run the full OTF fixpoint and return the alias-analysis result.
   [[nodiscard]] AndersenOTFResult solve();
+
+  /// Run the full OTF fixpoint and return the points-to sets.
+  [[nodiscard]] AndersenOTFPointsToResult solvePointsTo();
 
 private:
   struct SolverData;
@@ -164,5 +202,31 @@ computeAndersenOTF(const LLVMProjectIRDB &IRDB,
                    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC = nullptr,
                    Soundness S = Soundness::Soundy,
                    ContextSensitivityOptions CSOpts = {});
+
+/// Runs the Andersen OTF fixpoint and returns the raw points-to sets (no
+/// LLVM-value wrapping).  If \p VC is null, a fresh one is allocated.
+[[nodiscard]] AndersenOTFPointsToResult computeAndersenOTFPointsToRaw(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC = nullptr,
+    Soundness S = Soundness::Soundy, ContextSensitivityOptions CSOpts = {});
+
+/// Runs the Andersen OTF fixpoint and returns an \c LLVMRawPointsToIterator
+/// that implements \c IsPointsToIterator.
+[[nodiscard]] LLVMRawPointsToIterator<AndersenOTFPointsToResult>
+computeAndersenOTFPointsTo(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC = nullptr,
+    Soundness S = Soundness::Soundy, ContextSensitivityOptions CSOpts = {});
+
+/// Like \c computeAndersenOTFPointsTo(), but type-erased.
+///
+/// \note Discards access to the co-refined call graph.
+[[nodiscard]] LLVMPointsToIterator createAndersenOTFPointsToIterator(
+    const LLVMProjectIRDB &IRDB,
+    llvm::ArrayRef<const llvm::Function *> EntryPoints,
+    MaybeUniquePtr<ValueCompressor<PAGVariable>> VC = nullptr,
+    Soundness S = Soundness::Soundy, ContextSensitivityOptions CSOpts = {});
 
 } // namespace psr

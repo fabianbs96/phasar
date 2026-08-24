@@ -1,5 +1,6 @@
 set(PointerFlowSources
 	AndersenOTFAATest.cpp
+	AndersenOTFPointsToTest.cpp
 	LLVMAliasSetTest.cpp
 	LLVMAliasSetSerializationTest.cpp
 	FilteredLLVMAliasSetTest.cpp
