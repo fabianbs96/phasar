@@ -1,6 +1,3 @@
-// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint19_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
-// CHECK: /xtaint/xtaint19.cpp:17:3:
-
 void sink([[clang::annotate("psr.sink")]] int) {}
 extern int rand();
 
@@ -19,3 +16,6 @@ int main([[clang::annotate("psr.source")]] int argc, char *argv[]) {
   // we can skip the sanitizer => leak here
   sink(x);
 }
+
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint19_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: /xtaint/xtaint19.cpp:17:3:

@@ -1,7 +1,3 @@
-// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint03_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
-// CHECK: /xtaint/xtaint03.cpp:9:3:
-// CHECK: /xtaint/xtaint03.cpp:10:3:
-
 void print([[clang::annotate("psr.sink")]] int) {}
 
 int main([[clang::annotate("psr.source")]] int argc, char *argv[]) {
@@ -12,3 +8,7 @@ int main([[clang::annotate("psr.source")]] int argc, char *argv[]) {
   print(array[0]);
   print(array[1]);
 }
+
+// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint03_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
+// CHECK: /xtaint/xtaint03.cpp:8:3:
+// CHECK: /xtaint/xtaint03.cpp:9:3:
