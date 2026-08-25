@@ -10,6 +10,7 @@
  *****************************************************************************/
 
 #include "phasar/DataFlow/IfdsIde/IDETabulationProblem.h"
+#include "phasar/DataFlow/IfdsIde/IFDSProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
 #include "phasar/DataFlow/Mono/InterMonoProblem.h"
 #include "phasar/DataFlow/Mono/Solver/InterMonoSolver.h"
@@ -217,9 +218,7 @@ private:
 
 template <typename ProblemT, typename I>
 auto solveDataFlowAnalysisProblem(auto &Pipeline, ProblemT &Problem, I &ICF) {
-  if constexpr (std::derived_from<
-                    ProblemT, IDETabulationProblem<
-                                  typename ProblemT::ProblemAnalysisDomain>>) {
+  if constexpr (IFDSProblem<ProblemT>) {
     return IterativeIDESolver(&Problem, &ICF).solve();
   } else if (monoifds::MonoIFDSProblem<ProblemT>) {
     auto Solver = monoifds::MonoIFDSSolver(&Problem, &ICF);

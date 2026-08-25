@@ -1,6 +1,7 @@
 #ifndef PHASAR_DATAFLOW_IFDSIDE_SOLVER_STATICIDESOLVERCONFIG_H
 #define PHASAR_DATAFLOW_IFDSIDE_SOLVER_STATICIDESOLVERCONFIG_H
 
+#include "phasar/DataFlow/IfdsIde/IDEProblem.h"
 #include "phasar/DataFlow/IfdsIde/IFDSTabulationProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/ESGEdgeKind.h"
 #include "phasar/DataFlow/IfdsIde/Solver/FlowEdgeFunctionCacheNG.h"
@@ -115,14 +116,11 @@ struct PSR_PREFERRED_NAME(IFDSSolverConfigWithStatsAndGC) WithGCMode : Base {
   static constexpr JumpFunctionGCMode EnableJumpFunctionGC = GCMode;
 };
 
-template <typename ProblemTy>
-struct DefaultIDESolverConfig : IDESolverConfig {};
+template <IFDSProblem ProblemTy>
+struct DefaultIDESolverConfig : IFDSSolverConfig {};
 
-template <typename ProblemTy>
-  requires std::is_base_of_v<
-      IFDSTabulationProblem<typename ProblemTy::ProblemAnalysisDomain>,
-      ProblemTy>
-struct DefaultIDESolverConfig<ProblemTy> : IFDSSolverConfig {};
+template <IDEProblem ProblemTy>
+struct DefaultIDESolverConfig<ProblemTy> : IDESolverConfig {};
 
 } // namespace psr
 

@@ -7,10 +7,14 @@
  *     Philipp Schubert and others
  *****************************************************************************/
 
+#include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
+#include "phasar/PhasarLLVM/AnalysisInput.h"
 #include "phasar/PhasarLLVM/AnalysisPipeline.h"
+#include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/Pointer/AliasAnalysisType.h"
@@ -65,6 +69,30 @@ int main(int Argc, const char **Argv) {
     Pipeline.solve();
 
     llvm::outs() << "Pipeline Taint Analysis elapsed: " << Tm.elapsed() << '\n';
+  }
+
+  {
+    SimpleTimer Tm;
+    auto Pipeline = phasarInput(Argv[1])
+                        .with<EntryFunctionsInput>()
+                        .with<AndersenAliasInfoInput>()
+                        // .with(TaintConfigStage{})
+                        // .with(DataflowAnalysisStage{
+                        //     std::type_identity<IFDSTaintAnalysis>{}})
+                        .shared();
+
+    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMBasedICFG>
+        GI = &Pipeline;
+
+    static_assert(!CanEfficientlyPassByValue<psr::LLVMBasedICFG>);
+    auto &IRB = analysis_input::getResult<LLVMProjectIRDB>(GI);
+    auto AI = analysis_input::getResult<LLVMAliasInfoRef>(GI);
+    auto &ICF = analysis_input::getResult<LLVMBasedICFG>(GI);
+
+    // Pipeline.solve();
+
+    llvm::outs() << "AnalysisInput Taint Analysis elapsed: " << Tm.elapsed()
+                 << '\n';
   }
 
   return 0;
