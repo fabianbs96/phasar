@@ -74,7 +74,9 @@ set(RELEASE_CONFIGURATIONS RELWITHDEBINFO RELEASE CACHE INTERNAL "" FORCE)
 
 string(APPEND CMAKE_CXX_FLAGS " -MP -fstack-protector-strong -ffunction-sections -fdata-sections -pipe")
 string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fno-omit-frame-pointer")
+string(APPEND CMAKE_C_FLAGS_DEBUG " -fno-omit-frame-pointer")
 string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -fno-omit-frame-pointer")
+string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO " -fno-omit-frame-pointer")
 string(APPEND CMAKE_CXX_FLAGS_RELEASE "")
 
 option(CMAKE_VISIBILITY_INLINES_HIDDEN "Hide inlined functions from the DSO table (default ON)" ON)
@@ -123,6 +125,7 @@ if (NOT "${PHASAR_TARGET_ARCH_INTERNAL}" STREQUAL "")
   if (MARCH_SUPPORTED)
     message(STATUS "Target architecture '${PHASAR_TARGET_ARCH_INTERNAL}' enabled")
     string(APPEND CMAKE_CXX_FLAGS_RELEASE " -march=${PHASAR_TARGET_ARCH_INTERNAL}")
+    string(APPEND CMAKE_C_FLAGS_RELEASE " -march=${PHASAR_TARGET_ARCH_INTERNAL}")
   else()
     message(WARNING "Target architecture '${PHASAR_TARGET_ARCH_INTERNAL}' not supported. Fallback to generic build")
   endif()
@@ -197,18 +200,16 @@ if (PHASAR_ENABLE_PIC)
 endif (PHASAR_ENABLE_PIC)
 
 # PAMM
-if (NOT PHASAR_ENABLE_PAMM)
-  set(PHASAR_ENABLE_PAMM "Off" CACHE STRING "Enable the performance measurement mechanism ('Off', 'Core' or 'Full', default is 'Off')" FORCE)
-  set_property(CACHE PHASAR_ENABLE_PAMM PROPERTY STRINGS "Off" "Core" "Full")
-endif()
-if(PHASAR_ENABLE_PAMM STREQUAL "Core" AND NOT PHASAR_BUILD_UNITTESTS)
+set(PHASAR_ENABLE_PAMM "Off" CACHE STRING "Enable the performance measurement mechanism ('Off', 'Core' or 'Full', default is 'Off')")
+set_property(CACHE PHASAR_ENABLE_PAMM PROPERTY STRINGS "Off" "Core" "Full")
+option(PHASAR_THREAD_SAFE_PAMM "Use a thread-safe version of PAMM, if PAMM is enabled" ON)
+
+if(PHASAR_ENABLE_PAMM STREQUAL "Core")
   set(PAMM_CORE ON)
   message(STATUS "PAMM metric severity level: Core")
-elseif(PHASAR_ENABLE_PAMM STREQUAL "Full" AND NOT PHASAR_BUILD_UNITTESTS)
+elseif(PHASAR_ENABLE_PAMM STREQUAL "Full")
   set(PAMM_FULL ON)
   message(STATUS "PAMM metric severity level: Full")
-elseif(PHASAR_BUILD_UNITTESTS AND (PHASAR_ENABLE_PAMM STREQUAL "Core" OR PHASAR_ENABLE_PAMM STREQUAL "Full"))
-  message(WARNING "PAMM metric severity level: Off (due to unittests)")
 else()
   message(STATUS "PAMM metric severity level: Off")
 endif()
@@ -270,6 +271,9 @@ include(add_nlohmann_json)
 add_nlohmann_json()
 add_json_schema_validator()
 
+# TBB
+find_package(TBB)
+
 # Coverage
 if (CODE_COVERAGE)
   set(CODE_COVERAGE_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/code-coverage.cmake")
@@ -328,6 +332,15 @@ set(PHASAR_LLVM_VERSION 16 CACHE STRING "The LLVM major-version that PhASAR shou
 
 include(add_llvm)
 add_llvm()
+
+# Roaring
+
+find_package(roaring QUIET CONFIG)
+if(NOT TARGET roaring::roaring)
+  set(ENABLE_ROARING_TESTS OFF)
+  add_subdirectory(external/CRoaring)
+  set(PHASAR_PROVIDE_CROARING ON)
+endif()
 
 # SVF
 option(PHASAR_USE_SVF "Use SVF for more options in alias analysis (default is OFF)" OFF)
@@ -415,6 +428,10 @@ target_sources(phasar_interface INTERFACE
   BASE_DIRS "${PHASAR_SRC_DIR}/include" "${PHASAR_BINARY_DIR}/include"
   FILES ${PHASAR_PUBLIC_HEADERS} "${PHASAR_BINARY_DIR}/include/phasar/Config/phasar-config.h"
 )
+if (TARGET TBB::tbb)
+  target_link_libraries(phasar_interface INTERFACE TBB::tbb)
+endif()
+
 
 # Some preprocessor symbols that need to be available in phasar sources, but should not be installed
 add_cxx_compile_definitions(PHASAR_SRC_DIR="${CMAKE_SOURCE_DIR}")
