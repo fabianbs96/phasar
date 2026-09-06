@@ -7,6 +7,9 @@ int main([[clang::annotate("psr.source")]] int argc, char *argv[]) {
   print(argc);
 }
 
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ide-xtaint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint01_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ide-xtaint
+// ide-xtaint: /xtaint/xtaint01.cpp:7:3:
+
 // RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint01_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
 // ifds-taint: /xtaint/xtaint01.cpp:7:3:
 

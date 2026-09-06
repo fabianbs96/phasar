@@ -13,6 +13,10 @@ int main(int argc, char *argv[]) {
   sink(y);    // leak
 }
 
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ide-xtaint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint20_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ide-xtaint
+// ide-xtaint: /xtaint/xtaint20.cpp:12:3:
+// ide-xtaint: /xtaint/xtaint20.cpp:13:3:
+
 // RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint20_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
 // ifds-taint: /xtaint/xtaint20.cpp:10:3:
 // ifds-taint: /xtaint/xtaint20.cpp:12:3:
