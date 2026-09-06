@@ -42,12 +42,6 @@
 
 namespace psr {
 
-struct IDEExtendedTaintAnalysisDomain : public LLVMAnalysisDomainDefault {
-  using d_t = AbstractMemoryLocation;
-  /// Nullptr means tainted, nonnull llvm::Instruction* refers to a
-  /// sanitizer on the current path, Bottom means sanitized on all paths.
-  using l_t = XTaint::EdgeDomain;
-};
 namespace XTaint {
 
 /// \brief An IDE-based taint analysis that uses k-limited field-access paths to

@@ -17,6 +17,9 @@ int main() {
   sink(x);
 }
 
-// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint13_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
-// CHECK: /xtaint/xtaint13.cpp:16:3:
-// CHECK: /xtaint/xtaint13.cpp:17:3:
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint13_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
+// ifds-taint: /xtaint/xtaint13.cpp:16:3:
+// ifds-taint: /xtaint/xtaint13.cpp:17:3:
+
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-fieldsens-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint13_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-fieldsens-taint
+// ifds-fieldsens-taint: /xtaint/xtaint13.cpp:17:3:

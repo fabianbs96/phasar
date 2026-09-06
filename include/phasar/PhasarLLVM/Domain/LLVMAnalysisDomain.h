@@ -11,6 +11,8 @@
 #define PHASAR_PHASARLLVM_DOMAIN_LLVMANALYSISDOMAIN_H
 
 #include "phasar/Domain/AnalysisDomain.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/AbstractMemoryLocation.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/ExtendedTaintAnalysis/EdgeDomain.h"
 #include "phasar/PhasarLLVM/Utils/LLVMAnalysisPrinter.h"
 #include "phasar/Utils/DefaultAnalysisPrinterSelector.h"
 #include "phasar/Utils/TypeTraits.h"
@@ -56,12 +58,26 @@ struct LLVMAnalysisDomainDefault : public AnalysisDomain {
 using LLVMIFDSAnalysisDomainDefault =
     WithBinaryValueDomain<LLVMAnalysisDomainDefault>;
 
+/// \brief An AnalysisDomain that specializes sensible defaults for LLVM-based
+/// IDE analysis
+struct IDEExtendedTaintAnalysisDomain : public LLVMAnalysisDomainDefault {
+  using d_t = AbstractMemoryLocation;
+  /// Nullptr means tainted, nonnull llvm::Instruction* refers to a
+  /// sanitizer on the current path, Bottom means sanitized on all paths.
+  using l_t = XTaint::EdgeDomain;
+};
+
 extern template class DefaultLLVMAnalysisPrinter<LLVMIFDSAnalysisDomainDefault>;
 
 template <>
 struct DefaultAnalysisPrinterSelector<LLVMIFDSAnalysisDomainDefault>
     : type_identity<DefaultLLVMAnalysisPrinter<LLVMIFDSAnalysisDomainDefault>> {
 };
+
+template <>
+struct DefaultAnalysisPrinterSelector<IDEExtendedTaintAnalysisDomain>
+    : type_identity<
+          DefaultLLVMAnalysisPrinter<IDEExtendedTaintAnalysisDomain>> {};
 
 } // namespace psr
 

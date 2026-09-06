@@ -7,3 +7,9 @@ int main() {
   doFree(X);
   free(X);
 }
+
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/taint_analysis/double_free_02_c_dbg.ll --analysis-config %S/../../../config/double-free-config.json | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
+// ifds-taint: /taint_analysis/double_free_02.c:8:3:
+
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-fieldsens-taint --module %S/../../../build/test/llvm_test_code/taint_analysis/double_free_02_c_dbg.ll --analysis-config %S/../../../config/double-free-config.json | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-fieldsens-taint
+// ifds-fieldsens-taint: /taint_analysis/double_free_02.c:8:3:

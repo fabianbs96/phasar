@@ -26,5 +26,8 @@ int main() {
   disposeSource(src);
 }
 
-// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint15_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
-// CHECK: A LLVM-based static analysis framework
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint15_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
+// ifds-taint: A LLVM-based static analysis framework
+
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-fieldsens-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint15_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-fieldsens-taint
+// ifds-fieldsens-taint: A LLVM-based static analysis framework

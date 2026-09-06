@@ -17,5 +17,8 @@ int main([[clang::annotate("psr.source")]] int argc, char *argv[]) {
   sink(x);
 }
 
-// RUN: phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint19_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s
-// CHECK: /xtaint/xtaint19.cpp:17:3:
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint19_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
+// ifds-taint: /xtaint/xtaint19.cpp:17:3:
+
+// RUN: %S/../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-fieldsens-taint --module %S/../../../build/test/llvm_test_code/xtaint/xtaint19_cpp_dbg.ll | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-fieldsens-taint
+// ifds-fieldsens-taint: /xtaint/xtaint19.cpp:17:3:
