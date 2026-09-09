@@ -446,8 +446,10 @@ if (BUILD_SWIFT_TESTS)
   enable_language(Swift)
 endif(BUILD_SWIFT_TESTS)
 
-# LLVM Integrated Tester (LIT)
-option(CHECK_PHASAR_CLI "Runs end-to-end tests for the phasar-cli" OFF)
+# Run tests for phasar-cli using LLVM Integrated Tester (LIT)
+add_custom_target(check-phasar-cli
+  COMMAND lit -v "${CMAKE_SOURCE_DIR}/test/llvm_test_code/"
+)
 
 # Add Phasar unittests and build all IR test code
 if (PHASAR_BUILD_UNITTESTS)
