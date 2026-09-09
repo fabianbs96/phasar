@@ -58,26 +58,12 @@ struct LLVMAnalysisDomainDefault : public AnalysisDomain {
 using LLVMIFDSAnalysisDomainDefault =
     WithBinaryValueDomain<LLVMAnalysisDomainDefault>;
 
-/// \brief An AnalysisDomain that specializes sensible defaults for LLVM-based
-/// IDE analysis
-struct IDEExtendedTaintAnalysisDomain : public LLVMAnalysisDomainDefault {
-  using d_t = AbstractMemoryLocation;
-  /// Nullptr means tainted, nonnull llvm::Instruction* refers to a
-  /// sanitizer on the current path, Bottom means sanitized on all paths.
-  using l_t = XTaint::EdgeDomain;
-};
-
 extern template class DefaultLLVMAnalysisPrinter<LLVMIFDSAnalysisDomainDefault>;
 
 template <>
 struct DefaultAnalysisPrinterSelector<LLVMIFDSAnalysisDomainDefault>
     : type_identity<DefaultLLVMAnalysisPrinter<LLVMIFDSAnalysisDomainDefault>> {
 };
-
-template <>
-struct DefaultAnalysisPrinterSelector<IDEExtendedTaintAnalysisDomain>
-    : type_identity<
-          DefaultLLVMAnalysisPrinter<IDEExtendedTaintAnalysisDomain>> {};
 
 } // namespace psr
 
