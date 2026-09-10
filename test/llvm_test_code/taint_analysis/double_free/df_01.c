@@ -5,3 +5,12 @@ int main() {
   free(foo); // vulnerability
   return 0;
 }
+
+// RUN: %S/../../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ide-xtaint --module %S/../../../../build/test/llvm_test_code/taint_analysis/double_free/df_01_c_dbg.ll --analysis-config %S/../../../../config/double-free-config.json | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=xtaint
+// xtaint: /taint_analysis/double_free/df_01.c:5:3:
+
+// RUN: %S/../../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-taint --module %S/../../../../build/test/llvm_test_code/taint_analysis/double_free/df_01_c_dbg.ll --analysis-config %S/../../../../config/double-free-config.json | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-taint
+// ifds-taint: /taint_analysis/double_free/df_01.c:5:3:
+
+// RUN: %S/../../../../build/tools/phasar-cli/phasar-cli --data-flow-analysis=ifds-fieldsens-taint --module %S/../../../../build/test/llvm_test_code/taint_analysis/double_free/df_01_c_dbg.ll --analysis-config %S/../../../../config/double-free-config.json | /usr/local/llvm-16/bin/FileCheck %s -check-prefix=ifds-fieldsens-taint
+// ifds-fieldsens-taint: /taint_analysis/double_free/df_01.c:5:3:
