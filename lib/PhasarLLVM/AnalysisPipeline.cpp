@@ -49,10 +49,6 @@ LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
   case AliasAnalysisType::CFLSteens:
   case AliasAnalysisType::CFLAnders:
     return std::make_unique<LLVMAliasSet>(&IRDB, true, AATy);
-  case AliasAnalysisType::PointsTo:
-    llvm::WithColor::error()
-        << "AliasAnalysisType::PointsTo not implemented yet\n";
-    llvm::report_fatal_error("AliasAnalysisType::PointsTo not implemented");
   case AliasAnalysisType::UnionFind:
     if (!BaseCG) {
       llvm::WithColor::error()
@@ -63,6 +59,11 @@ LLVMAliasInfo AliasInfoStage::buildImpl(LLVMProjectIRDB &IRDB,
     return std::make_unique<LLVMUnionFindAliasSet>(
         &IRDB, BaseCG->getCallGraph(),
         LLVMUnionFindAliasSet::Config{.AType = UFAATy});
+  case AliasAnalysisType::PointsTo:
+  case AliasAnalysisType::AndersenOTF:
+  case AliasAnalysisType::AndersenOTFCtx:
+  case AliasAnalysisType::AndersenOTFDynCtx:
+    llvm::report_fatal_error("TODO: implement");
   case AliasAnalysisType::Invalid:
     llvm::report_fatal_error("Invalid AliasAnalysisType");
     break;

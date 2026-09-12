@@ -14,6 +14,7 @@
 #include "phasar/PhasarLLVM/AnalysisPipeline.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/DataFlow/TaintResults.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
@@ -76,23 +77,24 @@ int main(int Argc, const char **Argv) {
     auto Pipeline = phasarInput(Argv[1])
                         .with<EntryFunctionsInput>()
                         .with<AndersenAliasInfoInput>()
-                        // .with(TaintConfigStage{})
+                        .with<TaintConfigInput>()
+                        .with<IfdsIdeAnalysisInput<IFDSTaintAnalysis>>()
                         // .with(DataflowAnalysisStage{
                         //     std::type_identity<IFDSTaintAnalysis>{}})
                         .shared();
 
-    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMBasedICFG>
+    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMBasedICFG,
+                            analysis_input::EntryPoints, TaintResults>
         GI = &Pipeline;
 
     static_assert(!CanEfficientlyPassByValue<psr::LLVMBasedICFG>);
-    auto &IRB = analysis_input::getResult<LLVMProjectIRDB>(GI);
+    auto &IRDB = analysis_input::getResult<LLVMProjectIRDB>(GI);
     auto AI = analysis_input::getResult<LLVMAliasInfoRef>(GI);
     auto &ICF = analysis_input::getResult<LLVMBasedICFG>(GI);
-
-    // Pipeline.solve();
+    auto &Leaks = analysis_input::getResult<TaintResults>(GI);
 
     llvm::outs() << "AnalysisInput Taint Analysis elapsed: " << Tm.elapsed()
-                 << '\n';
+                 << "; Found " << Leaks.size() << " leaks" << '\n';
   }
 
   return 0;

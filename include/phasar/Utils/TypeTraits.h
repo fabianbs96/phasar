@@ -117,6 +117,12 @@ template <typename T>
 concept is_pair_v = detail::is_pair<T>::value; // NOLINT
 
 template <typename T>
+concept IsPairLike = requires(T &Val) {
+  Val.first;
+  Val.second;
+};
+
+template <typename T>
 concept is_tuple_v = detail::is_tuple<T>::value; // NOLINT
 
 template <typename T, typename OS>

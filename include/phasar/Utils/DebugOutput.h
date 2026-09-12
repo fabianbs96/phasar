@@ -63,7 +63,7 @@ template <typename OS_t, typename T> void printHelper(OS_t &OS, const T &Data) {
     OS << psr::adl_to_string(Data);
   } else if constexpr (std::is_enum_v<ElemTy>) {
     OS << std::underlying_type_t<ElemTy>(Data);
-  } else if constexpr (is_pair_v<ElemTy>) {
+  } else if constexpr (IsPairLike<ElemTy>) {
     OS << "(";
     printHelper(OS, Data.first);
     OS << ", ";

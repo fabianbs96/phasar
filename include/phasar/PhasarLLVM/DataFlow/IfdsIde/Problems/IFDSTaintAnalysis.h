@@ -10,10 +10,12 @@
 #ifndef PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IFDSTAINTANALYSIS_H
 #define PHASAR_PHASARLLVM_DATAFLOW_IFDSIDE_PROBLEMS_IFDSTAINTANALYSIS_H
 
+#include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/DataFlow/IfdsIde/IfdsIdeProblemMixin.h"
 #include "phasar/DataFlow/IfdsIde/InitialSeeds.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
+#include "phasar/PhasarLLVM/DataFlow/TaintResults.h"
 #include "phasar/PhasarLLVM/Domain/LLVMAnalysisDomain.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Utils/LLVMFunctionDataFlowFacts.h"
@@ -56,13 +58,31 @@ public:
   using ConfigurationTy = LLVMTaintConfig;
 
   /// Holds all leaks found during the analysis
-  std::map<n_t, std::set<d_t>> Leaks;
+  TaintResults Leaks;
 
   IFDSTaintAnalysis(const LLVMProjectIRDB *IRDB, LLVMAliasInfoRef PT,
                     const LLVMTaintConfig *Config,
                     std::vector<std::string> EntryPoints = {"main"},
                     bool TaintMainArgs = true,
                     bool EnableStrongUpdateStore = true);
+
+  IFDSTaintAnalysis(
+      AnalysisInputOf<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMTaintConfig,
+                      analysis_input::EntryPoints> auto &Inp,
+      bool TaintMainArgs = true, bool EnableStrongUpdates = true)
+      : IFDSTaintAnalysis{
+            &analysis_input::getResult<LLVMProjectIRDB>(Inp),
+            analysis_input::getResult<LLVMAliasInfoRef>(Inp),
+            &analysis_input::getResult<LLVMTaintConfig>(Inp),
+            analysis_input::getResult<analysis_input::EntryPoints>(Inp),
+            TaintMainArgs,
+            EnableStrongUpdates,
+        } {}
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<TaintResults> /*unused*/) noexcept {
+    return Leaks;
+  }
 
   FlowFunctionPtrType getNormalFlowFunction(n_t Curr, n_t Succ);
 

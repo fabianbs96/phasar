@@ -7,6 +7,7 @@
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/DefaultAllocSitesAwareIDEProblem.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/LLVMZeroValue.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/DataFlow/TaintResults.h"
 #include "phasar/PhasarLLVM/Pointer/FilteredLLVMAliasSet.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
@@ -24,6 +25,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 
 namespace {
 
@@ -131,7 +133,7 @@ public:
     });
   }
 
-  llvm::DenseMap<n_t, std::set<d_t>> Leaks{};
+  psr::TaintResults Leaks{};
 
 private:
   const psr::LLVMTaintConfig *Config{};
@@ -192,12 +194,11 @@ protected:
     std::map<const llvm::Instruction *, std::set<const llvm::Value *>>
         ComputedLeaks;
 
-    for (auto IIt = TaintProblem.Leaks.begin(), End = TaintProblem.Leaks.end();
-         IIt != End;) {
-      auto It = IIt++;
-      const auto &[LeakInst, LeakFacts] = *It;
-
-      ASSERT_EQ(LeakFacts.size(), 1);
+    erase_if(TaintProblem.Leaks, [&](const auto *LeakInst,
+                                     const auto &LeakFacts) {
+      if (LeakFacts.size() != 1) {
+        throw std::runtime_error("Expect only one leaking fact per inst");
+      }
       const auto *LeakFact = *LeakFacts.begin();
 
       const auto &Res = Results.resultAt(LeakInst, LeakFact);
@@ -207,12 +208,12 @@ protected:
                        << "; because leaking fact "
                        << psr::llvmIRToShortString(LeakFact)
                        << " has empty set of access-paths: " << Res << '\n';
-          TaintProblem.Leaks.erase(It);
-          continue;
+          return true;
         }
       }
       ComputedLeaks[LeakInst].insert(LeakFact);
-    }
+      return false;
+    });
 
     EXPECT_EQ(GroundTruthEntries, ComputedLeaks);
     if (ShouldDumpResults || HasFailure()) {

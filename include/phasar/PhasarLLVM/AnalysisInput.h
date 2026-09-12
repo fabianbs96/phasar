@@ -11,6 +11,11 @@
 
 #include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
+#include "phasar/DataFlow/IfdsIde/IFDSProblem.h"
+#include "phasar/DataFlow/IfdsIde/Solver/GenericSolverResults.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IdBasedSolverResults.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
+#include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
 #include "phasar/PhasarLLVM/ControlFlow/GlobalCtorsDtorsModel.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
@@ -21,9 +26,11 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointerAssignmentGraph.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMRawAliasSet.h"
+#include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/DIBasedTypeHierarchy.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMVFTable.h"
 #include "phasar/Pointer/UnionFindAliasAnalysisType.h"
+#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/Soundness.h"
 #include "phasar/Utils/ValueCompressor.h"
 
@@ -31,6 +38,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/WithColor.h"
 
+#include <concepts>
 #include <memory>
 
 namespace psr {
@@ -255,6 +263,61 @@ private:
   LLVMRawAliasSet AI;
 };
 
+class TaintConfigInput {
+public:
+  explicit TaintConfigInput(AnalysisInputOf<LLVMProjectIRDB> auto &Inp)
+      : Config(analysis_input::getResult<LLVMProjectIRDB>(Inp)) {}
+
+  explicit TaintConfigInput(AnalysisInputOf<LLVMProjectIRDB> auto &Inp,
+                            const TaintConfigData &TC)
+      : Config(analysis_input::getResult<LLVMProjectIRDB>(Inp), TC) {}
+
+  [[nodiscard]] LLVMTaintConfig &
+  getResult(AnalysisResultTag<LLVMTaintConfig> /*unused*/) noexcept {
+    return Config;
+  }
+
+private:
+  LLVMTaintConfig Config;
+};
+
+template <IFDSProblem ProblemT> class IfdsIdeAnalysisInput : public ProblemT {
+public:
+  using typename ProblemT::d_t;
+  using typename ProblemT::n_t;
+  using l_t =
+      detail::ValueDomainAdder<typename ProblemT::ProblemAnalysisDomain>::l_t;
+
+  template <AnalysisInputOf<LLVMBasedICFG> InpT, typename... Ts>
+    requires std::constructible_from<ProblemT, InpT &, Ts...>
+  explicit IfdsIdeAnalysisInput(InpT &Inp, Ts &&...Args)
+      : ProblemT(Inp, PSR_FWD(Args)...), RawResults([&Inp](ProblemT &Problem) {
+          IterativeIDESolver Solver(
+              &Problem, &analysis_input::getResult<LLVMBasedICFG>(Inp));
+          return std::move(Solver).solve();
+        }(*this)) {}
+
+  template <typename ResultT>
+    requires detail::ProvidesResult<ProblemT, ResultT>
+  [[nodiscard]] ResultT &getResult(AnalysisResultTag<ResultT> Tag) {
+    // Note: Cannot just using::ProblemT::getResult; -- this won't compile if
+    // ProblemT provides no result
+    return static_cast<ProblemT &>(*this).getResult(Tag);
+  }
+
+  [[nodiscard]] IdBasedSolverResults<n_t, d_t, l_t>
+  getResult(AnalysisResultTag<IdBasedSolverResults<n_t, d_t, l_t>> /*unused*/) {
+    return RawResults;
+  }
+
+  [[nodiscard]] GenericSolverResults<n_t, d_t, l_t>
+  getResult(AnalysisResultTag<GenericSolverResults<n_t, d_t, l_t>> /*unused*/) {
+    return RawResults.get();
+  }
+
+private:
+  OwningIdBasedSolverResults<n_t, d_t, l_t> RawResults;
+};
 // TODO: More
 
 namespace detail {

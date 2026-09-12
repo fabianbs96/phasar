@@ -95,7 +95,7 @@ TEST_P(TaintAnalysis, LeaksWithAndWithoutAliasFilteringEqual) {
     }
 
     for (const auto *LeakFact : LeakFacts) {
-      EXPECT_TRUE(It->second.count(LeakFact))
+      EXPECT_TRUE(It->second.contains(LeakFact))
           << "Expected to find leak-fact " + llvmIRToShortString(LeakFact) +
                  " at " + llvmIRToString(LeakInst);
     }
