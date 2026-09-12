@@ -51,6 +51,10 @@ int main(int Argc, const char **Argv) {
       return 1;
     }
 
+    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMBasedICFG,
+                            analysis_input::EntryPoints>
+        GI = &HA;
+
     LLVMTaintConfig TC(HA.getProjectIRDB());
     auto TA = createAnalysisProblem<IFDSTaintAnalysis>(HA, &TC);
     solveIFDSProblem(TA, HA.getICFG());

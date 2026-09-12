@@ -53,6 +53,9 @@ static constexpr int indexOfMatchingStage() noexcept {
 
 } // namespace detail
 
+template <typename AnalysisInputT, typename... Ts>
+concept AnalysisInputOf = (detail::ProvidesResult<AnalysisInputT, Ts> && ...);
+
 template <typename Prefix> class SharedAnalysisInput;
 
 template <typename... StagesT> class AnalysisInputImpl {
@@ -159,7 +162,7 @@ private:
 
 template <typename... ResultTs> class [[gsl::Pointer]] GenericAnalysisInputRef {
 public:
-  template <typename AnalysisInputT>
+  template <AnalysisInputOf<ResultTs...> AnalysisInputT>
   constexpr GenericAnalysisInputRef(
       AnalysisInputT *Input PSR_LIFETIMEBOUND) noexcept
       : VT(&VTableFor<AnalysisInputT>), Data(&assertNotNull(Input)) {}
@@ -219,9 +222,6 @@ private:
   const VTable *VT{};
   void *Data{};
 };
-
-template <typename AnalysisInputT, typename... Ts>
-concept AnalysisInputOf = (detail::ProvidesResult<AnalysisInputT, Ts> && ...);
 
 namespace analysis_input {
 

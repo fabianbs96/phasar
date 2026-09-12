@@ -10,6 +10,7 @@
 #ifndef PHASAR_PHASARLLVM_HELPERANALYSES_H
 #define PHASAR_PHASARLLVM_HELPERANALYSES_H
 
+#include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/ControlFlow/CallGraphData.h"
 #include "phasar/PhasarLLVM/HelperAnalysisConfig.h"
@@ -79,8 +80,49 @@ public:
   [[nodiscard]] const SCCDependencyGraph<FunctionId> &getCGSCCCallers();
   [[nodiscard]] const UsedGlobalsHolder<const llvm::GlobalVariable *> &
   getUsedGlobals();
-  [[nodiscard]] const std::vector<std::string> &
+  [[nodiscard]] const analysis_input::EntryPoints &
   getEntryPoints() const noexcept {
+    return EntryPoints;
+  }
+
+  // Compatibility with AnalysisInputOf concept
+
+  [[nodiscard]] auto &getResult(AnalysisResultTag<LLVMProjectIRDB> /*unused*/) {
+    return getProjectIRDB();
+  }
+  [[nodiscard]] auto getResult(AnalysisResultTag<LLVMAliasInfoRef> /*unused*/) {
+    return getAliasInfo();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<DIBasedTypeHierarchy> /*unused*/) {
+    return getTypeHierarchy();
+  }
+  [[nodiscard]] auto &getResult(AnalysisResultTag<LLVMBasedICFG> /*unused*/) {
+    return getICFG();
+  }
+  [[nodiscard]] auto &getResult(AnalysisResultTag<LLVMBasedCFG> /*unused*/) {
+    return getCFG();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<
+            FunctionCompressor<const llvm::Function *>> /*unused*/) {
+    return getCompressedFunctions();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<SCCHolder<FunctionId>> /*unused*/) {
+    return getCGSCCs();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<SCCDependencyGraph<FunctionId>> /*unused*/) {
+    return getCGSCCCallers();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<
+            UsedGlobalsHolder<const llvm::GlobalVariable *>> /*unused*/) {
+    return getUsedGlobals();
+  }
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<analysis_input::EntryPoints> /*unused*/) {
     return EntryPoints;
   }
 
@@ -106,7 +148,7 @@ private:
 
   // ICF
   std::optional<CallGraphData> PrecomputedCG;
-  std::vector<std::string> EntryPoints;
+  analysis_input::EntryPoints EntryPoints;
   CallGraphAnalysisType CGTy{};
   Soundness SoundnessLevel{};
   bool AutoGlobalSupport{};
