@@ -332,12 +332,12 @@ namespace detail {
 } // namespace detail
 
 [[nodiscard]] inline auto phasarInputRoot(const llvm::Twine &IRFile) {
-  return AnalysisInputImpl<AnalysisInputRoot, IRDBInput>(
-      {}, std::make_unique<IRDBInput>(IRFile));
+  return AnalysisInputImpl<IRDBInput>(
+      std::tuple{std::make_unique<IRDBInput>(IRFile)});
 }
 [[nodiscard]] inline auto phasarInputRoot(llvm::Module *IRModule) {
-  return AnalysisInputImpl<AnalysisInputRoot, IRDBInput>(
-      {}, std::make_unique<IRDBInput>(IRModule));
+  return AnalysisInputImpl<IRDBInput>(
+      std::tuple{std::make_unique<IRDBInput>(IRModule)});
 }
 
 [[nodiscard]] inline auto phasarInput(const llvm::Twine &IRFile) {

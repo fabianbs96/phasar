@@ -31,7 +31,21 @@ static constexpr int indexOfResult() noexcept {
   int Result = -1;
   for (size_t Idx = 0; Idx < sizeof...(StageTs); ++Idx) {
     if (Matches[Idx]) {
-      Result = static_cast<int>(Idx);
+      // return last index
+      Result = int(Idx);
+    }
+  }
+  return Result;
+}
+
+template <typename ResultT, typename... StageTs>
+static constexpr int indexOfMatchingStage() noexcept {
+  constexpr bool Matches[] = {ProvidesResult<StageTs, ResultT>...};
+  int Result = -1;
+  for (size_t Idx = 0; Idx < sizeof...(StageTs); ++Idx) {
+    if (Matches[Idx]) {
+      // return last index
+      Result = int(Idx);
     }
   }
   return Result;
@@ -39,41 +53,31 @@ static constexpr int indexOfResult() noexcept {
 
 } // namespace detail
 
-class AnalysisInputRoot {
-public:
-  template <typename T> constexpr void getResult(...) = delete;
-  template <typename T = void>
-  constexpr std::nullptr_t getResultOrNull(...) noexcept {
-    return {};
-  }
-};
-
 template <typename Prefix> class SharedAnalysisInput;
 
-template <typename Prefix, typename StageT>
-class AnalysisInputImpl : private Prefix {
+template <typename... StagesT> class AnalysisInputImpl {
 public:
-  explicit AnalysisInputImpl(Prefix Prev, std::unique_ptr<StageT> Top)
-      : Prefix(std::move(Prev)), TopStage(std::move(Top)) {}
+  using TupT = std::tuple<std::unique_ptr<StagesT>...>;
+
+  explicit AnalysisInputImpl(TupT &&Tup) noexcept : Stages(std::move(Tup)) {}
 
   template <typename T>
+    requires(detail::indexOfMatchingStage<T, StagesT...>() >= 0)
   [[nodiscard]] constexpr decltype(auto)
   getResult(AnalysisResultTag<T> Tag = {}) noexcept {
-    if constexpr (detail::ProvidesResult<StageT, T>) {
-      return TopStage->getResult(Tag);
-    } else {
-      static_assert(detail::ProvidesResult<Prefix, T>);
-      return static_cast<Prefix &>(*this).getResult(Tag);
-    }
+    constexpr int Idx = detail::indexOfMatchingStage<T, StagesT...>();
+    return std::get<Idx>(Stages)->getResult(Tag);
   }
 
   template <typename T>
   [[nodiscard]] constexpr auto
   getResultOrNull(AnalysisResultTag<T> Tag = {}) noexcept {
-    if constexpr (detail::ProvidesResult<StageT, T>) {
-      return &TopStage->getResult(Tag);
+    constexpr int Idx = detail::indexOfMatchingStage<T, StagesT...>();
+
+    if constexpr (Idx >= 0) {
+      return &std::get<Idx>(Stages)->getResult(Tag);
     } else {
-      return static_cast<Prefix &>(*this).getResultOrNull(Tag);
+      return nullptr;
     }
   }
 
@@ -92,8 +96,8 @@ public:
 
   template <typename NextStageT>
   [[nodiscard]] auto withValue(std::unique_ptr<NextStageT> Next) && {
-    return AnalysisInputImpl<AnalysisInputImpl, NextStageT>(std::move(*this),
-                                                            std::move(Next));
+    return AnalysisInputImpl<StagesT..., NextStageT>(
+        std::tuple_cat(std::move(Stages), std::make_tuple(std::move(Next))));
   }
 
   [[nodiscard]] auto shared() && {
@@ -101,7 +105,7 @@ public:
   }
 
 private:
-  std::unique_ptr<StageT> TopStage;
+  [[no_unique_address]] TupT Stages;
 };
 
 template <typename Prefix> class SharedAnalysisInput {
@@ -143,8 +147,8 @@ public:
 
   template <typename NextStageT>
   [[nodiscard]] auto withValue(std::unique_ptr<NextStageT> Next) {
-    return AnalysisInputImpl<SharedAnalysisInput, NextStageT>(*this,
-                                                              std::move(Next));
+    return AnalysisInputImpl<SharedAnalysisInput, NextStageT>(
+        std::make_tuple(*this, std::move(Next)));
   }
 
   [[nodiscard]] SharedAnalysisInput shared() const noexcept { return *this; }
