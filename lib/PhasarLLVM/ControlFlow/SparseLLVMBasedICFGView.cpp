@@ -8,52 +8,16 @@
 
 using namespace psr;
 
+namespace psr {
+template class LLVMBasedICFGViewMixin<SparseLLVMBasedICFGView>;
+} // namespace psr
+
 SparseLLVMBasedICFGView::SparseLLVMBasedICFGView(const LLVMBasedICFG *ICF,
                                                  LLVMAliasInfoRef PT)
-    : ICF(ICF), SparseCFGCache(new SVFGCache{}), AliasAnalysis(PT) {}
+    : LLVMBasedICFGViewMixin(ICF), SparseCFGCache(new SVFGCache{}),
+      AliasAnalysis(PT) {}
 
 SparseLLVMBasedICFGView::~SparseLLVMBasedICFGView() = default;
-
-FunctionRange SparseLLVMBasedICFGView::getAllFunctionsImpl() const {
-  return ICF->getAllFunctions();
-}
-
-auto SparseLLVMBasedICFGView::getFunctionImpl(llvm::StringRef Fun) const
-    -> f_t {
-  return ICF->getFunction(Fun);
-};
-
-bool SparseLLVMBasedICFGView::isIndirectFunctionCallImpl(n_t Inst) const {
-  return ICF->isIndirectFunctionCall(Inst);
-}
-
-bool SparseLLVMBasedICFGView::isVirtualFunctionCallImpl(n_t Inst) const {
-  return ICF->isVirtualFunctionCall(Inst);
-}
-
-auto SparseLLVMBasedICFGView::allNonCallStartNodesImpl() const
-    -> std::vector<n_t> {
-  return ICF->allNonCallStartNodes();
-}
-
-auto SparseLLVMBasedICFGView::getCallsFromWithinImpl(f_t Fun) const
-    -> llvm::SmallVector<n_t> {
-  return ICF->getCallsFromWithin(Fun);
-}
-
-auto SparseLLVMBasedICFGView::getReturnSitesOfCallAtImpl(n_t Inst) const
-    -> llvm::SmallVector<n_t, 2> {
-  return ICF->getReturnSitesOfCallAt(Inst);
-}
-
-void SparseLLVMBasedICFGView::printImpl(llvm::raw_ostream &OS) const {
-  ICF->print(OS);
-}
-
-auto SparseLLVMBasedICFGView::getCallGraphImpl() const noexcept
-    -> const CallGraph<n_t, f_t> & {
-  return ICF->getCallGraph();
-}
 
 const SparseLLVMBasedCFG &
 SparseLLVMBasedICFGView::getSparseCFGImpl(const llvm::Function *Fun,
@@ -66,8 +30,4 @@ auto SparseLLVMBasedICFGView::advanceToNextUserImpl(n_t Succ, v_t Fact) const
     -> n_t {
   assert(SparseCFGCache != nullptr);
   return SparseCFGCache->advanceToNextUser(Succ, Fact, AliasAnalysis);
-}
-
-size_t SparseLLVMBasedICFGView::getNumCallSitesImpl() const noexcept {
-  return ICF->getNumCallSites();
 }

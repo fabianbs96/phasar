@@ -100,6 +100,13 @@ bool SparsePointsToControlFlow<PTRef>::shouldKeepInst(
     return true;
   }
 
+  // If Val itself never escapes, nothing but a direct reference to it
+  // (Op == Val, checked below) can ever reach its memory.
+  bool ValNonEscaping = false;
+  if constexpr (std::is_convertible_v<o_t, v_t>) {
+    ValNonEscaping = detail::isNonAddressTakenVariable(v_t(Val));
+  }
+
   for (const auto *Op : Inst->operand_values()) {
     o_t OpObj = PT.asAbstractObject(Op);
     if (OpObj == Val) {
@@ -107,6 +114,10 @@ bool SparsePointsToControlFlow<PTRef>::shouldKeepInst(
     }
     if (!Op->getType()->isPointerTy()) {
       // Non-pointers cannot influence Val
+      continue;
+    }
+    if (ValNonEscaping || detail::isNonAddressTakenVariable(Op)) {
+      // Op cannot reach anything but its own object, already ruled out above
       continue;
     }
 

@@ -135,6 +135,7 @@ private:
   std::optional<llvm::DenseSet<o_t>> GlobalObjects;
 };
 
+// for backwards compatibility
 struct SVFGCache : SparseCFGCache<SparseLLVMControlFlow, LLVMAliasInfoRef> {};
 
 } // namespace psr

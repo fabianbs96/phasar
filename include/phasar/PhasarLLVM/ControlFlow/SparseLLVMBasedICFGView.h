@@ -13,9 +13,9 @@
 #include "phasar/ControlFlow/CallGraph.h"
 #include "phasar/ControlFlow/ICFGBase.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFGViewMixin.h"
 #include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedCFGProvider.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
-#include "phasar/PhasarLLVM/Utils/LLVMBasedContainerConfig.h"
 
 #include <memory>
 
@@ -40,7 +40,8 @@ struct CFGTraits<SparseLLVMBasedICFGView> : CFGTraits<LLVMBasedCFG> {};
 class SparseLLVMBasedICFGView
     : public LLVMBasedCFG,
       public ICFGBase<SparseLLVMBasedICFGView>,
-      public SparseLLVMBasedCFGProvider<SparseLLVMBasedICFGView> {
+      public SparseLLVMBasedCFGProvider<SparseLLVMBasedICFGView>,
+      public LLVMBasedICFGViewMixin<SparseLLVMBasedICFGView> {
   friend ICFGBase;
   friend SparseLLVMBasedCFGProvider<SparseLLVMBasedICFGView>;
 
@@ -48,13 +49,10 @@ public:
   using typename LLVMBasedCFG::f_t;
   using typename LLVMBasedCFG::n_t;
 
-  explicit SparseLLVMBasedICFGView(const LLVMBasedICFG *ICF,
-                                   LLVMAliasInfoRef PT);
+  explicit SparseLLVMBasedICFGView(const LLVMBasedICFG *ICF PSR_LIFETIMEBOUND,
+                                   LLVMAliasInfoRef PT PSR_LIFETIMEBOUND);
 
   ~SparseLLVMBasedICFGView();
-
-  // To make the IDESolver happy...
-  operator const LLVMBasedICFG &() const noexcept { return *ICF; }
 
   [[nodiscard]] n_t advanceToNextUser(n_t Succ, const auto &Fact) const {
     using psr::valueOf;
@@ -62,26 +60,11 @@ public:
   }
 
 private:
-  [[nodiscard]] FunctionRange getAllFunctionsImpl() const;
-  [[nodiscard]] f_t getFunctionImpl(llvm::StringRef Fun) const;
-
-  [[nodiscard]] bool isIndirectFunctionCallImpl(n_t Inst) const;
-  [[nodiscard]] bool isVirtualFunctionCallImpl(n_t Inst) const;
-  [[nodiscard]] std::vector<n_t> allNonCallStartNodesImpl() const;
-  [[nodiscard]] llvm::SmallVector<n_t> getCallsFromWithinImpl(f_t Fun) const;
-  [[nodiscard]] llvm::SmallVector<n_t, 2>
-  getReturnSitesOfCallAtImpl(n_t Inst) const;
-  void printImpl(llvm::raw_ostream &OS) const;
-  [[nodiscard]] const CallGraph<n_t, f_t> &getCallGraphImpl() const noexcept;
-
   [[nodiscard]] const SparseLLVMBasedCFG &
   getSparseCFGImpl(const llvm::Function *Fun, const llvm::Value *Val) const;
 
   [[nodiscard]] n_t advanceToNextUserImpl(n_t Succ, v_t Fact) const;
 
-  [[nodiscard]] size_t getNumCallSitesImpl() const noexcept;
-
-  const LLVMBasedICFG *ICF{};
   std::unique_ptr<SVFGCache> SparseCFGCache;
   LLVMAliasInfoRef AliasAnalysis;
 };
