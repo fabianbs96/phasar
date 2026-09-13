@@ -6,6 +6,7 @@ set(IfdsIdeSources
   EdgeFunctionSingletonCacheTest.cpp
   InteractiveIDESolverTest.cpp
   SparseIDESolverTest.cpp
+  SparsePointsToIDESolverTest.cpp
   IterativeIDESolverTest.cpp
   CFLFieldSensTest.cpp
   WPDSSolverTest.cpp

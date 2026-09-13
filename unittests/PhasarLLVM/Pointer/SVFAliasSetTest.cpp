@@ -13,7 +13,7 @@ using namespace psr;
 
 TEST(SVFAliasSetTest, Alias_01) {
   LLVMProjectIRDB IRDB(unittest::PathToLLTestFiles +
-                       "pointers/basic_01_cpp_dbg.ll");
+                       "pointers/basic_01_c_dbg.ll");
 
   LLVMAliasSet AS(&IRDB, false, AliasAnalysisType::SVFVFS);
 
@@ -30,7 +30,7 @@ TEST(SVFAliasSetTest, Alias_01) {
 
 TEST(SVFAliasSetTest, Alias_02) {
   LLVMProjectIRDB IRDB(unittest::PathToLLTestFiles +
-                       "pointers/basic_01_cpp_dbg.ll");
+                       "pointers/basic_01_c_dbg.ll");
 
   LLVMAliasSet AS(&IRDB, false, AliasAnalysisType::SVFDDA);
 
@@ -47,7 +47,7 @@ TEST(SVFAliasSetTest, Alias_02) {
 
 TEST(SVFAliasSetTest, PointsTo_01) {
   LLVMProjectIRDB IRDB(unittest::PathToLLTestFiles +
-                       "pointers/basic_01_cpp_dbg.ll");
+                       "pointers/basic_01_c_dbg.ll");
 
   auto PT = createSVFVFSPointsToInfo(IRDB);
 
@@ -68,7 +68,7 @@ TEST(SVFAliasSetTest, PointsTo_01) {
 
 TEST(SVFAliasSetTest, PointsTo_02) {
   LLVMProjectIRDB IRDB(unittest::PathToLLTestFiles +
-                       "pointers/basic_01_cpp_dbg.ll");
+                       "pointers/basic_01_c_dbg.ll");
 
   auto PT = createSVFDDAPointsToInfo(IRDB);
 
@@ -89,7 +89,7 @@ TEST(SVFAliasSetTest, PointsTo_02) {
 
 TEST(SVFAliasSetTest, PointsTo_03) {
   LLVMProjectIRDB IRDB(unittest::PathToLLTestFiles +
-                       "pointers/basic_01_cpp_dbg.ll");
+                       "pointers/basic_01_c_dbg.ll");
 
   auto PT = createLLVMSVFPointsToIterator(IRDB, SVFPointsToAnalysisType::VFS);
 

@@ -27,7 +27,7 @@ template <> struct CFGTraits<SparseLLVMBasedCFG> : CFGTraits<LLVMBasedCFG> {
 /// CFGBase CRTP interface.
 class SparseLLVMBasedCFG : public LLVMBasedCFG,
                            public SparseCFGBase<SparseLLVMBasedCFG> {
-  friend struct SVFGCache;
+  template <typename Policy, typename InfoRef> friend class SparseCFGCache;
   friend SparseCFGBase<SparseLLVMBasedCFG>;
 
   using typename LLVMBasedCFG::n_t;

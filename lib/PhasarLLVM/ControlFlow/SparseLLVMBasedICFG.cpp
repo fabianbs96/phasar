@@ -1,21 +1,13 @@
 #include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFG.h"
 
 #include "phasar/ControlFlow/CallGraphData.h"
+#include "phasar/PhasarLLVM/ControlFlow/SparseCFGCache.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
-
-#include "SVFGCache.h"
 
 #include <cassert>
 #include <utility>
 
 using namespace psr;
-
-struct FVHasher {
-  auto operator()(std::pair<const llvm::Function *, const llvm::Value *> FV)
-      const noexcept {
-    return llvm::hash_value(FV);
-  }
-};
 
 SparseLLVMBasedICFG::~SparseLLVMBasedICFG() = default;
 
@@ -47,5 +39,6 @@ SparseLLVMBasedICFG::getSparseCFGImpl(const llvm::Function *Fun,
 
 auto SparseLLVMBasedICFG::advanceToNextUserImpl(n_t Succ, v_t Fact) const
     -> n_t {
-  return SVFGCache::advanceToNextUser(Succ, Fact, AliasAnalysis);
+  assert(SparseCFGCache != nullptr);
+  return SparseCFGCache->advanceToNextUser(Succ, Fact, AliasAnalysis);
 }

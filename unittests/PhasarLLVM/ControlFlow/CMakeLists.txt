@@ -13,9 +13,18 @@ set(ControlFlowSources
   LLVMBasedICFGSerializationTest.cpp
   LLVMVFTableProviderTest.cpp
   VTACallGraphTest.cpp
+  SparsePointsToControlFlowTest.cpp
 )
+
+if (PHASAR_USE_SVF)
+  list(APPEND ControlFlowSources SVFSparsePointsToControlFlowTest.cpp)
+endif()
 
 set(LLVM_LINK_COMPONENTS Linker) # The CtorDtorTest needs the linker
 foreach(TEST_SRC ${ControlFlowSources})
   add_phasar_unittest(${TEST_SRC})
 endforeach(TEST_SRC)
+
+if (PHASAR_USE_SVF)
+  target_link_libraries(SVFSparsePointsToControlFlowTest PRIVATE phasar_llvm_pointer_svf)
+endif()

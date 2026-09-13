@@ -1,9 +1,10 @@
 #include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFGView.h"
 
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
+#include "phasar/PhasarLLVM/ControlFlow/SparseCFGCache.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 
-#include "SVFGCache.h"
+#include <cassert>
 
 using namespace psr;
 
@@ -63,7 +64,8 @@ SparseLLVMBasedICFGView::getSparseCFGImpl(const llvm::Function *Fun,
 
 auto SparseLLVMBasedICFGView::advanceToNextUserImpl(n_t Succ, v_t Fact) const
     -> n_t {
-  return SVFGCache::advanceToNextUser(Succ, Fact, AliasAnalysis);
+  assert(SparseCFGCache != nullptr);
+  return SparseCFGCache->advanceToNextUser(Succ, Fact, AliasAnalysis);
 }
 
 size_t SparseLLVMBasedICFGView::getNumCallSitesImpl() const noexcept {
