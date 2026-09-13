@@ -10,6 +10,8 @@
 #ifndef PHASAR_UTILS_NULLABLE_H
 #define PHASAR_UTILS_NULLABLE_H
 
+#include "phasar/Utils/Macros.h"
+
 #include <cassert>
 #include <optional>
 #include <type_traits>
@@ -24,6 +26,20 @@ concept IsNullable =
 
 template <typename T>
 using Nullable = std::conditional_t<IsNullable<T>, T, std::optional<T>>;
+
+template <typename T>
+using NullableRef =
+    std::conditional_t<std::is_reference_v<T>, std::remove_reference_t<T> *,
+                       Nullable<T>>;
+
+template <typename T>
+[[nodiscard]] constexpr NullableRef<T> makeNullableRef(T &&Val) noexcept {
+  if constexpr (std::is_reference_v<T>) {
+    return &Val;
+  } else {
+    return {PSR_FWD(Val)};
+  }
+}
 
 template <typename T>
   requires IsNullable<T>
@@ -50,6 +66,16 @@ template <typename T>
   assert(Val && "Unwrapping nullopt!");
   return *Val;
 }
+
+template <typename T>
+[[nodiscard]] constexpr auto nullableRefToPtr(T Ref) noexcept
+    -> decltype(&unwrapNullable(Ref)) {
+  if (Ref) {
+    return &unwrapNullable(Ref);
+  }
+  return nullptr;
+}
+
 } // namespace psr
 
 #endif // PHASAR_UTILS_NULLABLE_H

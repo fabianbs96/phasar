@@ -2,6 +2,7 @@
 
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/Macros.h"
+#include "phasar/Utils/Nullable.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -78,7 +79,7 @@ public:
     constexpr int Idx = detail::indexOfMatchingStage<T, StagesT...>();
 
     if constexpr (Idx >= 0) {
-      return &std::get<Idx>(Stages)->getResult(Tag);
+      return psr::makeNullableRef(std::get<Idx>(Stages)->getResult(Tag));
     } else {
       return nullptr;
     }
@@ -132,7 +133,7 @@ public:
   [[nodiscard]] constexpr auto
   getResultOrNull(AnalysisResultTag<T> Tag = {}) noexcept {
     if constexpr (detail::ProvidesResult<Prefix, T>) {
-      return &Rc->P.getResult(Tag);
+      return psr::makeNullableRef(Rc->P.getResult(Tag));
     } else {
       return nullptr;
     }
@@ -178,7 +179,7 @@ public:
   getResultOrNull(AnalysisResultTag<T> Tag = {}) noexcept {
     constexpr auto Idx = detail::indexOfResult<T, ResultTs...>();
     if constexpr (size_t(Idx) < sizeof...(ResultTs)) {
-      return &VT->getResult(Tag);
+      return psr::makeNullableRef(VT->getResult(Tag));
     } else {
       return nullptr;
     }
@@ -245,8 +246,8 @@ template <typename T, typename AnalysisInputT>
 }
 
 template <typename T, typename AnalysisInputT>
-[[nodiscard]] auto getResultOrNull(AnalysisInputT &Inp,
-                                   AnalysisResultTag<T> Tag = {}) {
+[[nodiscard]] IsNullable auto getResultOrNull(AnalysisInputT &Inp,
+                                              AnalysisResultTag<T> Tag = {}) {
   return Inp.getResultOrNull(Tag);
 }
 

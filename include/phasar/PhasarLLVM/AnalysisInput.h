@@ -179,7 +179,7 @@ public:
               analysis_input::getResult<analysis_input::EntryPoints>(Inp);
           auto &VTP = analysis_input::getResult<LLVMVFTableProvider>(Inp);
           auto &TH = analysis_input::getResult<DIBasedTypeHierarchy>(Inp);
-          auto PT = analysis_input::getResultOrNull<LLVMAliasInfo>(Inp);
+          auto PT = analysis_input::getResultOrNull<LLVMAliasInfoRef>(Inp);
           auto BaseCG = analysis_input::getResultOrNull<LLVMBasedICFG>(Inp);
           return buildImpl(IRDB, Entries, VTP, TH, PT, BaseCG, CGTy);
         }(Inp)) {}
