@@ -12,6 +12,7 @@
 #include "phasar/DataFlow/WPDS/RuleProvider.h"
 #include "phasar/DataFlow/WPDS/Solver/WPDSSolverResults.h"
 #include "phasar/Utils/Logger.h"
+#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/NonNullPtr.h"
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/SemiRing.h"
@@ -51,16 +52,17 @@ public:
 
   static constexpr llvm::StringLiteral LogCategory = "RuleBasedSolver";
 
-  explicit WPDSSolver(RuleProviderT *RP, SemiRingT *SR) noexcept
+  explicit WPDSSolver(RuleProviderT *RP PSR_LIFETIMEBOUND,
+                      SemiRingT *SR PSR_LIFETIMEBOUND) noexcept
       : RP(RP), SR(SR) {}
-  explicit WPDSSolver(NonNullPtr<RuleProviderT> RP,
-                      NonNullPtr<SemiRingT> SR) noexcept
+  explicit WPDSSolver(NonNullPtr<RuleProviderT> RP PSR_LIFETIMEBOUND,
+                      NonNullPtr<SemiRingT> SR PSR_LIFETIMEBOUND) noexcept
       : RP(RP), SR(SR) {}
   WPDSSolver(RuleProviderT *RP, std::nullptr_t SR) = delete;
   WPDSSolver(std::nullptr_t RP, SemiRingT *SR) = delete;
   WPDSSolver(std::nullptr_t RP, std::nullptr_t SR) = delete;
 
-  wpds::SolverResults<cl_t, se_t, weight_t> solve() & {
+  wpds::SolverResults<cl_t, se_t, weight_t> solve() & PSR_LIFETIMEBOUND {
     solveImpl();
     return getSolverResults();
   }

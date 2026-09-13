@@ -124,4 +124,13 @@ template <typename L> struct DefaultSemiRing {
 
 template <> struct DefaultSemiRing<BinaryDomain> : public BinarySemiRing {};
 
+template <typename T>
+[[nodiscard]] constexpr IsSemiRing auto *getSemiRingOrBinary(T *SR) noexcept {
+  if constexpr (IsSemiRing<T>) {
+    return SR;
+  } else {
+    return &BinarySemiRing::Instance;
+  }
+}
+
 } // namespace psr

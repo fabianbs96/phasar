@@ -1,6 +1,7 @@
 #pragma once
 
 #include "phasar/Utils/Compressor.h"
+#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/MapUtils.h"
 #include "phasar/Utils/NonNullPtr.h"
 #include "phasar/Utils/Printer.h"
@@ -345,30 +346,6 @@ void SolverResultsBase<Derived, CLTy, SETy, WeightTy>::dumpResults(
 } // namespace detail
 
 template <typename CLTy, typename SETy, typename WeightTy>
-class OwningSolverResults
-    : public detail::SolverResultsBase<
-          OwningSolverResults<CLTy, SETy, WeightTy>, CLTy, SETy, WeightTy> {
-  friend detail::SolverResultsBase<OwningSolverResults<CLTy, SETy, WeightTy>,
-                                   CLTy, SETy, WeightTy>;
-
-public:
-  OwningSolverResults(detail::SolverResultsData<CLTy, SETy, WeightTy> &&Data)
-      : Data(std::move(Data)) {}
-
-private:
-  [[nodiscard]] const auto &pathEdges() const noexcept {
-    return Data.PathEdges;
-  }
-  [[nodiscard]] const auto &incoming() const noexcept { return Data.Incoming; }
-  [[nodiscard]] const auto &esgNodeCompressor() const noexcept {
-    return Data.ESGNodeCompressor;
-  }
-  [[nodiscard]] const auto &seeds() const noexcept { return Data.Seeds; }
-
-  detail::SolverResultsData<CLTy, SETy, WeightTy> Data;
-};
-
-template <typename CLTy, typename SETy, typename WeightTy>
 class SolverResults
     : public detail::SolverResultsBase<SolverResults<CLTy, SETy, WeightTy>,
                                        CLTy, SETy, WeightTy> {
@@ -377,8 +354,8 @@ class SolverResults
 
 public:
   constexpr SolverResults(
-      NonNullPtr<const detail::SolverResultsData<CLTy, SETy, WeightTy>>
-          Data) noexcept
+      NonNullPtr<const detail::SolverResultsData<CLTy, SETy, WeightTy>> Data
+          PSR_LIFETIMEBOUND) noexcept
       : Data(Data) {}
 
 private:
@@ -392,6 +369,35 @@ private:
   [[nodiscard]] const auto &seeds() const noexcept { return Data->Seeds; }
 
   NonNullPtr<const detail::SolverResultsData<CLTy, SETy, WeightTy>> Data;
+};
+
+template <typename CLTy, typename SETy, typename WeightTy>
+class OwningSolverResults
+    : public detail::SolverResultsBase<
+          OwningSolverResults<CLTy, SETy, WeightTy>, CLTy, SETy, WeightTy> {
+  friend detail::SolverResultsBase<OwningSolverResults<CLTy, SETy, WeightTy>,
+                                   CLTy, SETy, WeightTy>;
+
+public:
+  OwningSolverResults(detail::SolverResultsData<CLTy, SETy, WeightTy> &&Data)
+      : Data(std::move(Data)) {}
+
+  [[nodiscard]] constexpr operator SolverResults<CLTy, SETy, WeightTy>()
+      const noexcept PSR_LIFETIMEBOUND {
+    return {&Data};
+  }
+
+private:
+  [[nodiscard]] const auto &pathEdges() const noexcept {
+    return Data.PathEdges;
+  }
+  [[nodiscard]] const auto &incoming() const noexcept { return Data.Incoming; }
+  [[nodiscard]] const auto &esgNodeCompressor() const noexcept {
+    return Data.ESGNodeCompressor;
+  }
+  [[nodiscard]] const auto &seeds() const noexcept { return Data.Seeds; }
+
+  detail::SolverResultsData<CLTy, SETy, WeightTy> Data;
 };
 
 } // namespace psr::wpds

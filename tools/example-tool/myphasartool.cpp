@@ -80,9 +80,15 @@ int main(int Argc, const char **Argv) {
     SimpleTimer Tm;
     auto Pipeline = phasarInput(Argv[1])
                         .with<EntryFunctionsInput>()
-                        .with<AndersenAliasInfoInput>()
+                        .with<GlobalCtorsDtorsInput>()
+                        .with<ICFGInput>(CallGraphAnalysisType::RTA)
+                        .with<SteensgaardAliasInfoInput>(
+                            UnionFindAliasAnalysisType::CtxIndSens)
+                        .with<ICFGInput>(CallGraphAnalysisType::VTA)
+                        // .with<AndersenAliasInfoInput>()
                         .with<TaintConfigInput>()
-                        .with<IfdsIdeAnalysisInput<IFDSTaintAnalysis>>()
+                        // .with<IfdsIdeAnalysisInput<IFDSTaintAnalysis>>()
+                        .with<WPDSAnalysisInput<IFDSTaintAnalysis>>()
                         // .with(DataflowAnalysisStage{
                         //     std::type_identity<IFDSTaintAnalysis>{}})
                         .shared();

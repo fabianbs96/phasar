@@ -11,16 +11,21 @@
 
 #include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
+#include "phasar/DataFlow/IfdsIde/IDEProblem.h"
 #include "phasar/DataFlow/IfdsIde/IFDSProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/GenericSolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IdBasedSolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
+#include "phasar/DataFlow/WPDS/IfdsIdeRuleProvider.h"
+#include "phasar/DataFlow/WPDS/Solver/WPDSSolver.h"
+#include "phasar/DataFlow/WPDS/Solver/WPDSSolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
 #include "phasar/PhasarLLVM/ControlFlow/GlobalCtorsDtorsModel.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMVFTableProvider.h"
+#include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFGView.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/AndersenOTFAA.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
@@ -31,6 +36,7 @@
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMVFTable.h"
 #include "phasar/Pointer/UnionFindAliasAnalysisType.h"
 #include "phasar/Utils/Macros.h"
+#include "phasar/Utils/SemiRing.h"
 #include "phasar/Utils/Soundness.h"
 #include "phasar/Utils/ValueCompressor.h"
 
@@ -199,6 +205,22 @@ private:
   LLVMBasedICFG ICF;
 };
 
+class SparseICFGInput {
+public:
+  explicit SparseICFGInput(
+      AnalysisInputOf<LLVMBasedICFG, LLVMAliasInfoRef> auto &Inp)
+      : ICF(&analysis_input::getResult<LLVMBasedICFG>(Inp),
+            analysis_input::getResult<LLVMAliasInfoRef>(Inp)) {}
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<LLVMBasedICFG> /*unused*/) noexcept {
+    return ICF;
+  }
+
+private:
+  SparseLLVMBasedICFGView ICF;
+};
+
 class SteensgaardAliasInfoInput {
 public:
   explicit SteensgaardAliasInfoInput(
@@ -317,6 +339,42 @@ public:
 
 private:
   OwningIdBasedSolverResults<n_t, d_t, l_t> RawResults;
+};
+
+template <IFDSProblem ProblemT> class WPDSAnalysisInput : public ProblemT {
+public:
+  using typename ProblemT::d_t;
+  using typename ProblemT::n_t;
+  using weight_t =
+      typename wpds::detail::WeightTypeOf<IDEProblem<ProblemT>, ProblemT>::type;
+
+  template <AnalysisInputOf<LLVMBasedICFG> InpT, typename... Ts>
+    requires std::constructible_from<ProblemT, InpT &, Ts...>
+  explicit WPDSAnalysisInput(InpT &Inp, Ts &&...Args)
+      : ProblemT(Inp, PSR_FWD(Args)...), RawResults([&Inp](ProblemT &Problem) {
+          wpds::IfdsIdeRuleProvider Rules(
+              &Problem, &analysis_input::getResult<LLVMBasedICFG>(Inp));
+
+          WPDSSolver Solver(&Rules, psr::getSemiRingOrBinary(&Problem));
+          return std::move(Solver).solve();
+        }(*this)) {}
+
+  template <typename ResultT>
+    requires detail::ProvidesResult<ProblemT, ResultT>
+  [[nodiscard]] ResultT &getResult(AnalysisResultTag<ResultT> Tag) {
+    // Note: Cannot just using::ProblemT::getResult; -- this won't compile if
+    // ProblemT provides no result
+    return static_cast<ProblemT &>(*this).getResult(Tag);
+  }
+
+  [[nodiscard]] wpds::SolverResults<d_t, n_t, weight_t>
+  getResult(AnalysisResultTag<
+            wpds::OwningSolverResults<d_t, n_t, weight_t>> /*unused*/) {
+    return RawResults;
+  }
+
+private:
+  wpds::OwningSolverResults<d_t, n_t, weight_t> RawResults;
 };
 // TODO: More
 
