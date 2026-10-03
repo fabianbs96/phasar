@@ -14,6 +14,7 @@
 #include "phasar/PhasarLLVM/AnalysisPipeline.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/DataFlow/MonoIfds/Problems/MonoIFDSTaintAnalysis.h"
 #include "phasar/PhasarLLVM/DataFlow/TaintResults.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
@@ -85,26 +86,38 @@ int main(int Argc, const char **Argv) {
                         .with<SteensgaardAliasInfoInput>(
                             UnionFindAliasAnalysisType::CtxIndSens)
                         .with<ICFGInput>(CallGraphAnalysisType::VTA)
+                        .with<FunctionCompressorInput>()
+                        .with<CGSCCsInput>()
+                        .with<CGSCCDependencyGraphInput>()
+                        .with<UsedGlobalsInput>()
                         // .with<AndersenAliasInfoInput>()
                         .with<TaintConfigInput>()
                         // .with<IfdsIdeAnalysisInput<IFDSTaintAnalysis>>()
-                        .with<WPDSAnalysisInput<IFDSTaintAnalysis>>()
-                        // .with(DataflowAnalysisStage{
-                        //     std::type_identity<IFDSTaintAnalysis>{}})
+                        // .with<WPDSAnalysisInput<IFDSTaintAnalysis>>()
+                        .with<FilteredAliasIteratorInput>()
+                        .with<MonoIFDSAnalysisInput<monoifds::TaintAnalysis>>()
                         .shared();
 
-    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasInfoRef, LLVMBasedICFG,
-                            analysis_input::EntryPoints, TaintResults>
+    GenericAnalysisInputRef<LLVMProjectIRDB, LLVMAliasIteratorRef,
+                            LLVMBasedICFG, analysis_input::EntryPoints>
         GI = &Pipeline;
 
     static_assert(!CanEfficientlyPassByValue<psr::LLVMBasedICFG>);
     auto &IRDB = analysis_input::getResult<LLVMProjectIRDB>(GI);
-    auto AI = analysis_input::getResult<LLVMAliasInfoRef>(GI);
+    auto AI = analysis_input::getResult<LLVMAliasIteratorRef>(GI);
     auto &ICF = analysis_input::getResult<LLVMBasedICFG>(GI);
-    auto &Leaks = analysis_input::getResult<TaintResults>(GI);
+    // auto &Leaks = analysis_input::getResult<TaintResults>(GI);
 
-    llvm::outs() << "AnalysisInput Taint Analysis elapsed: " << Tm.elapsed()
-                 << "; Found " << Leaks.size() << " leaks" << '\n';
+    llvm::outs() << "AnalysisInput Taint Analysis elapsed: "
+                 << Tm.elapsed()
+                 //  << "; Found " << Leaks.size() << " leaks"
+                 << '\n';
+
+    // auto Foo = phasarInput(Argv[1])
+    //                .with<EntryFunctionsInput>()
+    //                .with<GlobalCtorsDtorsInput>();
+    // auto EntryFns =
+    //     analysis_input::getResult<analysis_input::EntryFunctions>(Foo);
   }
 
   return 0;

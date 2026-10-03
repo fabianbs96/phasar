@@ -7,8 +7,10 @@
 
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
+#include <memory>
 #include <tuple>
 #include <utility>
 
@@ -20,11 +22,34 @@ namespace psr {
 
 template <typename T> class AnalysisResultTag {};
 
+template <typename... Ts> class Invalidates {};
+
 namespace detail {
 template <typename AInputT, typename T>
 concept ProvidesResult = requires(AInputT &AI) {
   { AI.getResult(AnalysisResultTag<T>{}) } -> std::convertible_to<const T &>;
 };
+
+template <typename ResultT>
+static consteval bool
+invalidatesResultImpl(AnalysisResultTag<ResultT> /*unused*/, ...) {
+  return false;
+}
+template <typename ResultT, typename... Ts>
+static consteval bool
+invalidatesResultImpl(AnalysisResultTag<ResultT> /*unused*/,
+                      Invalidates<Ts...> * /*unused*/) {
+  constexpr bool Matches[] = {std::same_as<Ts, ResultT>..., false};
+  for (auto B : Matches) {
+    if (B) {
+      return true;
+    }
+  }
+  return false;
+}
+template <typename StageT, typename ResultT>
+concept InvalidatesResult =
+    invalidatesResultImpl(AnalysisResultTag<ResultT>{}, (StageT *)nullptr);
 
 template <typename Tag, typename... StageTs>
 static constexpr int indexOfResult() noexcept {
@@ -42,14 +67,19 @@ static constexpr int indexOfResult() noexcept {
 template <typename ResultT, typename... StageTs>
 static constexpr int indexOfMatchingStage() noexcept {
   constexpr bool Matches[] = {ProvidesResult<StageTs, ResultT>...};
-  int Result = -1;
-  for (size_t Idx = 0; Idx < sizeof...(StageTs); ++Idx) {
+  constexpr bool Inv[] = {InvalidatesResult<StageTs, ResultT>...};
+  for (size_t Idx = sizeof...(StageTs); Idx;) {
+    --Idx;
     if (Matches[Idx]) {
-      // return last index
-      Result = int(Idx);
+      return int(Idx);
+    }
+    if (Inv[Idx]) {
+      // invalidated
+      return -1;
     }
   }
-  return Result;
+  // not found, not invalidated
+  return -1;
 }
 
 } // namespace detail

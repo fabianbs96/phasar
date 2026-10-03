@@ -9,6 +9,7 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
+#include "phasar/AnalysisStrategy/AnalysisInput.h"
 #include "phasar/DataFlow/MonoIfds/DataFlowEnvironment.h"
 #include "phasar/DataFlow/MonoIfds/MonoIFDSProblem.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h" // for concept checking
@@ -47,6 +48,14 @@ public:
         UsedGlobals(&assertNotNull(UsedGlobals)), AI(AI) {
     static_assert(MonoIFDSProblem<TaintAnalysis>);
   }
+
+  TaintAnalysis(AnalysisInputOf<LLVMTaintConfig,
+                                UsedGlobalsHolder<const llvm::GlobalVariable *>,
+                                LLVMAliasIteratorRef> auto &Inp)
+      : TaintAnalysis(&analysis_input::getResult<LLVMTaintConfig>(Inp),
+                      &analysis_input::getResult<
+                          UsedGlobalsHolder<const llvm::GlobalVariable *>>(Inp),
+                      analysis_input::getResult<LLVMAliasIteratorRef>(Inp)) {}
 
   void setAnalysisPrinter(
       MaybeUniquePtr<AnalysisPrinterBase<ProblemAnalysisDomain>> P) {

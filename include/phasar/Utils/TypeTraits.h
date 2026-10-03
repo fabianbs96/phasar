@@ -247,14 +247,16 @@ using ElementType = typename detail::ElementType<Container>::type;
 
 struct TrueFn {
   template <typename... Args>
-  [[nodiscard]] bool operator()(const Args &.../*unused*/) const noexcept {
+  [[nodiscard]] constexpr bool
+  operator()(const Args &.../*unused*/) const noexcept {
     return true;
   }
 };
 
 struct FalseFn {
   template <typename... Args>
-  [[nodiscard]] bool operator()(const Args &.../*unused*/) const noexcept {
+  [[nodiscard]] constexpr bool
+  operator()(const Args &.../*unused*/) const noexcept {
     return false;
   }
 };
@@ -262,7 +264,7 @@ struct FalseFn {
 /// Delegates to the ctor of T
 template <typename T> struct DefaultConstruct {
   template <typename... U>
-  [[nodiscard]] T
+  [[nodiscard]] constexpr T
   operator()(U &&...Val) noexcept(std::is_nothrow_constructible_v<T, U...>) {
     return T(std::forward<U>(Val)...);
   }
@@ -295,13 +297,14 @@ template <has_adl_join T>
 }
 
 struct IdentityFn {
-  template <typename T> decltype(auto) operator()(T &&Val) const noexcept {
+  template <typename T>
+  constexpr decltype(auto) operator()(T &&Val) const noexcept {
     return std::forward<decltype(Val)>(Val);
   }
 };
 
 template <typename... ArgsT> struct DummyFn {
-  void operator()(ArgsT... Arg) const noexcept {}
+  constexpr void operator()(ArgsT... Arg) const noexcept {}
 };
 
 /// True if T can be relocated by copying its bytes (e.g. via memcpy) without

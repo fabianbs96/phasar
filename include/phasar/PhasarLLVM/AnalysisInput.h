@@ -10,17 +10,21 @@
  *****************************************************************************/
 
 #include "phasar/AnalysisStrategy/AnalysisInput.h"
+#include "phasar/ControlFlow/CGSCCs.h"
 #include "phasar/ControlFlow/CallGraphAnalysisType.h"
 #include "phasar/DataFlow/IfdsIde/IDEProblem.h"
 #include "phasar/DataFlow/IfdsIde/IFDSProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/GenericSolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IdBasedSolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
+#include "phasar/DataFlow/MonoIfds/MonoIFDSProblem.h"
+#include "phasar/DataFlow/MonoIfds/MonoIFDSSolver.h"
 #include "phasar/DataFlow/WPDS/IfdsIdeRuleProvider.h"
 #include "phasar/DataFlow/WPDS/Solver/WPDSSolver.h"
 #include "phasar/DataFlow/WPDS/Solver/WPDSSolverResults.h"
 #include "phasar/Domain/AnalysisDomain.h"
 #include "phasar/PhasarLLVM/ControlFlow/EntryFunctionUtils.h"
+#include "phasar/PhasarLLVM/ControlFlow/FunctionCompressor.h"
 #include "phasar/PhasarLLVM/ControlFlow/GlobalCtorsDtorsModel.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedCallGraph.h"
 #include "phasar/PhasarLLVM/ControlFlow/LLVMBasedICFG.h"
@@ -28,19 +32,26 @@
 #include "phasar/PhasarLLVM/ControlFlow/SparseLLVMBasedICFGView.h"
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/AndersenOTFAA.h"
+#include "phasar/PhasarLLVM/Pointer/CachedLLVMAliasIterator.h"
+#include "phasar/PhasarLLVM/Pointer/FilteredLLVMAliasIterator.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasInfo.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointerAssignmentGraph.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMRawAliasSet.h"
 #include "phasar/PhasarLLVM/TaintConfig/LLVMTaintConfig.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/DIBasedTypeHierarchy.h"
 #include "phasar/PhasarLLVM/TypeHierarchy/LLVMVFTable.h"
+#include "phasar/PhasarLLVM/Utils/UsedGlobals.h"
 #include "phasar/Pointer/UnionFindAliasAnalysisType.h"
+#include "phasar/Utils/FunctionId.h"
 #include "phasar/Utils/Macros.h"
+#include "phasar/Utils/SCCGeneric.h"
 #include "phasar/Utils/SemiRing.h"
 #include "phasar/Utils/Soundness.h"
+#include "phasar/Utils/UsedGlobalsHolder.h"
 #include "phasar/Utils/ValueCompressor.h"
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/WithColor.h"
 
@@ -64,7 +75,7 @@ private:
   LLVMProjectIRDB IRDB;
 };
 
-class EntryPointsInput {
+class EntryPointsInput : public Invalidates<analysis_input::EntryFunctions> {
 public:
   EntryPointsInput(std::vector<std::string> EntryPoints) noexcept
       : EntryPoints(std::move(EntryPoints)) {}
@@ -77,11 +88,6 @@ public:
       AnalysisResultTag<analysis_input::EntryPoints> /*unused*/) noexcept {
     return EntryPoints;
   }
-
-  // Gets invalidated by changing EntryPoints
-  [[nodiscard]] analysis_input::EntryFunctions &getResult(
-      AnalysisResultTag<analysis_input::EntryFunctions> /*unused*/) noexcept =
-      delete;
 
 private:
   analysis_input::EntryPoints EntryPoints;
@@ -107,7 +113,8 @@ private:
   analysis_input::EntryFunctions EntryPoints;
 };
 
-class GlobalCtorsDtorsInput {
+class GlobalCtorsDtorsInput
+    : public Invalidates<analysis_input::EntryFunctions> {
 public:
   GlobalCtorsDtorsInput(
       AnalysisInputOf<LLVMProjectIRDB, analysis_input::EntryPoints> auto &Inp)
@@ -115,30 +122,16 @@ public:
     auto &IRDB = analysis_input::getResult<LLVMProjectIRDB>(Inp);
     auto &Entries = analysis_input::getResult<analysis_input::EntryPoints>(Inp);
 
-    if (Entries.size() != 1 || Entries[0] != "main") {
-      // Currently, the GlobalCtorsDtorsModel only works with "main" as single
-      // entrypoint. We can relax this condition, once the implementation has
-      // caught up
-      llvm::WithColor::warning() << "Cannot build GlobalCtorsDtorsModel "
-                                    "because EntryPoints are not { 'main' }.\n";
-      EntryPoints = Entries;
-    }
-
     GlobalCtorsDtorsModel::buildModel(IRDB, Entries);
   }
 
-  [[nodiscard]] std::vector<std::string> &getResult(
+  [[nodiscard]] auto &getResult(
       AnalysisResultTag<analysis_input::EntryPoints> /*unused*/) noexcept {
     return EntryPoints;
   }
 
-  // Gets invalidated by changing EntryPoints
-  [[nodiscard]] std::vector<const llvm::Function *> &getResult(
-      AnalysisResultTag<analysis_input::EntryFunctions> /*unused*/) noexcept =
-      delete;
-
 private:
-  std::vector<std::string> EntryPoints;
+  analysis_input::EntryPoints EntryPoints;
 };
 
 class TypeHierarchyInput {
@@ -195,6 +188,11 @@ public:
     return ICF;
   }
 
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<LLVMBasedCallGraph> /*unused*/) noexcept {
+    return ICF.getCallGraph();
+  }
+
 private:
   static LLVMBasedICFG
   buildImpl(LLVMProjectIRDB &IRDB, const std::vector<std::string> &Entries,
@@ -217,6 +215,8 @@ public:
     return ICF;
   }
 
+  // Call-graph does not change and is inherited
+
 private:
   SparseLLVMBasedICFGView ICF;
 };
@@ -234,6 +234,10 @@ public:
 
   [[nodiscard]] LLVMAliasInfoRef
   getResult(AnalysisResultTag<LLVMAliasInfoRef> /*unused*/) noexcept {
+    return &AI;
+  }
+  [[nodiscard]] LLVMAliasIteratorRef
+  getResult(AnalysisResultTag<LLVMAliasIteratorRef> /*unused*/) noexcept {
     return &AI;
   }
 
@@ -268,9 +272,19 @@ public:
     return &AI;
   }
 
+  [[nodiscard]] LLVMAliasIteratorRef
+  getResult(AnalysisResultTag<LLVMAliasIteratorRef> /*unused*/) noexcept {
+    return &AI;
+  }
+
   [[nodiscard]] auto &
   getResult(AnalysisResultTag<LLVMBasedICFG> /*unused*/) noexcept {
     return ICF;
+  }
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<LLVMBasedCallGraph> /*unused*/) noexcept {
+    return ICF.getCallGraph();
   }
 
 private:
@@ -376,7 +390,161 @@ public:
 private:
   wpds::OwningSolverResults<d_t, n_t, weight_t> RawResults;
 };
-// TODO: More
+
+template <monoifds::MonoIFDSProblem ProblemT>
+class MonoIFDSAnalysisInput : public ProblemT {
+public:
+  template <AnalysisInputOf<LLVMBasedICFG> InpT, typename... Ts>
+    requires std::constructible_from<ProblemT, InpT &, Ts...>
+  explicit MonoIFDSAnalysisInput(InpT &Inp, Ts &&...Args)
+      : ProblemT(Inp, PSR_FWD(Args)...) {
+    monoifds::MonoIFDSSolver Solver(
+        static_cast<ProblemT *>(this),
+        &analysis_input::getResult<LLVMBasedICFG>(Inp));
+
+    if (auto SCCs =
+            analysis_input::getResultOrNull<SCCHolder<FunctionId>>(Inp)) {
+      Solver.setCGSCCs(SCCs);
+    }
+    if (auto Functions = analysis_input::getResultOrNull<
+            FunctionCompressor<const llvm::Function *>>(Inp)) {
+      Solver.setFunctionCompressor(Functions);
+    }
+
+    Solver.solve();
+  }
+
+  template <typename ResultT>
+    requires detail::ProvidesResult<ProblemT, ResultT>
+  [[nodiscard]] ResultT &getResult(AnalysisResultTag<ResultT> Tag) {
+    // Note: Cannot just using::ProblemT::getResult; -- this won't compile if
+    // ProblemT provides no result
+    return static_cast<ProblemT &>(*this).getResult(Tag);
+  }
+};
+
+class UsedGlobalsInput {
+public:
+  explicit UsedGlobalsInput(
+      AnalysisInputOf<
+          LLVMProjectIRDB, FunctionCompressor<const llvm::Function *>,
+          SCCHolder<FunctionId>, SCCDependencyGraph<FunctionId>> auto &Inp)
+      : UG(psr::computeUsedGlobals(
+            analysis_input::getResult<LLVMProjectIRDB>(Inp),
+            analysis_input::getResult<
+                FunctionCompressor<const llvm::Function *>>(Inp),
+            analysis_input::getResult<SCCHolder<FunctionId>>(Inp),
+            analysis_input::getResult<SCCDependencyGraph<FunctionId>>(Inp))) {}
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<UsedGlobalsHolder<
+                const llvm::GlobalVariable *>> /*unused*/) noexcept {
+    return UG;
+  }
+
+private:
+  UsedGlobalsHolder<const llvm::GlobalVariable *> UG;
+};
+
+class FunctionCompressorInput {
+public:
+  template <AnalysisInputOf<LLVMProjectIRDB> InpT>
+    requires(!detail::ProvidesResult<InpT, LLVMBasedCallGraph> ||
+             !detail::ProvidesResult<InpT, analysis_input::EntryFunctions>)
+  explicit FunctionCompressorInput(InpT &Inp)
+      : Functions(psr::compressFunctions(
+            analysis_input::getResult<LLVMProjectIRDB>(Inp))) {}
+
+  explicit FunctionCompressorInput(
+      AnalysisInputOf<LLVMBasedCallGraph, analysis_input::EntryFunctions> auto
+          &Inp)
+      : Functions(psr::compressFunctions(
+            analysis_input::getResult<LLVMBasedCallGraph>(Inp),
+            analysis_input::getResult<analysis_input::EntryFunctions>(Inp))) {}
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<
+            FunctionCompressor<const llvm::Function *>> /*unused*/) noexcept {
+    return Functions;
+  }
+
+private:
+  FunctionCompressor<const llvm::Function *> Functions;
+};
+
+class CGSCCsInput {
+public:
+  explicit CGSCCsInput(
+      AnalysisInputOf<LLVMBasedICFG,
+                      FunctionCompressor<const llvm::Function *>> auto &Inp)
+      : SCCs(psr::computeCGSCCs(
+            analysis_input::getResult<LLVMBasedICFG>(Inp),
+            analysis_input::getResult<
+                FunctionCompressor<const llvm::Function *>>(Inp))) {}
+
+  [[nodiscard]] auto &
+  getResult(AnalysisResultTag<SCCHolder<FunctionId>> /*unused*/) noexcept {
+    return SCCs;
+  }
+
+private:
+  SCCHolder<FunctionId> SCCs;
+};
+
+class CGSCCDependencyGraphInput {
+public:
+  explicit CGSCCDependencyGraphInput(
+      AnalysisInputOf<LLVMBasedICFG, FunctionCompressor<const llvm::Function *>,
+                      SCCHolder<FunctionId>> auto &Inp)
+      : Callers(psr::computeCGSCCCallers(
+            analysis_input::getResult<LLVMBasedICFG>(Inp),
+            analysis_input::getResult<
+                FunctionCompressor<const llvm::Function *>>(Inp),
+            analysis_input::getResult<SCCHolder<FunctionId>>(Inp))) {}
+
+  [[nodiscard]] auto &getResult(
+      AnalysisResultTag<SCCDependencyGraph<FunctionId>> /*unused*/) noexcept {
+    return Callers;
+  }
+
+private:
+  SCCDependencyGraph<FunctionId> Callers;
+};
+
+class FilteredAliasIteratorInput : public Invalidates<LLVMAliasInfoRef> {
+public:
+  explicit FilteredAliasIteratorInput(
+      AnalysisInputOf<LLVMAliasIteratorRef> auto &Inp)
+      : FAI(analysis_input::getResult<LLVMAliasIteratorRef>(Inp)) {}
+
+  [[nodiscard]] LLVMAliasIteratorRef
+  getResult(AnalysisResultTag<LLVMAliasIteratorRef> /*unused*/) {
+    return &FAI;
+  }
+
+private:
+  FilteredLLVMAliasIterator FAI;
+};
+
+class CachedAliasIteratorInput {
+public:
+  explicit CachedAliasIteratorInput(
+      AnalysisInputOf<LLVMAliasIteratorRef> auto &Inp)
+      : CAI(analysis_input::getResult<LLVMAliasIteratorRef>(Inp)) {}
+
+  [[nodiscard]] LLVMAliasInfoRef
+  getResult(AnalysisResultTag<LLVMAliasInfoRef> /*unused*/) {
+    return &CAI;
+  }
+
+private:
+  CachedLLVMAliasIterator CAI;
+};
+
+// TODO: More:
+// TODO: - [ ] PointsTo
+// TODO: - [ ] AnalysisPrinter
+// TODO: ...
 
 namespace detail {
 [[nodiscard]] inline auto defaultPhasarInput() {
