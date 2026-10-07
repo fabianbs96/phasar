@@ -53,7 +53,11 @@ public:
 
   /// \param CGSCCs The SCCs of the call-graph in reverse topological order,
   /// as computed by computeCGSCCs()
-  explicit DFIExplodedSupergraph(SCCHolder<FunctionId> CGSCCs);
+  /// \param FollowReturnsPastSeeds Whether summarize() reports exits that are
+  /// reachable without a calling context, see
+  /// IFDSIDESolverConfig::followReturnsPastSeeds()
+  explicit DFIExplodedSupergraph(SCCHolder<FunctionId> CGSCCs,
+                                 bool FollowReturnsPastSeeds);
 
   /// The next step towards the fixpoint, or std::nullopt if there is none.
   /// Prefers callees over callers, and expansion over summarization.
@@ -93,12 +97,23 @@ public:
   [[nodiscard]] llvm::ArrayRef<dfi::VertexId> addCallEdge(dfi::VertexId CallVtx,
                                                           dfi::EntryId Entry);
 
+  /// Records the unbalanced return from the exit vertex Exit to RetVtx, which
+  /// is reachable without a calling context. RetVtx then behaves as if it was
+  /// reached from the zero fact at the start of its function.
+  void addUnbalancedReturn(dfi::VertexId Exit, dfi::VertexId RetVtx);
+
   /// Computes the same-level reachability from the entries of Fun to its exit
   /// vertices and calls Handler(CallVtx, Entry, Exit) for each new
   /// (Entry, Exit) pair and each call vertex CallVtx calling Entry.
+  ///
+  /// With FollowReturnsPastSeeds, also calls UnbalancedHandler(Exit) for each
+  /// new exit vertex that is reachable without calling context, i.e., from a
+  /// seed without callers or from an unbalanced return. The solver must
+  /// return it to all callers of Fun.
   void summarize(
       FunctionId Fun,
-      std::invocable<dfi::VertexId, dfi::EntryId, dfi::VertexId> auto Handler) {
+      std::invocable<dfi::VertexId, dfi::EntryId, dfi::VertexId> auto Handler,
+      std::invocable<dfi::VertexId> auto UnbalancedHandler) {
     indexFunction(Fun);
 
     for (auto Entry : FunState[Fun].Entries) {
@@ -108,6 +123,14 @@ public:
         for (auto Exit : NewExits) {
           std::invoke(Handler, EntryCallers[Entry][I], Entry, Exit);
         }
+      }
+    }
+
+    if (FollowReturnsPastSeeds) {
+      // UnbalancedHandler may add vertices, roots and unbalanced returns, but
+      // no entries or callers
+      for (auto Exit : updateUnbalancedExits(Fun)) {
+        std::invoke(UnbalancedHandler, Exit);
       }
     }
   }
@@ -130,7 +153,7 @@ public:
     return SeedVertices;
   }
 
-  /// The graph of intra-procedural, summary, and call edges
+  /// The graph of intra-procedural, summary, call, and unbalanced-return edges
   [[nodiscard]] CsrGraph<dfi::VertexId> buildSupergraph() const;
 
   [[nodiscard]] TypedVector<dfi::VertexId, dfi::InstId>
@@ -146,10 +169,15 @@ private:
   struct FunctionState {
     TypedVector<dfi::LocalVertexId, dfi::VertexId> Vertices;
     llvm::SmallVector<dfi::VertexId, 0> Worklist;
-    /// Entries and seeds
+    /// Entries, seeds, and unbalanced-return targets
     llvm::SmallVector<dfi::VertexId, 0> Roots;
     llvm::SmallVector<dfi::EntryId, 0> Entries;
+    llvm::SmallVector<dfi::VertexId, 0> Seeds;
+    /// Targets of unbalanced returns into this function
+    llvm::SmallVector<dfi::VertexId, 0> UnbalancedRoots;
     llvm::SmallVector<std::pair<dfi::VertexId, dfi::VertexId>, 0> SummaryEdges;
+    /// Exit vertices already reported as unbalanced, sorted
+    llvm::SmallVector<dfi::VertexId, 0> UnbalancedExits;
     /// Whether the graph changed since the last summarize()
     bool Dirty = false;
   };
@@ -157,13 +185,31 @@ private:
   void markDirty(FunctionId Fun);
   bool addRoot(dfi::VertexId Vtx);
 
+  [[nodiscard]] bool hasCallers(dfi::VertexId Vtx) const;
+  /// Whether a call reaches the zero fact at a start point of Fun
+  [[nodiscard]] bool isZeroEntryCalled(FunctionId Fun) const;
+
   /// Builds LocalIndex for the vertices of Fun, with exits as targets
   void indexFunction(FunctionId Fun);
 
+  /// Appends the exits reachable from Src according to LocalIndex to NewExits,
+  /// unless they are in Known
+  void collectNewExits(FunctionId Fun, dfi::VertexId Src,
+                       llvm::ArrayRef<dfi::VertexId> Known);
+
+  /// Sorts NewExits, removes duplicates, and merges them into Known
+  void mergeNewExits(llvm::SmallVectorImpl<dfi::VertexId> &Known);
+
   /// Adds the exits reachable from Entry according to LocalIndex to its
-  /// summary. Returns the newly added ones.
+  /// summary. Returns the newly added ones. As in the IDESolver, the zero
+  /// entry also reaches whatever the unbalanced-return targets reach.
   [[nodiscard]] llvm::ArrayRef<dfi::VertexId>
   updateSummaryExits(FunctionId Fun, dfi::EntryId Entry);
+
+  /// Adds the exits reachable without calling context according to LocalIndex
+  /// to the unbalanced exits of Fun. Returns the newly added ones.
+  [[nodiscard]] llvm::ArrayRef<dfi::VertexId>
+  updateUnbalancedExits(FunctionId Fun);
 
   [[nodiscard]] llvm::ArrayRef<dfi::VertexId>
   edgesOf(dfi::VertexId Vtx) const noexcept {
@@ -200,6 +246,8 @@ private:
 
   llvm::DenseSet<std::pair<dfi::VertexId, dfi::VertexId>> SummaryEdgeSet;
   llvm::SmallVector<std::pair<dfi::VertexId, dfi::VertexId>, 0> CallEdges;
+  llvm::DenseSet<std::pair<dfi::VertexId, dfi::VertexId>> UnbalancedReturnEdges;
+  bool FollowReturnsPastSeeds{};
 
   // Scratch buffers
   llvm::SmallVector<dfi::VertexId, 0> Batch;

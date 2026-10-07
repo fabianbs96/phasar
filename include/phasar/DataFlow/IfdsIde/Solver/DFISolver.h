@@ -21,7 +21,6 @@
 #include "phasar/Utils/FunctionId.h"
 #include "phasar/Utils/IntervalReachability.h"
 #include "phasar/Utils/IotaIterator.h"
-#include "phasar/Utils/Logger.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -49,8 +48,6 @@ namespace psr {
 /// StaticSolverConfigTy::BuildQueryIndex, getReachability() answers
 /// context-sensitive reachability queries between arbitrary
 /// (instruction, fact) pairs that hold.
-///
-/// Does not support IFDSIDESolverConfig::followReturnsPastSeeds().
 template <IFDSProblem ProblemTy,
           typename StaticSolverConfigTy = DFISolverConfig,
           ICFG ICFGTy = typename ProblemTy::ProblemAnalysisDomain::i_t>
@@ -105,15 +102,11 @@ private:
   // --- IDESolverAPIMixin
 
   void doInitialize() {
-    if (getProblemSolverConfig(*Problem).followReturnsPastSeeds()) {
-      PHASAR_LOG_LEVEL(WARNING, "The DFISolver does not support "
-                                "followReturnsPastSeeds; ignoring it");
-    }
-
     for (const auto &Fun : ICF->getAllFunctions()) {
       Funs.getOrInsert(Fun);
     }
-    Graph.emplace(computeCGSCCs(*ICF, Funs));
+    Graph.emplace(computeCGSCCs(*ICF, Funs),
+                  getProblemSolverConfig(*Problem).followReturnsPastSeeds());
 
     auto ZeroId = Results->Facts.getOrInsert(Problem->getZeroValue());
     assert(ZeroId == dfi::FactId::Zero);
@@ -137,10 +130,12 @@ private:
     if (Next->Kind == detail::DFIExplodedSupergraph::ActionKind::Expand) {
       expand(Next->Fun);
     } else {
+      auto Fun = Next->Fun;
       Graph->summarize(
-          Next->Fun,
+          Fun,
           [this](dfi::VertexId CallVtx, dfi::EntryId Entry,
-                 dfi::VertexId Exit) { applySummary(CallVtx, Entry, Exit); });
+                 dfi::VertexId Exit) { applySummary(CallVtx, Entry, Exit); },
+          [this, Fun](dfi::VertexId Exit) { returnUnbalanced(Fun, Exit); });
     }
     return true;
   }
@@ -208,6 +203,35 @@ private:
       for (const auto &Fact : computeTargets(FF, ExitFact)) {
         Graph->addSummaryEdge(CallVtx,
                               getOrCreateSuccVertex(RetSite, Fact, Caller));
+      }
+    }
+  }
+
+  /// Returns the exit vertex Exit of Fun, which is reachable without calling
+  /// context, to all callers of Fun in the call-graph
+  void returnUnbalanced(FunctionId Fun, dfi::VertexId Exit) {
+    n_t ExitInst = instOf(Exit);
+    d_t ExitFact = factOf(Exit);
+    f_t Callee = Funs[Fun];
+
+    bool HasCallers = false;
+    for (const auto &CallSite : ICF->getCallersOf(Callee)) {
+      HasCallers = true;
+      auto Caller = Funs.get(ICF->getFunctionOf(CallSite));
+      for (const auto &RetSite : ICF->getReturnSitesOfCallAt(CallSite)) {
+        auto FF =
+            Problem->getRetFlowFunction(CallSite, Callee, ExitInst, RetSite);
+        for (const auto &Fact : computeTargets(FF, ExitFact)) {
+          Graph->addUnbalancedReturn(
+              Exit, getOrCreateSuccVertex(RetSite, Fact, Caller));
+        }
+      }
+    }
+
+    if constexpr (UnbalancedRetSideEffectProvider<ProblemTy>) {
+      if (!HasCallers) {
+        Problem->applyUnbalancedRetFlowFunctionSideEffects(Callee, ExitInst,
+                                                           ExitFact);
       }
     }
   }

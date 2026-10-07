@@ -10,6 +10,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/DFISolver.h"
 
 #include "phasar/DataFlow/IfdsIde/Solver/GenericSolverResults.h"
+#include "phasar/DataFlow/IfdsIde/Solver/IFDSSolver.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IterativeIDESolver.h"
 #include "phasar/DataFlow/IfdsIde/Solver/StaticIDESolverConfig.h"
 #include "phasar/Domain/BinaryDomain.h"
@@ -17,6 +18,7 @@
 #include "phasar/PhasarLLVM/DB/LLVMProjectIRDB.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IDELinearConstantAnalysis.h"
 #include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSTaintAnalysis.h"
+#include "phasar/PhasarLLVM/DataFlow/IfdsIde/Problems/IFDSUninitializedVariables.h"
 #include "phasar/PhasarLLVM/HelperAnalyses.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMAliasSet.h"
 #include "phasar/PhasarLLVM/SimpleAnalysisConstructor.h"
@@ -44,10 +46,12 @@ using n_t = const llvm::Instruction *;
 using d_t = const llvm::Value *;
 
 void compareResults(const psr::LLVMProjectIRDB &IRDB, const auto &Expected,
-                    const auto &Actual) {
+                    const auto &Actual, d_t IgnoredFact = nullptr) {
   for (const auto *Inst : IRDB.getAllInstructions()) {
     auto ExpectedFacts = Expected.ifdsResultsAt(Inst);
     auto ActualFacts = Actual.ifdsResultsAt(Inst);
+    ExpectedFacts.erase(IgnoredFact);
+    ActualFacts.erase(IgnoredFact);
     EXPECT_EQ(ExpectedFacts, ActualFacts)
         << "Results differ at " << psr::llvmIRToString(Inst)
         << "\n  Expected: " << psr::PrettyPrinter{ExpectedFacts}
@@ -251,6 +255,69 @@ constexpr std::string_view TaintTestFiles[] = {
 
 INSTANTIATE_TEST_SUITE_P(DFISolverTaintTest, DFISolverTaintTest,
                          ::testing::ValuesIn(TaintTestFiles));
+
+struct UnbalancedTestCase {
+  std::string_view File;
+  std::string_view EntryPoint;
+};
+
+class DFISolverUnbalancedTest
+    : public ::testing::TestWithParam<UnbalancedTestCase> {
+protected:
+  static constexpr auto PathToLlFiles =
+      PHASAR_BUILD_SUBFOLDER("uninitialized_variables/");
+  static inline const std::vector<std::string> ICFGEntryPoints = {"main"};
+};
+
+/// The IterativeIDESolver does not support followReturnsPastSeeds, so compare
+/// against the IFDSSolver
+TEST_P(DFISolverUnbalancedTest, SameResultsAsIFDSSolver) {
+  const auto &[File, EntryPoint] = GetParam();
+  // The ICFG starts at main, such that the seeded function has callers
+  psr::HelperAnalyses HA(PathToLlFiles + File, ICFGEntryPoints);
+  const auto &IRDB = HA.getProjectIRDB();
+  std::vector<std::string> ProblemEntryPoints = {std::string(EntryPoint)};
+
+  auto ExpectedProblem =
+      psr::createAnalysisProblem<psr::IFDSUninitializedVariables>(
+          HA, ProblemEntryPoints);
+  ExpectedProblem.getIFDSIDESolverConfig().setFollowReturnsPastSeeds(true);
+  psr::IFDSSolver ExpectedSolver(&ExpectedProblem, &HA.getICFG());
+  auto ExpectedResults = ExpectedSolver.solve();
+
+  auto Problem = psr::createAnalysisProblem<psr::IFDSUninitializedVariables>(
+      HA, ProblemEntryPoints);
+  Problem.getIFDSIDESolverConfig().setFollowReturnsPastSeeds(true);
+  psr::DFISolver Solver(&Problem, &HA.getICFG());
+  auto Results = Solver.solve();
+
+  // The IDESolver drops the zero fact at call sites and exits that are only
+  // reachable via unbalanced returns, as its value computation (phase II)
+  // starts at the start points only
+  compareResults(IRDB, ExpectedResults, Results, Problem.getZeroValue());
+  checkReachableFromSeeds(IRDB, Problem, Results, Solver.getReachability());
+  EXPECT_EQ(ExpectedProblem.getAllUndefUses(), Problem.getAllUndefUses());
+
+  // Unbalanced returns into main, if any, also happen in the DFISolver
+  const auto *Main = IRDB.getFunctionDefinition("main");
+  ASSERT_NE(Main, nullptr);
+  const auto HasResultsInMain = [&](const auto &SR) {
+    return llvm::any_of(IRDB.getAllInstructionsOf(Main), [&](const auto *Inst) {
+      return !SR.ifdsResultsAt(Inst).empty();
+    });
+  };
+  EXPECT_EQ(HasResultsInMain(ExpectedResults), HasResultsInMain(Results));
+}
+
+constexpr UnbalancedTestCase UnbalancedTestCases[] = {
+    {"multiple_calls_cpp_dbg.ll", "_Z8functionv"},
+    {"recursion_cpp_dbg.ll", "_Z3fooRii"},
+    {"callsite_cpp_dbg.ll", "_Z3foov"},
+    {"return_uninit_cpp_dbg.ll", "_Z3foov"},
+};
+
+INSTANTIATE_TEST_SUITE_P(DFISolverUnbalancedTest, DFISolverUnbalancedTest,
+                         ::testing::ValuesIn(UnbalancedTestCases));
 
 } // namespace
 

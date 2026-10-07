@@ -18,8 +18,9 @@
 using psr::detail::DFIExplodedSupergraph;
 
 DFIExplodedSupergraph::DFIExplodedSupergraph(
-    psr::SCCHolder<psr::FunctionId> CGSCCs)
-    : CGSCCs(std::move(CGSCCs)) {
+    psr::SCCHolder<psr::FunctionId> CGSCCs, bool FollowReturnsPastSeeds)
+    : CGSCCs(std::move(CGSCCs)),
+      FollowReturnsPastSeeds(FollowReturnsPastSeeds) {
   FunState.resize(this->CGSCCs.SCCOfNode.size());
   PendingSCCs.reserve(this->CGSCCs.size());
 }
@@ -75,6 +76,7 @@ bool DFIExplodedSupergraph::addSeed(dfi::VertexId Vtx) {
     return false;
   }
   SeedVertices.push_back(Vtx);
+  FunState[VtxFun[Vtx]].Seeds.push_back(Vtx);
   return true;
 }
 
@@ -120,6 +122,22 @@ DFIExplodedSupergraph::addCallEdge(dfi::VertexId CallVtx, dfi::EntryId Entry) {
   return SummaryExits[Entry];
 }
 
+void DFIExplodedSupergraph::addUnbalancedReturn(dfi::VertexId Exit,
+                                                dfi::VertexId RetVtx) {
+  if (!UnbalancedReturnEdges.insert({Exit, RetVtx}).second) {
+    return;
+  }
+
+  auto Fun = VtxFun[RetVtx];
+  if (addRoot(RetVtx)) {
+    FunState[Fun].UnbalancedRoots.push_back(RetVtx);
+  } else if (!llvm::is_contained(FunState[Fun].UnbalancedRoots, RetVtx)) {
+    // An entry or seed; still, it may now reach exits via the zero entry
+    FunState[Fun].UnbalancedRoots.push_back(RetVtx);
+    markDirty(Fun);
+  }
+}
+
 psr::CsrGraph<psr::dfi::VertexId>
 DFIExplodedSupergraph::buildSupergraph() const {
   assert(VtxInst.size() == VtxFun.size() &&
@@ -135,6 +153,7 @@ DFIExplodedSupergraph::buildSupergraph() const {
     GraphEdges.append(FS.SummaryEdges.begin(), FS.SummaryEdges.end());
   }
   GraphEdges.append(CallEdges.begin(), CallEdges.end());
+  GraphEdges.append(UnbalancedReturnEdges.begin(), UnbalancedReturnEdges.end());
   return CsrGraph<dfi::VertexId>::fromEdges(numVertices(), GraphEdges);
 }
 
@@ -151,6 +170,18 @@ bool DFIExplodedSupergraph::addRoot(dfi::VertexId Vtx) {
   FunState[Fun].Roots.push_back(Vtx);
   markDirty(Fun);
   return true;
+}
+
+bool DFIExplodedSupergraph::hasCallers(dfi::VertexId Vtx) const {
+  auto It = EntryOf.find(Vtx);
+  return It != EntryOf.end() && !EntryCallers[It->second].empty();
+}
+
+bool DFIExplodedSupergraph::isZeroEntryCalled(FunctionId Fun) const {
+  return llvm::any_of(FunState[Fun].Entries, [this](dfi::EntryId Entry) {
+    return VtxFact[EntryVertex[Entry]] == dfi::FactId::Zero &&
+           !EntryCallers[Entry].empty();
+  });
 }
 
 void DFIExplodedSupergraph::indexFunction(FunctionId Fun) {
@@ -182,23 +213,70 @@ void DFIExplodedSupergraph::indexFunction(FunctionId Fun) {
       LocalIndex);
 }
 
+void DFIExplodedSupergraph::collectNewExits(
+    FunctionId Fun, dfi::VertexId Src, llvm::ArrayRef<dfi::VertexId> Known) {
+  const auto &FS = FunState[Fun];
+  auto LocalSrc = VtxLocalId[Src];
+  if (size_t(LocalSrc) >= LocalIndex.numVertices()) {
+    // Created after indexFunction(); covered by the next summarize()
+    return;
+  }
+
+  LocalIndex.forEachReachableTarget(LocalSrc, [&](dfi::LocalVertexId Local) {
+    auto Exit = FS.Vertices[Local];
+    if (!std::binary_search(Known.begin(), Known.end(), Exit)) {
+      NewExits.push_back(Exit);
+    }
+  });
+}
+
+void DFIExplodedSupergraph::mergeNewExits(
+    llvm::SmallVectorImpl<dfi::VertexId> &Known) {
+  if (NewExits.empty()) {
+    return;
+  }
+  llvm::sort(NewExits);
+  NewExits.erase(std::unique(NewExits.begin(), NewExits.end()), NewExits.end());
+  Known.append(NewExits.begin(), NewExits.end());
+  llvm::sort(Known);
+}
+
 llvm::ArrayRef<psr::dfi::VertexId>
 DFIExplodedSupergraph::updateSummaryExits(FunctionId Fun, dfi::EntryId Entry) {
-  const auto &FS = FunState[Fun];
   auto &Exits = SummaryExits[Entry];
+  auto EntryVtx = EntryVertex[Entry];
 
   NewExits.clear();
-  LocalIndex.forEachReachableTarget(
-      VtxLocalId[EntryVertex[Entry]], [&](dfi::LocalVertexId Local) {
-        auto Exit = FS.Vertices[Local];
-        if (!std::binary_search(Exits.begin(), Exits.end(), Exit)) {
-          NewExits.push_back(Exit);
-        }
-      });
-
-  if (!NewExits.empty()) {
-    Exits.append(NewExits.begin(), NewExits.end());
-    llvm::sort(Exits);
+  collectNewExits(Fun, EntryVtx, Exits);
+  if (VtxFact[EntryVtx] == dfi::FactId::Zero) {
+    for (auto Root : FunState[Fun].UnbalancedRoots) {
+      collectNewExits(Fun, Root, Exits);
+    }
   }
+
+  mergeNewExits(Exits);
+  return NewExits;
+}
+
+llvm::ArrayRef<psr::dfi::VertexId>
+DFIExplodedSupergraph::updateUnbalancedExits(FunctionId Fun) {
+  auto &FS = FunState[Fun];
+
+  NewExits.clear();
+  for (auto Seed : FS.Seeds) {
+    if (!hasCallers(Seed)) {
+      collectNewExits(Fun, Seed, FS.UnbalancedExits);
+    }
+  }
+  // As in the IDESolver, facts from unbalanced returns behave as if they were
+  // reached from the zero entry, so they only return past this function if
+  // the zero entry has no callers.
+  if (!isZeroEntryCalled(Fun)) {
+    for (auto Root : FS.UnbalancedRoots) {
+      collectNewExits(Fun, Root, FS.UnbalancedExits);
+    }
+  }
+
+  mergeNewExits(FS.UnbalancedExits);
   return NewExits;
 }

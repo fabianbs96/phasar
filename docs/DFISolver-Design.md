@@ -401,7 +401,7 @@ vertices at `At` (merge of two sorted lists), the typical taint query
 | `AutoAddZero` | zero fact always propagated by the solver |
 | `getSummaryFlowFunction` | local edges to return sites, callee not entered |
 | Callee without body | only call-to-return flow |
-| `followReturnsPastSeeds` | seeds (and derived unbalanced roots) are extra roots in `summarize`; exits reached from them return to *all* callers of `f` via `retFF`, creating unbalanced roots in the callers and unbalanced-return edges in `G*`; for functions without callers, `applyUnbalancedRetFlowFunctionSideEffects` if `UnbalancedRetSideEffectProvider` |
+| `followReturnsPastSeeds` | as in the IDESolver: exits reached from a seed without callers, or from an unbalanced root while the zero entry of `f` has no callers, return to *all* call-graph callers of `f` via `retFF`. This creates unbalanced roots in the callers and unbalanced-return edges in `G*`. Unbalanced roots count as reached from the zero entry, i.e. its summaries include their exits. For functions without callers, `applyUnbalancedRetFlowFunctionSideEffects` if `UnbalancedRetSideEffectProvider` |
 | `has_advanceToNextUser_v` | applied on target-vertex creation |
 | `isInteresting(n)` | `QueryTargets::Interesting` restricts ranks to those vertices |
 | `emitESG` / `recordEdges` | requires `KeepGraph`; dumps the CSR of `G*` |
