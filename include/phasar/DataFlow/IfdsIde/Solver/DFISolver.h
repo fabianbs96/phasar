@@ -12,6 +12,7 @@
 #include "phasar/ControlFlow/CGSCCs.h"
 #include "phasar/ControlFlow/ICFG.h"
 #include "phasar/ControlFlow/SparseCFGProvider.h"
+#include "phasar/DataFlow/IfdsIde/IFDSIDESolverConfig.h"
 #include "phasar/DataFlow/IfdsIde/IFDSProblem.h"
 #include "phasar/DataFlow/IfdsIde/Solver/DFIExplodedSupergraph.h"
 #include "phasar/DataFlow/IfdsIde/Solver/DFISolverConfig.h"
@@ -64,9 +65,18 @@ public:
   using config_t = StaticSolverConfigTy;
 
   DFISolver(ProblemTy *Problem, const ICFGTy *ICF,
-            StaticSolverConfigTy /*Config*/ = {})
+            StaticSolverConfigTy Config = {})
+      : DFISolver(Problem, ICF, Config,
+                  getProblemSolverConfig(assertNotNull(Problem))) {}
+
+  /// Uses SolverConfig instead of the problem's solver config. Only
+  /// followReturnsPastSeeds is respected; AutoAddZero is taken from
+  /// StaticSolverConfigTy.
+  DFISolver(ProblemTy *Problem, const ICFGTy *ICF,
+            StaticSolverConfigTy /*Config*/, IFDSIDESolverConfig SolverConfig)
       : Problem(&assertNotNull(Problem)), ICF(&assertNotNull(ICF)),
-        Results(std::make_unique<detail::DFIResultsData<n_t, d_t>>()) {}
+        Results(std::make_unique<detail::DFIResultsData<n_t, d_t>>()),
+        SolverConfig(SolverConfig) {}
 
   [[nodiscard]] DFISolverResults<n_t, d_t> getSolverResults() const noexcept {
     return DFISolverResults<n_t, d_t>(Results.get());
@@ -88,6 +98,11 @@ public:
     getSolverResults().dumpResults(OS);
   }
 
+  /// Only valid after solving
+  void emitTextReport(llvm::raw_ostream &OS = llvm::outs()) {
+    Problem->emitTextReport(getSolverResults(), OS);
+  }
+
 private:
   using FlowFunctionPtrType = typename ProblemTy::FlowFunctionPtrType;
 
@@ -106,7 +121,7 @@ private:
       Funs.getOrInsert(Fun);
     }
     Graph.emplace(computeCGSCCs(*ICF, Funs),
-                  getProblemSolverConfig(*Problem).followReturnsPastSeeds());
+                  SolverConfig.followReturnsPastSeeds());
 
     auto ZeroId = Results->Facts.getOrInsert(Problem->getZeroValue());
     assert(ZeroId == dfi::FactId::Zero);
@@ -388,6 +403,7 @@ private:
   ProblemTy *Problem{};
   const ICFGTy *ICF{};
   std::unique_ptr<detail::DFIResultsData<n_t, d_t>> Results;
+  IFDSIDESolverConfig SolverConfig;
 
   /// Only while solving
   FunctionCompressor<f_t> Funs;
@@ -399,6 +415,10 @@ DFISolver(ProblemTy *, const ICFGTy *)
     -> DFISolver<ProblemTy, DFISolverConfig, ICFGTy>;
 template <typename ProblemTy, typename ICFGTy, typename StaticSolverConfigTy>
 DFISolver(ProblemTy *, const ICFGTy *, StaticSolverConfigTy)
+    -> DFISolver<ProblemTy, StaticSolverConfigTy, ICFGTy>;
+template <typename ProblemTy, typename ICFGTy, typename StaticSolverConfigTy>
+DFISolver(ProblemTy *, const ICFGTy *, StaticSolverConfigTy,
+          IFDSIDESolverConfig)
     -> DFISolver<ProblemTy, StaticSolverConfigTy, ICFGTy>;
 
 /// Solves the given IFDS problem with the DFISolver and returns the owning
