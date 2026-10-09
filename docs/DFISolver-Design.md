@@ -251,12 +251,18 @@ contiguous slice of the vertex arrays.
 ### 4.4 Direction
 
 The ESG is explored forward (forced by `computeTargets`). The kernel can index
-`G*` or its reverse (`IndexDirection::Forward | Backward`, reverse CSR is one
-counting sort). Same answers, different `|Pi|` and different enumeration
+`G*` or its reverse (`DFIIndexDirection::Forward | Backward`, reverse CSR is
+one counting sort). Same answers, different `|Pi|` and different enumeration
 locality: forward makes "what does `x` reach" contiguous, backward makes
-"what reaches `y`" (provenance) contiguous. The paper's in-degree argument is
+"what reaches `y`" (provenance) contiguous. The respective other enumeration
+scans all vertices with point queries. The paper's in-degree argument is
 specific to SSA def-use graphs; for ESGs (merge points vs. branch/gen
 fan-out) this must be measured. Default: Forward.
+
+Backward roots: the sinks of `G*`, followed by all vertices. Vertices on
+cycles of `G*` without a path to a sink are not reachable from any sink in the
+reversed graph; the builder skips already visited roots, so the trailing
+vertices only start new DFS trees for those.
 
 ## 5. Data layout
 
@@ -315,13 +321,13 @@ unless `KeepGraph` is set.
 ```cpp
 namespace psr {
 
-enum class DfiIndexDirection : uint8_t { Forward, Backward };
+enum class DFIIndexDirection : uint8_t { Forward, Backward };
 enum class DfiQueryTargets : uint8_t { All, Interesting };
 
 struct DFISolverConfig {
   static constexpr bool AutoAddZero = true;
   static constexpr bool BuildQueryIndex = true;
-  static constexpr DfiIndexDirection IndexDirection = DfiIndexDirection::Forward;
+  static constexpr DFIIndexDirection IndexDirection = DFIIndexDirection::Forward;
   /// Interesting: rank only vertices at Problem.isInteresting(n) instructions
   static constexpr DfiQueryTargets QueryTargets = DfiQueryTargets::All;
   /// Keep the CSR of G* after solving (ESG export, witness paths)
@@ -376,10 +382,17 @@ public:
                              ByConstRef<N> ToInst, ByConstRef<D> ToFact) const;
 
   /// Facts at At that are reachable from From
-  void forEachReachableAt(DfiVertexRef From, ByConstRef<N> At,
-                          std::invocable<ByConstRef<D>> auto Handler) const;
-  void forEachReachable(DfiVertexRef From,
-                        std::invocable<ByConstRef<N>, ByConstRef<D>> auto Handler) const;
+  void forEachDescendantFactAt(DfiVertexRef From, ByConstRef<N> At,
+                               std::invocable<ByConstRef<D>> auto Handler) const;
+  /// Facts at At that reach To
+  void forEachAncestorFactAt(DfiVertexRef To, ByConstRef<N> At,
+                             std::invocable<ByConstRef<D>> auto Handler) const;
+  /// Contiguous for a forward index, full scan for a backward index
+  void forEachDescendant(DfiVertexRef From,
+                         std::invocable<ByConstRef<N>, ByConstRef<D>> auto Handler) const;
+  /// Contiguous for a backward index, full scan for a forward index
+  void forEachAncestor(DfiVertexRef To,
+                       std::invocable<ByConstRef<N>, ByConstRef<D>> auto Handler) const;
 };
 
 } // namespace psr
@@ -390,7 +403,7 @@ public:
 `containsNode`, `foreachResultEntry`. `resultsAt(n)` is a slice of
 `VerticesAt`; `resultAt(n, d)` is a binary search in it.
 
-`forEachReachableAt(From, At)` intersects `Pi(From)` with the rank-sorted
+`forEachDescendantFactAt(From, At)` intersects `Pi(From)` with the rank-sorted
 vertices at `At` (merge of two sorted lists), the typical taint query
 "which facts at sink `At` originate from source `From`".
 

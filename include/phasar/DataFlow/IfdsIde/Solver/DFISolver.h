@@ -19,6 +19,7 @@
 #include "phasar/DataFlow/IfdsIde/Solver/DFISolverResults.h"
 #include "phasar/DataFlow/IfdsIde/Solver/IDESolverAPIMixin.h"
 #include "phasar/Utils/ByRef.h"
+#include "phasar/Utils/CsrGraph.h"
 #include "phasar/Utils/FunctionId.h"
 #include "phasar/Utils/IntervalReachability.h"
 #include "phasar/Utils/IotaIterator.h"
@@ -365,12 +366,28 @@ private:
 
   // --- Results
 
+  /// Indexes the reversed supergraph. Its roots are the sinks of the
+  /// supergraph; all other vertices follow, as vertices on cycles without a
+  /// path to a sink are not reachable from any sink.
+  void buildBackwardIndex(IntervalReachabilityIndex<dfi::VertexId> &Out) {
+    auto Reversed = CsrGraph<dfi::VertexId>::reversed(Graph->buildSupergraph());
+    auto Roots = std::move(Reversed.Roots);
+    llvm::append_range(Roots, iota<dfi::VertexId>(Reversed.numVertices()));
+    IntervalReachabilityBuilder<dfi::VertexId>().build(Reversed, Roots, Out);
+  }
+
   void finalizeResults() {
     auto &R = *Results;
     if constexpr (StaticSolverConfigTy::BuildQueryIndex) {
       R.Index.emplace();
-      IntervalReachabilityBuilder<dfi::VertexId>().build(
-          Graph->buildSupergraph(), Graph->seeds(), *R.Index);
+      R.IndexDirection = StaticSolverConfigTy::IndexDirection;
+      if constexpr (StaticSolverConfigTy::IndexDirection ==
+                    DFIIndexDirection::Backward) {
+        buildBackwardIndex(*R.Index);
+      } else {
+        IntervalReachabilityBuilder<dfi::VertexId>().build(
+            Graph->buildSupergraph(), Graph->seeds(), *R.Index);
+      }
     }
 
     R.VtxInst = Graph->takeVertexInsts();

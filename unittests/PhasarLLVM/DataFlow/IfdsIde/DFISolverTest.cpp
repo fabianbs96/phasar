@@ -29,6 +29,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Value.h"
 
@@ -36,8 +37,11 @@
 #include "TestConfig.h"
 #include "gtest/gtest.h"
 
+#include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -212,32 +216,43 @@ protected:
   static constexpr auto PathToLlFiles =
       PHASAR_BUILD_SUBFOLDER("taint_analysis/dummy_source_sink/");
   static inline const std::vector<std::string> EntryPoints = {"main"};
+
+  /// Leaks are reported as side effects of the flow functions
+  template <typename DFIConfigTy>
+  static void checkSameLeaksAsIterativeIDESolver(const llvm::Twine &File) {
+    psr::HelperAnalyses HA(File, EntryPoints);
+    auto Config = psr::unittest::getDefaultConfig();
+
+    auto ExpectedProblem = psr::createAnalysisProblem<psr::IFDSTaintAnalysis>(
+        HA, &Config, EntryPoints);
+    psr::IterativeIDESolver ExpectedSolver(&ExpectedProblem, &HA.getICFG(),
+                                           psr::IFDSSolverConfig{});
+    auto ExpectedResults = ExpectedSolver.solve();
+
+    auto Problem = psr::createAnalysisProblem<psr::IFDSTaintAnalysis>(
+        HA, &Config, EntryPoints);
+    psr::DFISolver Solver(&Problem, &HA.getICFG(), DFIConfigTy{});
+    auto Results = Solver.solve();
+
+    EXPECT_EQ(ExpectedProblem.Leaks, Problem.Leaks)
+        << "Leaks differ:\n  Expected: "
+        << psr::PrettyPrinter{ExpectedProblem.Leaks}
+        << "\n  Got: " << psr::PrettyPrinter{Problem.Leaks};
+
+    compareResults(HA.getProjectIRDB(), ExpectedResults, Results);
+    checkReachableFromSeeds(HA.getProjectIRDB(), Problem, Results,
+                            Solver.getReachability());
+  }
 };
 
-/// Leaks are reported as side effects of the flow functions
 TEST_P(DFISolverTaintTest, SameLeaksAsIterativeIDESolver) {
-  psr::HelperAnalyses HA(PathToLlFiles + GetParam(), EntryPoints);
-  auto Config = psr::unittest::getDefaultConfig();
+  checkSameLeaksAsIterativeIDESolver<psr::DFISolverConfig>(PathToLlFiles +
+                                                           GetParam());
+}
 
-  auto ExpectedProblem = psr::createAnalysisProblem<psr::IFDSTaintAnalysis>(
-      HA, &Config, EntryPoints);
-  psr::IterativeIDESolver ExpectedSolver(&ExpectedProblem, &HA.getICFG(),
-                                         psr::IFDSSolverConfig{});
-  auto ExpectedResults = ExpectedSolver.solve();
-
-  auto Problem = psr::createAnalysisProblem<psr::IFDSTaintAnalysis>(
-      HA, &Config, EntryPoints);
-  psr::DFISolver Solver(&Problem, &HA.getICFG());
-  auto Results = Solver.solve();
-
-  EXPECT_EQ(ExpectedProblem.Leaks, Problem.Leaks)
-      << "Leaks differ:\n  Expected: "
-      << psr::PrettyPrinter{ExpectedProblem.Leaks}
-      << "\n  Got: " << psr::PrettyPrinter{Problem.Leaks};
-
-  compareResults(HA.getProjectIRDB(), ExpectedResults, Results);
-  checkReachableFromSeeds(HA.getProjectIRDB(), Problem, Results,
-                          Solver.getReachability());
+TEST_P(DFISolverTaintTest, SameLeaksAsIterativeIDESolverBackwardIndex) {
+  checkSameLeaksAsIterativeIDESolver<psr::DFISolverConfigBackward>(
+      PathToLlFiles + GetParam());
 }
 
 constexpr std::string_view TaintTestFiles[] = {
@@ -318,6 +333,151 @@ constexpr UnbalancedTestCase UnbalancedTestCases[] = {
 
 INSTANTIATE_TEST_SUITE_P(DFISolverUnbalancedTest, DFISolverUnbalancedTest,
                          ::testing::ValuesIn(UnbalancedTestCases));
+
+using NodeSet = std::set<std::pair<n_t, d_t>>;
+
+NodeSet allNodes(const psr::DFISolverResults<n_t, d_t> &Results) {
+  NodeSet Ret;
+  Results.foreachResultEntry([&Ret](const auto &Entry) {
+    Ret.emplace(std::get<0>(Entry), std::get<1>(Entry));
+  });
+  return Ret;
+}
+
+NodeSet descendants(const psr::DFIReachability<n_t, d_t> &Reach,
+                    psr::dfi::VertexId From) {
+  NodeSet Ret;
+  Reach.forEachDescendant(
+      From, [&Ret](n_t Inst, d_t Fact) { Ret.emplace(Inst, Fact); });
+  return Ret;
+}
+
+NodeSet ancestors(const psr::DFIReachability<n_t, d_t> &Reach,
+                  psr::dfi::VertexId To) {
+  NodeSet Ret;
+  Reach.forEachAncestor(
+      To, [&Ret](n_t Inst, d_t Fact) { Ret.emplace(Inst, Fact); });
+  return Ret;
+}
+
+/// int a = source(); sink(a);
+class DFISolverAPITest : public ::testing::Test {
+protected:
+  static constexpr auto PathToLlFiles =
+      PHASAR_BUILD_SUBFOLDER("taint_analysis/dummy_source_sink/");
+  static inline const std::vector<std::string> EntryPoints = {"main"};
+
+  DFISolverAPITest()
+      : HA(PathToLlFiles + "taint_01_cpp_dbg.ll", EntryPoints),
+        Problem(psr::createAnalysisProblem<psr::IFDSTaintAnalysis>(
+            HA, &Config, EntryPoints)) {}
+
+  [[nodiscard]] const llvm::CallBase *callTo(llvm::StringRef Callee) {
+    for (const auto *Inst : HA.getProjectIRDB().getAllInstructions()) {
+      const auto *Call = llvm::dyn_cast<llvm::CallBase>(Inst);
+      if (Call && Call->getCalledFunction() &&
+          Call->getCalledFunction()->getName() == Callee) {
+        return Call;
+      }
+    }
+    return nullptr;
+  }
+
+  psr::HelperAnalyses HA;
+  psr::LLVMTaintConfig Config = psr::unittest::getDefaultConfig();
+  psr::IFDSTaintAnalysis Problem;
+};
+
+TEST_F(DFISolverAPITest, ResultsAgreeWithIfdsResults) {
+  auto Results = psr::solveDFIProblem(Problem, HA.getICFG());
+  const auto *Zero = Problem.getZeroValue();
+
+  NodeSet ExpectedNodes;
+  size_t NumInstsWithResults = 0;
+  for (const auto *Inst : HA.getProjectIRDB().getAllInstructions()) {
+    auto Facts = Results.ifdsResultsAt(Inst);
+    EXPECT_EQ(!Facts.empty(), Results.containsNode(Inst));
+    NumInstsWithResults += !Facts.empty();
+
+    auto WithZero = Results.resultsAt(Inst);
+    auto WithoutZero = Results.resultsAt(Inst, /*StripZero*/ true);
+    EXPECT_EQ(WithZero.size(), Facts.size());
+    EXPECT_EQ(WithoutZero.size(), Facts.size() - Facts.count(Zero));
+    EXPECT_FALSE(WithoutZero.contains(Zero));
+
+    for (const auto *Fact : Facts) {
+      ExpectedNodes.emplace(Inst, Fact);
+      EXPECT_TRUE(WithZero.contains(Fact));
+      EXPECT_EQ(Results.resultAt(Inst, Fact), psr::BinaryDomain::BOTTOM);
+    }
+  }
+
+  EXPECT_EQ(Results.size(), NumInstsWithResults);
+  EXPECT_EQ(allNodes(Results), ExpectedNodes);
+  Results.foreachResultEntry([](const auto &Entry) {
+    EXPECT_EQ(std::get<2>(Entry), psr::BinaryDomain::BOTTOM);
+  });
+
+  const auto *SourceCall = callTo("_Z6sourcev");
+  ASSERT_NE(SourceCall, nullptr);
+  const auto *MainEntry = &SourceCall->getFunction()->getEntryBlock().front();
+  EXPECT_EQ(Results.resultAt(MainEntry, SourceCall), psr::BinaryDomain::TOP);
+}
+
+template <typename DFIConfigTy>
+class DFIReachabilityTest : public DFISolverAPITest {};
+
+using DFIIndexConfigs =
+    ::testing::Types<psr::DFISolverConfig, psr::DFISolverConfigBackward>;
+TYPED_TEST_SUITE(DFIReachabilityTest, DFIIndexConfigs);
+
+TYPED_TEST(DFIReachabilityTest, TaintFlowsFromSourceToSink) {
+  psr::DFISolver Solver(&this->Problem, &this->HA.getICFG(), TypeParam{});
+  auto Results = Solver.solve();
+  auto Reach = Solver.getReachability();
+  EXPECT_EQ(Reach.indexDirection(), TypeParam::IndexDirection);
+
+  const auto *SourceCall = this->callTo("_Z6sourcev");
+  const auto *SinkCall = this->callTo("_Z4sinki");
+  ASSERT_NE(SourceCall, nullptr);
+  ASSERT_NE(SinkCall, nullptr);
+  const auto *AfterSource = SourceCall->getNextNode();
+  const auto *Leaked = SinkCall->getArgOperand(0);
+  const auto *Zero = this->Problem.getZeroValue();
+
+  auto Source = Reach.find(AfterSource, SourceCall);
+  auto Sink = Reach.find(SinkCall, Leaked);
+  ASSERT_TRUE(Source.has_value());
+  ASSERT_TRUE(Sink.has_value());
+
+  EXPECT_TRUE(Reach.reaches(AfterSource, SourceCall, SinkCall, Leaked));
+  EXPECT_FALSE(Reach.reaches(SinkCall, Leaked, AfterSource, SourceCall));
+
+  std::set<d_t> DescendantsAtSink;
+  Reach.forEachDescendantFactAt(
+      *Source, SinkCall, [&](d_t Fact) { DescendantsAtSink.insert(Fact); });
+  EXPECT_TRUE(DescendantsAtSink.contains(Leaked));
+  EXPECT_FALSE(DescendantsAtSink.contains(Zero));
+
+  std::set<d_t> AncestorsAtSource;
+  Reach.forEachAncestorFactAt(
+      *Sink, AfterSource, [&](d_t Fact) { AncestorsAtSource.insert(Fact); });
+  EXPECT_TRUE(AncestorsAtSource.contains(SourceCall));
+  EXPECT_FALSE(AncestorsAtSource.contains(Zero));
+
+  NodeSet ExpectedDescendants;
+  NodeSet ExpectedAncestors;
+  for (const auto &[Inst, Fact] : allNodes(Results)) {
+    if (Reach.reaches(AfterSource, SourceCall, Inst, Fact)) {
+      ExpectedDescendants.emplace(Inst, Fact);
+    }
+    if (Reach.reaches(Inst, Fact, SinkCall, Leaked)) {
+      ExpectedAncestors.emplace(Inst, Fact);
+    }
+  }
+  EXPECT_EQ(descendants(Reach, *Source), ExpectedDescendants);
+  EXPECT_EQ(ancestors(Reach, *Sink), ExpectedAncestors);
+}
 
 } // namespace
 

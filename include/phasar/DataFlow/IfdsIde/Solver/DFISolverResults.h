@@ -9,10 +9,12 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
+#include "phasar/DataFlow/IfdsIde/Solver/DFISolverConfig.h"
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/Compressor.h"
 #include "phasar/Utils/IntervalReachability.h"
+#include "phasar/Utils/IotaIterator.h"
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/StrongTypeDef.h"
 #include "phasar/Utils/TypedVector.h"
@@ -53,6 +55,7 @@ template <typename N, typename D> struct DFIResultsData {
   llvm::SmallVector<dfi::VertexId, 0> VerticesAt;
 
   std::optional<IntervalReachabilityIndex<dfi::VertexId>> Index;
+  DFIIndexDirection IndexDirection = DFIIndexDirection::Forward;
 };
 
 template <typename Derived, typename N, typename D> class DFISolverResultsBase {
@@ -235,14 +238,20 @@ private:
 ///
 /// From reaches To iff there is a realizable path from From to To that may
 /// descend into callees, but does not return beyond the function of From.
-/// Every node reaches itself.
+/// Every node reaches itself. The nodes reachable from a node are its
+/// descendants, the nodes reaching it are its ancestors; both include the node
+/// itself.
+///
+/// Point queries cost O(log k) in both index directions. Enumerating the
+/// descendants (forward index) or ancestors (backward index) is linear in the
+/// output; the other enumeration scans all nodes.
 template <typename N, typename D> class DFIReachability {
 public:
   using n_t = N;
   using d_t = D;
 
   explicit DFIReachability(const detail::DFIResultsData<N, D> *Data) noexcept
-      : Results(Data), Index(&*Data->Index) {}
+      : Results(Data), Index(&*Data->Index), Direction(Data->IndexDirection) {}
 
   /// The node <Stmt, Fact>, if it has been materialized, i.e., if Fact holds
   /// at Stmt.
@@ -253,6 +262,9 @@ public:
 
   [[nodiscard]] bool reaches(dfi::VertexId From,
                              dfi::VertexId To) const noexcept {
+    if (Direction == DFIIndexDirection::Backward) {
+      return Index->reaches(To, From);
+    }
     return Index->reaches(From, To);
   }
 
@@ -265,22 +277,39 @@ public:
   }
 
   /// Calls Handler for each fact at At that is reachable from From
-  void forEachReachableAt(dfi::VertexId From, ByConstRef<n_t> At,
+  void
+  forEachDescendantFactAt(dfi::VertexId From, ByConstRef<n_t> At,
                           std::invocable<ByConstRef<d_t>> auto Handler) const {
     for (auto To : Results.verticesAt(At)) {
-      if (Index->reaches(From, To)) {
+      if (reaches(From, To)) {
         std::invoke(Handler, Results.factOf(To));
       }
     }
   }
 
+  /// Calls Handler for each fact at At that reaches To
+  void
+  forEachAncestorFactAt(dfi::VertexId To, ByConstRef<n_t> At,
+                        std::invocable<ByConstRef<d_t>> auto Handler) const {
+    for (auto From : Results.verticesAt(At)) {
+      if (reaches(From, To)) {
+        std::invoke(Handler, Results.factOf(From));
+      }
+    }
+  }
+
   /// Calls Handler for each node reachable from From
-  void forEachReachable(
+  void forEachDescendant(
       dfi::VertexId From,
       std::invocable<ByConstRef<n_t>, ByConstRef<d_t>> auto Handler) const {
-    Index->forEachReachableTarget(From, [&](dfi::VertexId To) {
-      std::invoke(Handler, Results.instOf(To), Results.factOf(To));
-    });
+    forEachRelated(From, DFIIndexDirection::Forward, Handler);
+  }
+
+  /// Calls Handler for each node that reaches To
+  void forEachAncestor(
+      dfi::VertexId To,
+      std::invocable<ByConstRef<n_t>, ByConstRef<d_t>> auto Handler) const {
+    forEachRelated(To, DFIIndexDirection::Backward, Handler);
   }
 
   [[nodiscard]] n_t instOf(dfi::VertexId Vtx) const {
@@ -295,9 +324,35 @@ public:
     return *Index;
   }
 
+  [[nodiscard]] DFIIndexDirection indexDirection() const noexcept {
+    return Direction;
+  }
+
 private:
+  /// Calls Handler for each node related to Vtx in direction Dir
+  void forEachRelated(
+      dfi::VertexId Vtx, DFIIndexDirection Dir,
+      std::invocable<ByConstRef<n_t>, ByConstRef<d_t>> auto &Handler) const {
+    const auto Report = [&](dfi::VertexId Related) {
+      std::invoke(Handler, Results.instOf(Related), Results.factOf(Related));
+    };
+
+    if (Dir == Direction) {
+      Index->forEachReachableTarget(Vtx, Report);
+      return;
+    }
+
+    // The index points the other way, so the related nodes are not contiguous
+    for (auto Other : iota<dfi::VertexId>(Index->numVertices())) {
+      if (Index->reaches(Other, Vtx)) {
+        Report(Other);
+      }
+    }
+  }
+
   DFISolverResults<N, D> Results;
   const IntervalReachabilityIndex<dfi::VertexId> *Index{};
+  DFIIndexDirection Direction{};
 };
 
 } // namespace psr
