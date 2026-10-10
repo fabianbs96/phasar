@@ -143,7 +143,7 @@ TEST(CsrGraphTest, Reversed) {
   EXPECT_EQ(Rev.succsOf(1_v), llvm::ArrayRef<VtxId>({0_v, 2_v}));
   EXPECT_TRUE(Rev.succsOf(2_v).empty());
   EXPECT_EQ(Rev.succsOf(3_v), llvm::ArrayRef<VtxId>({0_v}));
-  EXPECT_EQ(Rev.Roots, (llvm::SmallVector<VtxId, 1>{1_v, 3_v}));
+  EXPECT_EQ(Rev.roots(), (llvm::ArrayRef<VtxId>{1_v, 3_v}));
 }
 
 TEST(CsrGraphTest, AssignEdgesReusesGraph) {
@@ -158,8 +158,7 @@ TEST(CsrGraphTest, AssignEdgesReusesGraph) {
 
 TEST(IntervalReachabilityTest, Chain) {
   auto G = makeGraph(4, {{0_v, 1_v}, {1_v, 2_v}, {2_v, 3_v}});
-  Index Idx;
-  Builder().build(G, {0_v}, Idx);
+  Index Idx = Builder().build(G, {0_v});
 
   checkIndex(G, {0_v}, Idx);
   EXPECT_EQ(Idx.numSCCs(), 4U);
@@ -171,8 +170,7 @@ TEST(IntervalReachabilityTest, Chain) {
 TEST(IntervalReachabilityTest, SharedSuccessorIsNoFalsePositive) {
   // 1 and 2 both reach 3 via a tree- resp. cross-edge, but not each other
   auto G = makeGraph(4, {{0_v, 1_v}, {0_v, 2_v}, {1_v, 3_v}, {2_v, 3_v}});
-  Index Idx;
-  Builder().build(G, {0_v}, Idx);
+  Index Idx = Builder().build(G, {0_v});
 
   checkIndex(G, {0_v}, Idx);
   EXPECT_FALSE(Idx.reaches(1_v, 2_v));
@@ -182,8 +180,7 @@ TEST(IntervalReachabilityTest, SharedSuccessorIsNoFalsePositive) {
 
 TEST(IntervalReachabilityTest, Cycle) {
   auto G = makeGraph(5, {{0_v, 1_v}, {1_v, 2_v}, {2_v, 0_v}, {2_v, 3_v}});
-  Index Idx;
-  Builder().build(G, {1_v}, Idx);
+  Index Idx = Builder().build(G, {1_v});
 
   checkIndex(G, {1_v}, Idx);
   EXPECT_EQ(Idx.sccOf(0_v), Idx.sccOf(1_v));
@@ -195,8 +192,7 @@ TEST(IntervalReachabilityTest, Cycle) {
 
 TEST(IntervalReachabilityTest, SelfLoopAndMultiEdges) {
   auto G = makeGraph(3, {{0_v, 0_v}, {0_v, 1_v}, {0_v, 1_v}, {1_v, 2_v}});
-  Index Idx;
-  Builder().build(G, {0_v}, Idx);
+  Index Idx = Builder().build(G, {0_v});
 
   checkIndex(G, {0_v}, Idx);
 }
@@ -210,8 +206,7 @@ TEST(IntervalReachabilityTest, CrossEdgesIntoEarlierSubtrees) {
                          {3_v, 4_v},
                          {4_v, 1_v},
                          {4_v, 5_v}});
-  Index Idx;
-  Builder().build(G, {0_v}, Idx);
+  Index Idx = Builder().build(G, {0_v});
 
   checkIndex(G, {0_v}, Idx);
   EXPECT_TRUE(Idx.reaches(3_v, 1_v));
@@ -220,8 +215,7 @@ TEST(IntervalReachabilityTest, CrossEdgesIntoEarlierSubtrees) {
 
 TEST(IntervalReachabilityTest, MultipleRoots) {
   auto G = makeGraph(6, {{0_v, 1_v}, {2_v, 1_v}, {2_v, 3_v}, {4_v, 5_v}});
-  Index Idx;
-  Builder().build(G, {0_v, 2_v}, Idx);
+  Index Idx = Builder().build(G, {0_v, 2_v});
 
   checkIndex(G, {0_v, 2_v}, Idx);
   EXPECT_FALSE(Idx.isIndexed(4_v));
@@ -236,9 +230,8 @@ TEST(IntervalReachabilityTest, ProjectedTargets) {
   IsTarget.insert(2_v);
   IsTarget.insert(5_v);
 
-  Index Idx;
-  Builder().build(
-      G, {0_v}, [&](VtxId Vtx) { return IsTarget.contains(Vtx); }, Idx);
+  Index Idx = Builder().build(
+      G, {0_v}, [&](VtxId Vtx) { return IsTarget.contains(Vtx); });
 
   checkIndex(G, {0_v}, IsTarget, Idx);
   EXPECT_EQ(Idx.numTargets(), 2U);
@@ -248,8 +241,7 @@ TEST(IntervalReachabilityTest, ProjectedTargets) {
 
 TEST(IntervalReachabilityTest, EmptyGraph) {
   Graph G;
-  Index Idx;
-  Builder().build(G, {}, Idx);
+  Index Idx = Builder().build(G, {});
 
   EXPECT_EQ(Idx.numVertices(), 0U);
   EXPECT_EQ(Idx.numTargets(), 0U);
@@ -298,8 +290,8 @@ TEST(IntervalReachabilityTest, RandomGraphs) {
             IsTarget.insert(Vtx);
           }
         }
-        B.build(
-            G, Roots, [&](VtxId Vtx) { return IsTarget.contains(Vtx); }, Idx);
+        B.build(G, Roots, Idx,
+                [&](VtxId Vtx) { return IsTarget.contains(Vtx); });
         checkIndex(G, Roots, IsTarget, Idx);
 
         auto Rev = Graph::reversed(G);

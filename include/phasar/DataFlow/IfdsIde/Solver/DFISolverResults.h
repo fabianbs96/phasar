@@ -13,8 +13,10 @@
 #include "phasar/Domain/BinaryDomain.h"
 #include "phasar/Utils/ByRef.h"
 #include "phasar/Utils/Compressor.h"
+#include "phasar/Utils/CsrGraph.h"
 #include "phasar/Utils/IntervalReachability.h"
 #include "phasar/Utils/IotaIterator.h"
+#include "phasar/Utils/Macros.h"
 #include "phasar/Utils/Printer.h"
 #include "phasar/Utils/StrongTypeDef.h"
 #include "phasar/Utils/TypedVector.h"
@@ -161,10 +163,7 @@ public:
 
   [[nodiscard]] llvm::ArrayRef<dfi::VertexId>
   verticesAt(dfi::InstId Inst) const {
-    const auto &Data = data();
-    llvm::ArrayRef<uint32_t> Bounds(&Data.InstOffsets[Inst], 2);
-    return llvm::ArrayRef<dfi::VertexId>(Data.VerticesAt)
-        .slice(Bounds[0], Bounds[1] - Bounds[0]);
+    return csrSuccs(data().InstOffsets, data().VerticesAt, Inst);
   }
 
   [[nodiscard]] n_t instOf(dfi::VertexId Vtx) const {
@@ -184,12 +183,13 @@ private:
 /// Non-owning view into the results of a DFISolver. Conforms to the interface
 /// expected by GenericSolverResults.
 template <typename N, typename D>
-class DFISolverResults
+class [[gsl::Pointer]] DFISolverResults
     : public detail::DFISolverResultsBase<DFISolverResults<N, D>, N, D> {
   friend detail::DFISolverResultsBase<DFISolverResults<N, D>, N, D>;
 
 public:
-  explicit DFISolverResults(const detail::DFIResultsData<N, D> *Data) noexcept
+  explicit DFISolverResults(const detail::DFIResultsData<N, D> *Data
+                                PSR_LIFETIME_CAPTURE_BY(this)) noexcept
       : Data(Data) {
     assert(Data != nullptr);
   }

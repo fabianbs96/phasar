@@ -9,12 +9,14 @@
  *     Fabian Schiebel and others
  *****************************************************************************/
 
+#include "phasar/Utils/CsrGraph.h"
 #include "phasar/Utils/GraphTraits.h"
 #include "phasar/Utils/SCCGeneric.h"
 #include "phasar/Utils/SCCId.h"
 #include "phasar/Utils/StrongTypeDef.h"
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/TypedVector.h"
+#include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -55,15 +57,9 @@ template <SmallIdType VtxId> class IntervalReachabilityBuilder;
 
 /// Reachability index over a directed graph: answers whether a vertex reaches
 /// a target vertex in O(log k), where k is the number of rank intervals of the
-/// source (typically 1-3).
+/// source (usually small).
 ///
-/// Built by IntervalReachabilityBuilder from a set of roots: only vertices
-/// reachable from the roots are indexed. The targets are a subset of the
-/// indexed vertices, selected at build time; each target has a unique rank in
-/// [0, numTargets()). Every indexed vertex reaches itself.
-///
-/// The targets reachable from a vertex form a sorted list of disjoint rank
-/// intervals, see forEachReachableRange().
+/// Built by IntervalReachabilityBuilder
 template <SmallIdType VtxId> class IntervalReachabilityIndex {
   friend class IntervalReachabilityBuilder<VtxId>;
 
@@ -83,6 +79,7 @@ public:
     return SCCOf[Vtx] != NoSCC;
   }
 
+  // A sink node
   [[nodiscard]] bool isTarget(VtxId Vtx) const noexcept {
     return RankOf[Vtx] != ReachRank::None;
   }
@@ -178,9 +175,7 @@ public:
 private:
   [[nodiscard]] llvm::ArrayRef<RankInterval>
   extrasOf(SCCIdTy SCC) const noexcept {
-    llvm::ArrayRef<uint32_t> Bounds(&SetOffsets[SCCExtras[SCC]], 2);
-    return llvm::ArrayRef<RankInterval>(IntervalPool)
-        .slice(Bounds[0], Bounds[1] - Bounds[0]);
+    return csrSuccs(SetOffsets, IntervalPool, SCCExtras[SCC]);
   }
 
   void reset(size_t NumVertices) {
@@ -228,8 +223,14 @@ public:
   /// targets. The ranks are then DFS pre-order numbers.
   template <is_const_graph G>
     requires std::same_as<typename GraphTraits<G>::vertex_t, VtxId>
+  [[nodiscard]] IndexTy build(const G &Graph, llvm::ArrayRef<VtxId> Roots) {
+    return build(Graph, Roots, /*IsTarget=*/psr::TrueFn{});
+  }
+
+  template <is_const_graph G>
+    requires std::same_as<typename GraphTraits<G>::vertex_t, VtxId>
   void build(const G &Graph, llvm::ArrayRef<VtxId> Roots, IndexTy &Out) {
-    build(Graph, Roots, [](VtxId /*Vtx*/) { return true; }, Out);
+    build(Graph, Roots, Out, /*IsTarget=*/psr::TrueFn{});
   }
 
   /// Indexes all vertices of Graph reachable from Roots, only those
@@ -239,8 +240,8 @@ public:
   /// interval sets shrink accordingly.
   template <is_const_graph G>
     requires std::same_as<typename GraphTraits<G>::vertex_t, VtxId>
-  void build(const G &Graph, llvm::ArrayRef<VtxId> Roots,
-             std::predicate<VtxId> auto IsTarget, IndexTy &Out) {
+  void build(const G &Graph, llvm::ArrayRef<VtxId> Roots, IndexTy &Out,
+             std::predicate<VtxId> auto IsTarget) {
     auto NumVertices = GraphTraits<G>::size(Graph);
     Out.reset(NumVertices);
     SCCData.reset(NumVertices);
@@ -266,6 +267,17 @@ public:
     }
   }
 
+  /// Indexes all vertices of Graph reachable from Roots, only those
+  /// satisfying IsTarget as targets.
+  template <is_const_graph G>
+    requires std::same_as<typename GraphTraits<G>::vertex_t, VtxId>
+  [[nodiscard]] IndexTy build(const G &Graph, llvm::ArrayRef<VtxId> Roots,
+                              std::predicate<VtxId> auto IsTarget) {
+    IndexTy Out{};
+    build(Graph, Roots, Out, copyOrRef(IsTarget));
+    return Out;
+  }
+
 private:
   template <typename G>
   void completeSCC(const G &Graph, SCCIdTy SCC, llvm::ArrayRef<VtxId> Members,
@@ -274,8 +286,10 @@ private:
 
     // Members.back() is the root of the SCC in the DFS tree. Its subtree is
     // completely discovered.
-    RankInterval Range{RankBegin[Members.back()],
-                       ReachRank(Out.RankToVertex.size())};
+    auto Range = RankInterval{
+        .Lo = RankBegin[Members.back()],
+        .Hi = ReachRank(Out.RankToVertex.size()),
+    };
 
     for (auto Member : Members) {
       Out.SCCOf[Member] = SCC;
@@ -349,9 +363,9 @@ private:
       }
     }
 
-    std::sort(
-        Candidates.begin(), Candidates.end(),
-        [](RankInterval Lhs, RankInterval Rhs) { return Lhs.Lo < Rhs.Lo; });
+    llvm::sort(Candidates, [](RankInterval Lhs, RankInterval Rhs) {
+      return Lhs.Lo < Rhs.Lo;
+    });
 
     auto Ret = IntervalSetId(Out.SetOffsets.size() - 1);
     for (auto Interval : Candidates) {

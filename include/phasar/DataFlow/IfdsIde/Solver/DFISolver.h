@@ -23,6 +23,7 @@
 #include "phasar/Utils/FunctionId.h"
 #include "phasar/Utils/IntervalReachability.h"
 #include "phasar/Utils/IotaIterator.h"
+#include "phasar/Utils/Lazy.h"
 #include "phasar/Utils/Utilities.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -31,7 +32,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
-#include <cstdint>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -311,9 +311,8 @@ private:
     for (const auto &Callee : Callees) {
       auto &Info = CalleeInfos.emplace_back();
       Info.Callee = Funs.get(Callee);
-      FlowFunctionPtrType SummaryFF =
-          Problem->getSummaryFlowFunction(CallSite, Callee);
-      if (SummaryFF) {
+
+      if (auto SummaryFF = Problem->getSummaryFlowFunction(CallSite, Callee)) {
         Info.FF = std::move(SummaryFF);
         Info.IsSummaryFF = true;
         continue;
@@ -369,25 +368,26 @@ private:
   /// Indexes the reversed supergraph. Its roots are the sinks of the
   /// supergraph; all other vertices follow, as vertices on cycles without a
   /// path to a sink are not reachable from any sink.
-  void buildBackwardIndex(IntervalReachabilityIndex<dfi::VertexId> &Out) {
+  [[nodiscard]] IntervalReachabilityIndex<dfi::VertexId> buildBackwardIndex() {
     auto Reversed = CsrGraph<dfi::VertexId>::reversed(Graph->buildSupergraph());
-    auto Roots = std::move(Reversed.Roots);
+    auto Roots = std::move(Reversed).roots();
     llvm::append_range(Roots, iota<dfi::VertexId>(Reversed.numVertices()));
-    IntervalReachabilityBuilder<dfi::VertexId>().build(Reversed, Roots, Out);
+    return IntervalReachabilityBuilder<dfi::VertexId>().build(Reversed, Roots);
   }
 
   void finalizeResults() {
     auto &R = *Results;
     if constexpr (StaticSolverConfigTy::BuildQueryIndex) {
-      R.Index.emplace();
       R.IndexDirection = StaticSolverConfigTy::IndexDirection;
-      if constexpr (StaticSolverConfigTy::IndexDirection ==
-                    DFIIndexDirection::Backward) {
-        buildBackwardIndex(*R.Index);
-      } else {
-        IntervalReachabilityBuilder<dfi::VertexId>().build(
-            Graph->buildSupergraph(), Graph->seeds(), *R.Index);
-      }
+      R.Index.emplace(lazy{[&] {
+        if constexpr (StaticSolverConfigTy::IndexDirection ==
+                      DFIIndexDirection::Backward) {
+          return buildBackwardIndex();
+        } else {
+          return IntervalReachabilityBuilder<dfi::VertexId>().build(
+              Graph->buildSupergraph(), Graph->seeds());
+        }
+      }});
     }
 
     R.VtxInst = Graph->takeVertexInsts();
@@ -405,9 +405,7 @@ private:
       R.VerticesAt[--R.InstOffsets[R.VtxInst[Vtx]]] = Vtx;
     }
     for (auto Inst : iota<dfi::InstId>(R.Insts.size())) {
-      llvm::ArrayRef<uint32_t> Bounds(&R.InstOffsets[Inst], 2);
-      auto Vertices = llvm::MutableArrayRef<dfi::VertexId>(R.VerticesAt)
-                          .slice(Bounds[0], Bounds[1] - Bounds[0]);
+      auto Vertices = csrSuccsMut(R.InstOffsets, R.VerticesAt, Inst);
       llvm::sort(Vertices, [&R](dfi::VertexId Lhs, dfi::VertexId Rhs) {
         return R.VtxFact[Lhs] < R.VtxFact[Rhs];
       });

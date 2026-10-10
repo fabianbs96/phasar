@@ -82,6 +82,8 @@ public:
   /// addEdge() for each target, then endEdges(Vtx). Vtx must not be expanded
   /// before. Creating vertices in between is fine.
   void beginEdges(dfi::VertexId Vtx) {
+    assert(VtxEdgeBegin[Vtx] == UINT32_MAX &&
+           "beginEdges() called before for Vtx!");
     VtxEdgeBegin[Vtx] = uint32_t(Edges.size());
   }
   void addEdge(dfi::VertexId Target) { Edges.push_back(Target); }
@@ -213,9 +215,9 @@ private:
 
   [[nodiscard]] llvm::ArrayRef<dfi::VertexId>
   edgesOf(dfi::VertexId Vtx) const noexcept {
-    auto Begin = VtxEdgeBegin[Vtx];
-    return llvm::ArrayRef<dfi::VertexId>(Edges).slice(Begin,
-                                                      VtxEdgeEnd[Vtx] - Begin);
+    auto Start = VtxEdgeBegin[Vtx];
+    auto End = VtxEdgeEnd[Vtx];
+    return llvm::ArrayRef(Edges).slice(Start, End - Start);
   }
 
   SCCHolder<FunctionId> CGSCCs;

@@ -59,7 +59,7 @@ psr::dfi::VertexId DFIExplodedSupergraph::getOrCreateVertex(dfi::InstId Inst,
   VtxFact.push_back(Fact);
   VtxFun.push_back(Fun);
   VtxLocalId.push_back(dfi::LocalVertexId(FS.Vertices.size()));
-  VtxEdgeBegin.push_back(0);
+  VtxEdgeBegin.push_back(UINT32_MAX);
   VtxEdgeEnd.push_back(0);
   FS.Vertices.push_back(Vtx);
   if (IsExitVtx) {
@@ -150,9 +150,9 @@ DFIExplodedSupergraph::buildSupergraph() const {
     }
   }
   for (const auto &FS : FunState) {
-    GraphEdges.append(FS.SummaryEdges.begin(), FS.SummaryEdges.end());
+    GraphEdges.append(FS.SummaryEdges);
   }
-  GraphEdges.append(CallEdges.begin(), CallEdges.end());
+  GraphEdges.append(CallEdges);
   GraphEdges.append(UnbalancedReturnEdges.begin(), UnbalancedReturnEdges.end());
   return CsrGraph<dfi::VertexId>::fromEdges(numVertices(), GraphEdges);
 }
@@ -205,12 +205,11 @@ void DFIExplodedSupergraph::indexFunction(FunctionId Fun) {
     LocalRoots.push_back(VtxLocalId[Root]);
   }
 
-  LocalBuilder.build(
-      LocalGraph, LocalRoots,
-      [this, &FS](dfi::LocalVertexId Local) {
-        return IsExit.contains(FS.Vertices[Local]);
-      },
-      LocalIndex);
+  // Use out-variable to enable memory-reuse
+  LocalBuilder.build(LocalGraph, LocalRoots, LocalIndex,
+                     [this, &FS](dfi::LocalVertexId Local) {
+                       return IsExit.contains(FS.Vertices[Local]);
+                     });
 }
 
 void DFIExplodedSupergraph::collectNewExits(

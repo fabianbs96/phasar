@@ -13,6 +13,7 @@
 #include "phasar/Utils/GraphTraits.h"
 #include "phasar/Utils/IotaIterator.h"
 #include "phasar/Utils/RepeatIterator.h"
+#include "phasar/Utils/StrongTypeDef.h"
 #include "phasar/Utils/TypeTraits.h"
 #include "phasar/Utils/TypedVector.h"
 
@@ -27,19 +28,39 @@
 
 namespace psr {
 
+template <IdType IndexId, typename VtxId>
+[[nodiscard]] inline llvm::ArrayRef<VtxId>
+csrSuccs(const TypedVector<IndexId, uint32_t> &Offsets,
+         const llvm::SmallVectorImpl<VtxId> &Targets, IndexId Vtx) {
+  auto Start = Offsets[Vtx];
+  auto End = Offsets[nextId(Vtx)];
+  return llvm::ArrayRef(Targets).slice(Start, End - Start);
+}
+
+template <IdType IndexId, typename VtxId>
+[[nodiscard]] inline llvm::MutableArrayRef<VtxId>
+csrSuccsMut(const TypedVector<IndexId, uint32_t> &Offsets,
+            llvm::SmallVectorImpl<VtxId> &Targets, IndexId Vtx) {
+  auto Start = Offsets[Vtx];
+  auto End = Offsets[nextId(Vtx)];
+  return llvm::MutableArrayRef(Targets).slice(Start, End - Start);
+}
+
 /// Immutable directed graph in compressed-sparse-row format: the successors of
 /// vertex V are Targets[Offsets[V] .. Offsets[V+1]).
 ///
 /// Build it with fromEdges() or assignEdges(). assignEdges() reuses the
 /// allocated storage, so a single CsrGraph object can serve as buffer for many
 /// short-lived graphs.
-template <IdType VtxId> struct CsrGraph {
+template <IdType VtxId> class CsrGraph {
+public:
   /// Builds the graph from (Source, Target) pairs. The successors of each
   /// vertex keep the relative order of Edges.
   [[nodiscard]] static CsrGraph
-  fromEdges(size_t NumVertices, llvm::ArrayRef<std::pair<VtxId, VtxId>> Edges) {
+  fromEdges(size_t NumVertices, llvm::ArrayRef<std::pair<VtxId, VtxId>> Edges,
+            llvm::ArrayRef<VtxId> RootVtxs = {}) {
     CsrGraph Ret;
-    Ret.assignEdges(NumVertices, Edges);
+    Ret.assignEdges(NumVertices, Edges, RootVtxs);
     return Ret;
   }
 
@@ -66,14 +87,15 @@ template <IdType VtxId> struct CsrGraph {
   /// Replaces the contents of this graph by NumVertices vertices and the
   /// given (Source, Target) edges. Clears the roots.
   void assignEdges(size_t NumVertices,
-                   llvm::ArrayRef<std::pair<VtxId, VtxId>> Edges) {
+                   llvm::ArrayRef<std::pair<VtxId, VtxId>> Edges,
+                   llvm::ArrayRef<VtxId> RootVtxs = {}) {
     countEdges(NumVertices, llvm::make_first_range(Edges));
     Targets.resize_for_overwrite(Edges.size());
     for (auto [From, To] : llvm::reverse(Edges)) {
       assert(size_t(To) < NumVertices);
       Targets[--Offsets[From]] = To;
     }
-    Roots.clear();
+    Roots.assign(RootVtxs.begin(), RootVtxs.end());
   }
 
   [[nodiscard]] size_t numVertices() const noexcept {
@@ -84,12 +106,13 @@ template <IdType VtxId> struct CsrGraph {
   [[nodiscard]] size_t numEdges() const noexcept { return Targets.size(); }
 
   [[nodiscard]] llvm::ArrayRef<VtxId> succsOf(VtxId Vtx) const noexcept {
-    assert(size_t(Vtx) < numVertices());
-    llvm::ArrayRef<uint32_t> Bounds(&Offsets[Vtx], 2);
-    return llvm::ArrayRef<VtxId>(Targets).slice(Bounds[0],
-                                                Bounds[1] - Bounds[0]);
+    return csrSuccs(Offsets, Targets, Vtx);
   }
 
+  [[nodiscard]] llvm::ArrayRef<VtxId> roots() const & noexcept { return Roots; }
+  [[nodiscard]] auto roots() && noexcept { return Roots; }
+
+private:
   /// Sets Offsets[V] to the end of the successors of V. Inserting the edges
   /// at --Offsets[From] in reverse order then leaves Offsets[V] at the begin.
   void countEdges(size_t NumVertices, auto &&Sources) {
@@ -130,7 +153,7 @@ template <IdType VtxId> struct GraphTraits<CsrGraph<VtxId>> {
 
   [[nodiscard]] static llvm::ArrayRef<vertex_t>
   roots(const graph_type &G) noexcept {
-    return G.Roots;
+    return G.roots();
   }
 
   [[nodiscard]] static auto vertices(const graph_type &G) noexcept {
@@ -148,7 +171,7 @@ template <IdType VtxId> struct GraphTraits<CsrGraph<VtxId>> {
 
   [[nodiscard]] static size_t
   roots_size(const graph_type &G) noexcept { // NOLINT
-    return G.Roots.size();
+    return G.roots().size();
   }
 
   [[nodiscard]] static constexpr vertex_t target(edge_t Edge) noexcept {
