@@ -44,6 +44,8 @@ public:
   void addTaintCategory(const llvm::Value *Val, llvm::StringRef AnnotationStr);
   void addTaintCategory(const llvm::Value *Val, TaintCategory Annotation);
 
+  bool isAnnotatedFunction(const llvm::Function *Func) const;
+
 private:
   [[nodiscard]] bool isSourceImpl(const llvm::Value *V) const;
   [[nodiscard]] bool isSinkImpl(const llvm::Value *V) const;
@@ -100,6 +102,8 @@ private:
                        const TaintConfigData &Config);
 
   // --- data members
+
+  std::map<const llvm::Function *, TaintCategory> AnnotatedValues;
 
   std::unordered_set<const llvm::Value *> SourceValues;
   std::unordered_set<const llvm::Value *> SinkValues;

@@ -61,14 +61,21 @@ void collectGeneratedFacts(ContainerTy &Dest, const LLVMTaintConfig &Config,
   }
 
   if (Config.isSource(CB)) {
+    llvm::outs() << "Dest.insert(CB)\n";
     Dest.insert(CB);
   }
 
   if (!Callee) {
     return;
   }
+
+  if (Config.isAnnotatedFunction(Callee)) {
+    Dest.insert(CB);
+  }
+
   for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
     if (Config.isSource(Callee->getArg(I))) {
+      llvm::outs() << "Dest.insert(CB->getArgOperand(I))\n";
       Dest.insert(CB->getArgOperand(I));
     }
   }
