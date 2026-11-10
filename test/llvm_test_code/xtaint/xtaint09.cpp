@@ -26,7 +26,7 @@ int main() {
 // ifds-fieldsens-taint: /xtaint/xtaint09.cpp:16:3:
 
 // RUN: %phasar-cli --data-flow-analysis=monoifds-taint --module %llvm_test_code/xtaint/xtaint09_cpp_dbg.ll | FileCheck %s -check-prefix=monoifds-taint
-// monoifds-taint: No leaks found!
+// monoifds-taint: /xtaint/xtaint09.cpp:16:3:
 
 // RUN: %phasar-cli --data-flow-analysis=sparse-ifds-taint --module %llvm_test_code/xtaint/xtaint09_cpp_dbg.ll | FileCheck %s -check-prefix=sparse-ifds-taint
 // sparse-ifds-taint: /xtaint/xtaint09.cpp:16:3:

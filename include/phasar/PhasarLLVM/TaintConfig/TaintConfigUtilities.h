@@ -42,6 +42,11 @@ void forallGeneratedFacts(
   if (!Callee) {
     return;
   }
+
+  if (Config.isAnnotatedFunction(Callee)) {
+    std::invoke(WithGenFact, CB);
+  }
+
   for (unsigned I = 0, End = Callee->arg_size(); I < End; ++I) {
     if (Config.isSource(Callee->getArg(I))) {
       std::invoke(WithGenFact, CB->getArgOperand(I));
